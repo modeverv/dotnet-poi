@@ -23,6 +23,26 @@ public class XWPFDocumentTests
     }
 
     [Fact]
+    public void Write_AnyDocument_AlwaysIncludesSettingsAndRels()
+    {
+        using var doc = new XWPFDocument();
+        doc.createParagraph().createRun().setText("hello");
+
+        using var stream = new MemoryStream();
+        doc.write(stream);
+
+        stream.Position = 0;
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        Assert.NotNull(archive.GetEntry("word/settings.xml"));
+        Assert.NotNull(archive.GetEntry("word/_rels/document.xml.rels"));
+        var rels = ReadEntry(archive, "word/_rels/document.xml.rels");
+        Assert.Contains("rId1", rels);
+        Assert.Contains("settings.xml", rels);
+        var ct = ReadEntry(archive, "[Content_Types].xml");
+        Assert.Contains("wordprocessingml.settings", ct);
+    }
+
+    [Fact]
     public void Write_SimpleParagraph_TextAppearsInDocumentXml()
     {
         using var doc = new XWPFDocument();
@@ -55,8 +75,9 @@ public class XWPFDocumentTests
         stream.Position = 0;
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
         var xml = ReadEntry(archive, "word/document.xml");
-        Assert.Contains("<w:b/>", xml);
-        Assert.Contains("<w:i/>", xml);
+        // POI writes w:val="on" explicitly — we match this format
+        Assert.Contains("<w:b w:val=\"on\"/>", xml);
+        Assert.Contains("<w:i w:val=\"on\"/>", xml);
         Assert.Contains("<w:rPr>", xml);
     }
 
@@ -80,13 +101,15 @@ public class XWPFDocumentTests
         Assert.NotNull(archive.GetEntry("word/_rels/document.xml.rels"));
 
         var rels = ReadEntry(archive, "word/_rels/document.xml.rels");
+        Assert.Contains("Target=\"settings.xml\"", rels);
         Assert.Contains("Target=\"media/image1.jpeg\"", rels);
         Assert.Contains("Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\"", rels);
 
         var xml = ReadEntry(archive, "word/document.xml");
         Assert.Contains("<w:drawing>", xml);
         Assert.Contains("<wp:inline", xml);
-        Assert.Contains("r:embed=\"rId1\"", xml);
+        // rId1 = settings.xml; image starts at rId2
+        Assert.Contains("r:embed=\"rId2\"", xml);
     }
 
     [Fact]

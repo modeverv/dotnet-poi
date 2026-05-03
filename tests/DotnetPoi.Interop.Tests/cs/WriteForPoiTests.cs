@@ -1,4 +1,5 @@
 using DotnetPoi.SS.UserModel;
+using DotnetPoi.XSLF.UserModel;
 using DotnetPoi.XSSF.UserModel;
 using DotnetPoi.XWPF.UserModel;
 using Xunit;
@@ -158,6 +159,27 @@ public class WriteForPoiTests
 
         using var stream = File.Create(fixturePath);
         doc.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_PptxWithPictureAndRotation_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase3_3-pptx.pptx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var prs = new XMLSlideShow();
+        var slide = prs.createSlide();
+        var picIdx = prs.addPicture(LoadTestImage(), XSLFPictureData.PICTURE_TYPE_JPEG);
+        var shape = prs.createPicture(slide, picIdx);
+        shape.setAnchor(0, 0, XMLSlideShow.DefaultSlideCx, XMLSlideShow.DefaultSlideCy);
+        shape.setRotation(90.0);
+
+        using var stream = File.Create(fixturePath);
+        prs.write(stream);
 
         Assert.True(File.Exists(fixturePath));
         Assert.True(new FileInfo(fixturePath).Length > 0);

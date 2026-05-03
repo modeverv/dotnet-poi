@@ -18,15 +18,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="../../../src/DotnetPoi.XSSF/DotnetPoi.XSSF.csproj" />
-        <ProjectReference Include="../../../src/DotnetPoi.HSSF/DotnetPoi.HSSF.csproj" />
-        <ProjectReference Include="../../../src/DotnetPoi.XWPF/DotnetPoi.XWPF.csproj" />
-        <ProjectReference Include="../../../src/DotnetPoi.XSLF/DotnetPoi.XSLF.csproj" />
+        <ProjectReference Include="../../src/DotnetPoi.XSLF/DotnetPoi.XSLF.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="../../../tests/image.jpg" CopyToOutputDirectory="PreserveNewest" Link="image.jpg" />
+        <Content Include="../../tests/image.jpg" CopyToOutputDirectory="PreserveNewest" Link="image.jpg" />
     </ItemGroup>
 
 </Project>
-

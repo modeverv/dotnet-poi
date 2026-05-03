@@ -14,6 +14,12 @@ public sealed class XWPFDocument : IDisposable
     private const string NsA = "http://schemas.openxmlformats.org/drawingml/2006/main";
     private const string NsPic = "http://schemas.openxmlformats.org/drawingml/2006/picture";
 
+    private const string RelTypeSettings = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings";
+    private const string ContentTypeSettings = "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml";
+
+    // rId1 is always reserved for settings.xml; image rIds start at rId{Index + 1}.
+    private const int ImageRelIdOffset = 1;
+
     private readonly List<XWPFParagraph> _paragraphs = new();
     private readonly List<XWPFPictureData> _pictures = new();
     private long _nextDrawingId = 1;
@@ -52,10 +58,8 @@ public sealed class XWPFDocument : IDisposable
         WriteEntry(archive, "[Content_Types].xml", WriteContentTypes);
         WriteEntry(archive, "_rels/.rels", WriteRootRelationships);
         WriteEntry(archive, "word/document.xml", WriteDocument);
-        if (_pictures.Count > 0)
-        {
-            WriteEntry(archive, "word/_rels/document.xml.rels", WriteDocumentRelationships);
-        }
+        WriteEntry(archive, "word/_rels/document.xml.rels", WriteDocumentRelationships);
+        WriteEntry(archive, "word/settings.xml", WriteSettings);
         foreach (var pic in _pictures)
         {
             WriteBinaryEntry(archive, $"word/media/{pic.getFileName()}", pic.Data);
@@ -322,6 +326,7 @@ public sealed class XWPFDocument : IDisposable
         WriteDefault(writer, "xml", "application/xml");
         WriteOverride(writer, "/word/document.xml",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml");
+        WriteOverride(writer, "/word/settings.xml", ContentTypeSettings);
         writer.WriteEndElement();
     }
 
@@ -340,11 +345,21 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("Relationships");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
+        // rId1 is always settings; images use rId{Index + ImageRelIdOffset}
+        WriteRelationship(writer, "rId1", "settings.xml", RelTypeSettings);
         foreach (var pic in _pictures)
         {
-            WriteRelationship(writer, $"rId{pic.Index}", $"media/{pic.getFileName()}",
+            WriteRelationship(writer, $"rId{pic.Index + ImageRelIdOffset}", $"media/{pic.getFileName()}",
                 "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image");
         }
+        writer.WriteEndElement();
+    }
+
+    private static void WriteSettings(PoiXmlWriter writer)
+    {
+        writer.WriteStartDocument("UTF-8", standalone: true);
+        writer.WriteStartElement("w", "settings");
+        writer.WriteAttributeString("xmlns:w", NsW);
         writer.WriteEndElement();
     }
 
@@ -392,11 +407,13 @@ public sealed class XWPFDocument : IDisposable
                 if (run.Bold)
                 {
                     writer.WriteStartElement("w", "b");
+                    writer.WriteAttributeString("w", "val", "on");
                     writer.WriteEndElement();
                 }
                 if (run.Italic)
                 {
                     writer.WriteStartElement("w", "i");
+                    writer.WriteAttributeString("w", "val", "on");
                     writer.WriteEndElement();
                 }
                 writer.WriteEndElement(); // rPr

@@ -91,3 +91,57 @@ The workbook uses:
 - `XSSFCreationHelper.createClientAnchor()`
 - `XSSFSheet.createDrawingPatriarch()`
 - `XSSFDrawing.createPicture(...)`
+
+## Phase32DocxExample
+
+Generates a `.docx` file using the Phase 3.2 XWPF API, then reads it back to assert the content:
+
+```bash
+dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase3_2-docx-example.docx
+```
+
+The document demonstrates:
+
+- `XWPFDocument.createParagraph()`
+- `XWPFParagraph.createRun()`
+- `XWPFRun.setText()`, `setBold()`, `setItalic()`
+- `XWPFRun.addPicture()` — inline JPEG with rotation
+- `XWPFDocument.write(Stream)`
+- Round-trip read back via `XWPFDocument(Stream)`
+
+## Phase33PptxExample
+
+Creates a three-slide `.pptx` file using the Phase 3.3 XSLF API, then reads it back to assert all properties:
+
+```bash
+dotnet run --project examples/Phase33PptxExample/Phase33PptxExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase3_3-pptx-example.pptx
+```
+
+The presentation demonstrates:
+
+- `XMLSlideShow.createSlide()`
+- `XMLSlideShow.addPicture()` — JPEG format, deduplicated across slides
+- `XMLSlideShow.createPicture()` — places a picture shape on a slide
+- `XSLFPictureShape.setAnchor()` — position and size in EMU
+- `XSLFPictureShape.setRotation()` — rotation in degrees (normalised to [0°, 360°))
+- `XSLFPictureShape.setFlipHorizontal()` — horizontal flip
+- `XMLSlideShow.write(Stream)`
+- Round-trip read back via `XMLSlideShow(Stream)`
+
+Requires `tests/image.jpg` (present in the repository).
+
+Slide 1: photo filling the entire slide at 0° rotation.  
+Slide 2: same photo at 3×2.25 inch, 45° rotation, horizontal flip.  
+Slide 3: same photo at 3×2.25 inch, 90° rotation.

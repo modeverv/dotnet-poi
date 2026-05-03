@@ -9,7 +9,22 @@
       "Bash(dotnet nuget list *)",
       "Bash(dotnet nuget *)",
       "Bash(dotnet run *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(dotnet sln *)",
+      "Read(//private/tmp/**)",
+      "Bash(cp /Users/seijiro/Sync/sync_work/me/dotnet-poi/tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase3_3-pptx.pptx .)",
+      "Bash(unzip -o phase3_3-pptx.pptx -d phase3_3_extracted/)",
+      "Bash(mvn -q exec:java -f /Users/seijiro/Sync/sync_work/me/dotnet-poi/tests/DotnetPoi.Interop.Tests/java/pom.xml -Dexec.mainClass=\"ignore\")",
+      "Bash(java -cp .:__TRACKED_VAR__ tmp.GeneratePoi /Users/seijiro/Sync/sync_work/me/dotnet-poi/tests/image.jpg /tmp/poi_reference.pptx)",
+      "Bash(unzip -o poi_reference.pptx -d poi_ref_extracted/)",
+      "Bash(unzip -o /Users/seijiro/Sync/sync_work/me/dotnet-poi/examples/output/phase3_3-pptx-example.pptx -d new_pptx/)",
+      "Bash(unzip -o poi_reference.docx -d poi_docx/)",
+      "Bash(unzip -o /Users/seijiro/Sync/sync_work/me/dotnet-poi/examples/output/phase3_2-docx-example.docx -d our_docx/)",
+      "Bash(unzip -o /Users/seijiro/Sync/sync_work/me/dotnet-poi/examples/output/phase3_2-docx-example.docx -d fixed_docx/)",
+      "Bash(unzip -o /Users/seijiro/Sync/sync_work/me/dotnet-poi/tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase0-basic.xlsx -d our_xlsx/)",
+      "Bash(unzip -o poi_reference.xlsx -d poi_xlsx/)",
+      "Bash(unzip -p /Users/seijiro/Sync/sync_work/me/dotnet-poi/tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase0-basic.xlsx xl/workbook.xml)",
+      "Bash(unzip *)"
     ]
   }
 }

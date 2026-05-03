@@ -45,7 +45,8 @@ public sealed class XWPFRun
         ArgumentNullException.ThrowIfNull(pictureData);
         var doc = _paragraph.Document;
         var data = doc.AddPictureData(pictureData, pictureType);
-        var relationId = $"rId{data.Index}";
+        // rId1 is reserved for settings.xml; images start at rId2 = rId{Index + 1}
+        var relationId = $"rId{data.Index + 1}";
         var drawingId = doc.ReserveDrawingId();
         var picture = new XWPFPicture(data, filename, width, height, relationId, drawingId);
         _pictures.Add(picture);

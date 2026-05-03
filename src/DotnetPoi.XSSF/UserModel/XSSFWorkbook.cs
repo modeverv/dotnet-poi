@@ -1250,6 +1250,11 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteStartElement("workbookPr");
         writer.WriteAttributeString("date1904", "false");
         writer.WriteEndElement();
+        writer.WriteStartElement("bookViews");
+        writer.WriteStartElement("workbookView");
+        writer.WriteAttributeString("activeTab", "0");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
         writer.WriteStartElement("sheets");
         foreach (var sheet in _sheets)
         {

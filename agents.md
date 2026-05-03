@@ -237,7 +237,9 @@ Goal: `v0.4`. `IWorkbook` / `ISheet` / `IRow` / `ICell`.
 
 ### Phase 3.2.1 docxの画像の埋め込み、回転の動作
 
-### Phase 3.3 agile 暗号化
+### Phase 3.3 pptxの対応,pptxの画像の埋め込み、回転の動作
+
+### Phase 3.4 agile 暗号化
 
 
 
@@ -677,7 +679,14 @@ Phase 3 の前には、共通インターフェースの形に影響する Phase
 
 ### phase 3.3 pptxの対応,pptxの画像の埋め込み、回転の動作
 
-### Phase 3.3 agile 暗号化
+#### 実装済み
+- `src/DotnetPoi.XSLF/UserModel/XMLSlideShow.cs` — PPTX 書き出し・読み込み
+- `src/DotnetPoi.XSLF/UserModel/XSLFSlide.cs` — スライド
+- `src/DotnetPoi.XSLF/UserModel/XSLFPictureData.cs` — 画像データ
+- `src/DotnetPoi.XSLF/UserModel/XSLFPictureShape.cs` — 画像シェイプ（アンカー・回転・フリップ）
+- `tests/DotnetPoi.XSLF.Tests/UserModel/XMLSlideShowTests.cs` — 18テスト全パス
+
+### Phase 3.3.5 agile 暗号化
 
 ### Phase 4 — POIFS + HSSF（xls 対応）
 

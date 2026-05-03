@@ -15,6 +15,10 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.PictureData;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xslf.usermodel.XMLSlideShow;
+import org.apache.poi.xslf.usermodel.XSLFPictureShape;
+import org.apache.poi.xslf.usermodel.XSLFShape;
+import org.apache.poi.xslf.usermodel.XSLFSlide;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -156,6 +160,32 @@ public class ReadFromDotnetTest {
             // 90° = 5 400 000 in OOXML 60000ths-of-a-degree units
             int rot = pic.getCTPicture().getSpPr().getXfrm().getRot();
             assertEquals(5400000, rot);
+        }
+    }
+
+    @Test
+    void readPhase33PptxPresentation() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase3_3-pptx.pptx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XMLSlideShow prs = new XMLSlideShow(input)) {
+
+            assertEquals(1, prs.getSlides().size(), "should have 1 slide");
+
+            XSLFSlide slide = prs.getSlides().get(0);
+            assertEquals(1, slide.getShapes().size(), "should have 1 shape");
+
+            XSLFShape shape = slide.getShapes().get(0);
+            assertTrue(shape instanceof XSLFPictureShape, "shape should be XSLFPictureShape");
+            XSLFPictureShape picture = (XSLFPictureShape) shape;
+
+            // Verify rotation: 90° stored as 5400000 in 60000ths-of-a-degree units
+            assertEquals(90.0, picture.getRotation(), 0.01, "rotation should be 90°");
+
+            // Verify picture bytes
+            assertTrue(java.util.Arrays.equals(loadTestImage(), picture.getPictureData().getData()),
+                "picture bytes should match test image");
         }
     }
 

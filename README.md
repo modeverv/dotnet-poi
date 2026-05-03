@@ -4,7 +4,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-WIP-yellow)
-![Phase](https://img.shields.io/badge/phase-3.2%20%E2%80%94%20done%2C%20next%3A%20Phase%203.3-green)
+![Phase](https://img.shields.io/badge/phase-3.3%20%E2%80%94%20done%2C%20next%3A%20Phase%203.3.5-green)
 
 ## Philosophy
 
@@ -18,7 +18,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ## Status
 
-### Current Phase: Phase 3.3 — AGILE encryption (next up)
+### Current Phase: Phase 3.3.5 — AGILE encryption (next up)
 
 | Phase | Description | Target | Status |
 |---|---|---|---|
@@ -30,7 +30,8 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | **3** | **SS common interface (IWorkbook / ISheet / IRow / ICell)** | **v0.4** | ✅ Done |
 | **3.1** | **Image rotation (XSSFPicture.setRotation/getRotation)** | **—** | ✅ Done |
 | **3.2** | **docx support (XWPF — text, images, rotation)** | **—** | ✅ Done |
-| 3.3 | AGILE encryption | — | ⬜ Not started |
+| **3.3** | **pptx support (XSLF — slides, images, rotation, flip)** | **—** | ✅ Done |
+| 3.3.5 | AGILE encryption | — | ⬜ Not started |
 | 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
 | 5 | Formula engine (FormulaEvaluator) | v1.0 | ⬜ Not started |
 | 6 | Word / PowerPoint formats | v1.x | ⬜ Not started |
@@ -200,6 +201,37 @@ examples/output/phase3_2-docx-example.docx
 
 Scope note: Phase 3.2 covers the core XWPF write/read surface — paragraphs, runs, bold/italic, and inline images with rotation. Table support, headers/footers, styles, and numbering are later-phase work.
 
+### Phase 3.3 Verification
+
+Phase 3.3 is complete for the initial pptx surface: create slides with embedded images, set position and size in EMU, apply rotation and horizontal/vertical flip, save as `.pptx`, and read the result back.
+
+Implemented classes: `XMLSlideShow`, `XSLFSlide`, `XSLFPictureShape`, `XSLFPictureData`.
+
+Verification currently covers:
+
+- 18 unit tests for write/read round-trips (slide count, picture bytes, anchor, rotation, flip, deduplication)
+- Java interop in the write direction: dotnet-poi writes a `.pptx`, then Apache POI (XSLF) reads and asserts slide count, picture bytes, and rotation (90°)
+- a runnable example under `examples/Phase33PptxExample`
+
+Commands:
+
+```bash
+dotnet test tests/DotnetPoi.XSLF.Tests/ --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/ --no-restore --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase33PptxExample/Phase33PptxExample.csproj
+```
+
+The example writes:
+
+```text
+examples/output/phase3_3-pptx-example.pptx
+```
+
+**Byte-level XML parity note**: All XML output goes through `PoiXmlWriter` — the same foundation used for XSSF and XWPF. This ensures `<tag/>` empty-element style (no space before slash), correct XML declaration format, and no BOM. Full PPTX-specific XML fixture parity tests (analogous to the `xml-parity/` fixtures for XSSF) are not yet implemented; the current guarantee is semantic interoperability with Apache POI Java confirmed by the `ReadFromDotnetTest` suite.
+
+Scope note: Phase 3.3 covers the core XSLF write/read surface — slides, picture shapes with anchor/rotation/flip, and picture data deduplication. Text boxes, animations, charts, and themes are later-phase work.
+
 ---
 
 ## Quick Start
@@ -235,6 +267,23 @@ dotnet run --project examples/Phase0WriteExample/Phase0WriteExample.csproj
 dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
 dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
 dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
+dotnet run --project examples/Phase33PptxExample/Phase33PptxExample.csproj
+```
+
+pptx example:
+
+```csharp
+using DotnetPoi.XSLF.UserModel;
+
+using var prs = new XMLSlideShow();
+var slide = prs.createSlide();
+var picIdx = prs.addPicture(File.ReadAllBytes("photo.jpeg"), XSLFPictureData.PICTURE_TYPE_JPEG);
+var shape = prs.createPicture(slide, picIdx);
+shape.setAnchor(0, 0, XMLSlideShow.DefaultSlideCx, XMLSlideShow.DefaultSlideCy);
+shape.setRotation(45.0);
+
+using var fs = new FileStream("output.pptx", FileMode.Create);
+prs.write(fs);
 ```
 
 docx example:
@@ -333,7 +382,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 
 ## 対応状況
 
-### 現在のフェーズ: Phase 3.3 — AGILE 暗号化（次のフェーズ）
+### 現在のフェーズ: Phase 3.3.5 — AGILE 暗号化（次のフェーズ）
 
 | Phase | 内容 | バージョン目標 | 状態 |
 |---|---|---|---|
@@ -345,7 +394,8 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | **3** | **SS 共通インターフェース（IWorkbook / ISheet / IRow / ICell）** | **v0.4** | ✅ 完了 |
 | **3.1** | **画像の回転（XSSFPicture.setRotation/getRotation）** | **—** | ✅ 完了 |
 | **3.2** | **docx 対応（XWPF — テキスト・画像・回転）** | **—** | ✅ 完了 |
-| 3.3 | AGILE 暗号化 | — | ⬜ 未着手 |
+| **3.3** | **pptx 対応（XSLF — スライド・画像・回転・フリップ）** | **—** | ✅ 完了 |
+| 3.3.5 | AGILE 暗号化 | — | ⬜ 未着手 |
 | 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
 | 5 | 数式エンジン（FormulaEvaluator） | v1.0 | ⬜ 未着手 |
 | 6 | Word / PowerPoint 形式 | v1.x | ⬜ 未着手 |
@@ -486,6 +536,37 @@ examples/output/phase2_5-images-example.xlsx
 
 byte-level に関する注意: Apache POI/XMLBeans の XML byte-level 挙動は、引き続き低レイヤの `PoiXmlWriter` fixture test で固定しており green です。一方で `.xlsx` 全体の zip byte-level 一致は、zip metadata や document timestamp が変わるため主張していません。また drawing 関連の全 package part について完全な byte-for-byte parity を主張する段階でもありません。Phase 2.5 の現時点の保証は、Apache POI との意味的な package 相互運用性と、`PoiXmlWriter` fixture parity の維持です。
 
+### Phase 3.3 検証
+
+Phase 3.3 は最初の pptx 書き出し面として完了しています。対象はスライド作成・画像埋め込み・アンカー設定（EMU）・回転・水平/垂直フリップ・pptx 保存・読み込みです。
+
+実装済みクラス: `XMLSlideShow`、`XSLFSlide`、`XSLFPictureShape`、`XSLFPictureData`
+
+現在の検証内容:
+
+- write/read round-trip の 18 unit test（スライド数・画像バイト列・アンカー・回転・フリップ・重複排除）
+- dotnet-poi が `.pptx` を書き、Apache POI(Java / XSLF) がスライド数・画像バイト列・回転（90°）を読み取る相互運用テスト
+- `examples/Phase33PptxExample` の実行サンプル
+
+確認コマンド:
+
+```bash
+dotnet test tests/DotnetPoi.XSLF.Tests/ --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/ --no-restore --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase33PptxExample/Phase33PptxExample.csproj
+```
+
+サンプルの出力先:
+
+```text
+examples/output/phase3_3-pptx-example.pptx
+```
+
+**byte-level XML parity に関する注意**: 全 XML 出力は `PoiXmlWriter` を経由しており、XSSF・XWPF と同等の基盤です（空要素スタイル `<tag/>`、XML 宣言形式、BOM なし）。PPTX 固有の XML fixture parity テスト（XSSF の `xml-parity/` fixtures に相当するもの）は未整備です。現時点の保証は `ReadFromDotnetTest` で確認した Apache POI Java との意味的な相互運用性です。
+
+範囲の注意: Phase 3.3 が対象にしているのは XSLF の書き出し・読み込みコアサーフェス（スライド・アンカー付き画像シェイプ・回転・フリップ・重複排除）です。テキストボックス・アニメーション・グラフ・テーマは後続フェーズの対象です。
+
 ### Phase 3.2 検証
 
 Phase 3.2 は最初の docx 書き出し面として完了しています。対象は段落テキスト・インライン画像・bold/italic・画像の回転・docx 保存・読み込みです。
@@ -550,6 +631,23 @@ dotnet run --project examples/Phase0WriteExample/Phase0WriteExample.csproj
 dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
 dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
 dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
+dotnet run --project examples/Phase33PptxExample/Phase33PptxExample.csproj
+```
+
+pptx example:
+
+```csharp
+using DotnetPoi.XSLF.UserModel;
+
+using var prs = new XMLSlideShow();
+var slide = prs.createSlide();
+var picIdx = prs.addPicture(File.ReadAllBytes("photo.jpeg"), XSLFPictureData.PICTURE_TYPE_JPEG);
+var shape = prs.createPicture(slide, picIdx);
+shape.setAnchor(0, 0, XMLSlideShow.DefaultSlideCx, XMLSlideShow.DefaultSlideCy);
+shape.setRotation(45.0);
+
+using var fs = new FileStream("output.pptx", FileMode.Create);
+prs.write(fs);
 ```
 
 docx example:
