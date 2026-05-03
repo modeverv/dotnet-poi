@@ -1,6 +1,8 @@
+using DotnetPoi.SS.UserModel;
+
 namespace DotnetPoi.XSSF.UserModel;
 
-public sealed class XSSFCellStyle
+public sealed class XSSFCellStyle : ICellStyle
 {
     private readonly XSSFWorkbook _workbook;
 
@@ -87,6 +89,16 @@ public sealed class XSSFCellStyle
         ApplyFont = true;
     }
 
+    public void setFont(IFont? font)
+    {
+        if (font is not null && font is not XSSFFont)
+        {
+            throw new ArgumentException("Font must be an XSSFFont created by this workbook.", nameof(font));
+        }
+
+        setFont(font as XSSFFont);
+    }
+
     public void setFillForegroundColor(short fg)
     {
         FillForegroundColor = fg;
@@ -152,6 +164,8 @@ public sealed class XSSFCellStyle
     {
         return BorderLeft;
     }
+
+    IFont ICellStyle.getFont() => getFont();
 
     private void RegisterFill()
     {

@@ -50,6 +50,27 @@ dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --fi
 mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
 ```
 
+## Phase3InterfaceExample
+
+Demonstrates the Phase 3 SS common interfaces (`IWorkbook`, `ISheet`, `IRow`, `ICell`, `ICellStyle`, `IFont`).
+All variables are typed as interfaces — the example works identically against any future `IWorkbook` implementation.
+
+```bash
+dotnet run --project examples/Phase3InterfaceExample/Phase3InterfaceExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase3-interface-example.xlsx
+```
+
+The example:
+
+- Creates a styled header row using `ICellStyle` and `IFont`
+- Writes data rows with a number format via `IDataFormat`
+- Reads the workbook back via `IWorkbook`/`ISheet`/`IRow`/`ICell` and asserts cell values
+
 ## Phase25ImagesExample
 
 Generates an `.xlsx` file with a small embedded PNG using the Phase 2.5 XSSF image API:

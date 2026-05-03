@@ -21,5 +21,9 @@
         <ProjectReference Include="../../src/DotnetPoi.XSSF/DotnetPoi.XSSF.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="../../tests/image.jpg" CopyToOutputDirectory="PreserveNewest" Link="image.jpg" />
+    </ItemGroup>
+
 </Project>
 

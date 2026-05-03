@@ -1,6 +1,8 @@
+using DotnetPoi.SS.UserModel;
+
 namespace DotnetPoi.XSSF.UserModel;
 
-public sealed class XSSFPictureData
+public sealed class XSSFPictureData : IPictureData
 {
     internal XSSFPictureData(byte[] data, int pictureType, int index)
     {

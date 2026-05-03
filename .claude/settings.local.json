@@ -3,7 +3,13 @@
     "allow": [
       "Bash(dotnet test *)",
       "Bash(mvn -q test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest)",
-      "Bash(mvn test *)"
+      "Bash(mvn test *)",
+      "Bash(grep -E \"^\\(Workbook|Sheet|Row|Cell|CellStyle|Font|CreationHelper|DataFormat\\)\\\\.java$\")",
+      "Bash(dotnet build *)",
+      "Bash(dotnet nuget list *)",
+      "Bash(dotnet nuget *)",
+      "Bash(dotnet run *)",
+      "Bash(python3 *)"
     ]
   }
 }

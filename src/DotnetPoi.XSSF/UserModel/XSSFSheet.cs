@@ -1,6 +1,8 @@
+using DotnetPoi.SS.UserModel;
+
 namespace DotnetPoi.XSSF.UserModel;
 
-public sealed class XSSFSheet
+public sealed class XSSFSheet : ISheet
 {
     private readonly SortedDictionary<int, XSSFRow> _rows = new();
     private readonly XSSFWorkbook _workbook;
@@ -52,4 +54,10 @@ public sealed class XSSFSheet
     internal IReadOnlyCollection<XSSFRow> Rows => _rows.Values;
 
     internal XSSFDrawing? Drawing => _drawing;
+
+    IRow ISheet.createRow(int rownum) => createRow(rownum);
+
+    IRow? ISheet.getRow(int rownum) => getRow(rownum);
+
+    IWorkbook ISheet.getWorkbook() => getWorkbook();
 }

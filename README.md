@@ -4,7 +4,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-WIP-yellow)
-![Phase](https://img.shields.io/badge/phase-2.5%20%E2%80%94%20done%2C%20next%3A%20Phase%203-green)
+![Phase](https://img.shields.io/badge/phase-3%20%E2%80%94%20done%2C%20next%3A%20Phase%204-green)
 
 ## Philosophy
 
@@ -18,7 +18,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ## Status
 
-### Current Phase: Phase 3 — SS Common Interface (next up)
+### Current Phase: Phase 4 — POIFS + HSSF (next up)
 
 | Phase | Description | Target | Status |
 |---|---|---|---|
@@ -27,7 +27,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | **1** | **xlsx read (string / number)** | **v0.2** | ✅ Done |
 | **2** | **Styles & formatting (font, color, border)** | **v0.3** | ✅ Done |
 | **2.5** | **Images & drawing (XSSFPicture, XSSFDrawing)** | **v0.35** | ✅ Done |
-| 3 | SS common interface (IWorkbook / ISheet) | v0.4 | ⬜ Not started |
+| **3** | **SS common interface (IWorkbook / ISheet / IRow / ICell)** | **v0.4** | ✅ Done |
 | 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
 | 5 | Formula engine (FormulaEvaluator) | v1.0 | ⬜ Not started |
 | 6 | Word / PowerPoint formats | v1.x | ⬜ Not started |
@@ -284,7 +284,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 
 ## 対応状況
 
-### 現在のフェーズ: Phase 3 — SS 共通インターフェース（次のフェーズ）
+### 現在のフェーズ: Phase 4 — POIFS + HSSF（次のフェーズ）
 
 | Phase | 内容 | バージョン目標 | 状態 |
 |---|---|---|---|
@@ -293,7 +293,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | **1** | **xlsx 読み込み（文字・数値）** | **v0.2** | ✅ 完了 |
 | **2** | **スタイル・書式（フォント・色・罫線）** | **v0.3** | ✅ 完了 |
 | **2.5** | **画像・図形（XSSFPicture、XSSFDrawing）** | **v0.35** | ✅ 完了 |
-| 3 | SS 共通インターフェース（IWorkbook / ISheet） | v0.4 | ⬜ 未着手 |
+| **3** | **SS 共通インターフェース（IWorkbook / ISheet / IRow / ICell）** | **v0.4** | ✅ 完了 |
 | 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
 | 5 | 数式エンジン（FormulaEvaluator） | v1.0 | ⬜ 未着手 |
 | 6 | Word / PowerPoint 形式 | v1.x | ⬜ 未着手 |

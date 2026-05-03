@@ -1,6 +1,8 @@
+using DotnetPoi.SS.UserModel;
+
 namespace DotnetPoi.XSSF.UserModel;
 
-public sealed class XSSFDataFormat
+public sealed class XSSFDataFormat : IDataFormat
 {
     public const int FIRST_USER_DEFINED_FORMAT_INDEX = 164;
 

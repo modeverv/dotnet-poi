@@ -1,6 +1,8 @@
+using DotnetPoi.SS.UserModel;
+
 namespace DotnetPoi.XSSF.UserModel;
 
-public sealed class XSSFRow
+public sealed class XSSFRow : IRow
 {
     private readonly SortedDictionary<int, XSSFCell> _cells = new();
     private readonly XSSFSheet _sheet;
@@ -45,4 +47,10 @@ public sealed class XSSFRow
     }
 
     internal IReadOnlyCollection<XSSFCell> Cells => _cells.Values;
+
+    ICell IRow.createCell(int columnIndex) => createCell(columnIndex);
+
+    ICell? IRow.getCell(int cellnum) => getCell(cellnum);
+
+    ISheet IRow.getSheet() => getSheet();
 }

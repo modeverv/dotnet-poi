@@ -1,8 +1,9 @@
 using System.Globalization;
+using DotnetPoi.SS.UserModel;
 
 namespace DotnetPoi.XSSF.UserModel;
 
-public sealed class XSSFFont
+public sealed class XSSFFont : IFont
 {
     public const string DEFAULT_FONT_NAME = "Calibri";
     public const short DEFAULT_FONT_SIZE = 11;

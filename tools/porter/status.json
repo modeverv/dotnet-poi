@@ -27,8 +27,14 @@
     {
       "phase": "2.5",
       "name": "Images & Drawing",
-      "status": "in_progress",
-      "notes": "Initial XSSF image embedding slice is present: addPicture, createDrawingPatriarch, XSSFClientAnchor, XSSFDrawing, XSSFPicture, and package relationships. Advanced resize/read shape parity remains."
+      "status": "done",
+      "notes": "XSSF image embedding slice is present: addPicture, createDrawingPatriarch, XSSFClientAnchor, XSSFDrawing, XSSFPicture, and package relationships."
+    },
+    {
+      "phase": "3",
+      "name": "SS Common Interface",
+      "status": "done",
+      "notes": "IWorkbook, ISheet, IRow, ICell, ICellStyle, IFont, ICreationHelper, IDataFormat, IPictureData defined in DotnetPoi.SS. BorderStyle, FillPatternType, IndexedColors, CellType moved to SS. All XSSF classes implement the interfaces via explicit interface implementation."
     }
   ],
   "classes": [

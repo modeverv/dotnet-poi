@@ -1,6 +1,8 @@
+using DotnetPoi.SS.UserModel;
+
 namespace DotnetPoi.XSSF.UserModel;
 
-public sealed class XSSFCreationHelper
+public sealed class XSSFCreationHelper : ICreationHelper
 {
     private readonly XSSFWorkbook _workbook;
 
@@ -14,8 +16,15 @@ public sealed class XSSFCreationHelper
         return _workbook;
     }
 
+    public XSSFDataFormat createDataFormat()
+    {
+        return _workbook.createDataFormat();
+    }
+
     public XSSFClientAnchor createClientAnchor()
     {
         return new XSSFClientAnchor();
     }
+
+    IDataFormat ICreationHelper.createDataFormat() => createDataFormat();
 }

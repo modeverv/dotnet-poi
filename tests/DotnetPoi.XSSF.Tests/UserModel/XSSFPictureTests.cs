@@ -6,21 +6,22 @@ namespace DotnetPoi.XSSF.Tests.UserModel;
 
 public class XSSFPictureTests
 {
-    private static readonly byte[] OneByOnePng =
-        Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2O8WcAAAAASUVORK5CYII=");
+    private static byte[] LoadTestImage() => File.ReadAllBytes("image.jpg");
 
     [Fact]
-    public void Write_PngPicture_ProducesDrawingPartsAndRelationships()
+    public void Write_JpegPicture_ProducesDrawingPartsAndRelationships()
     {
+        var imageBytes = LoadTestImage();
+
         using var workbook = new XSSFWorkbook();
         var sheet = workbook.createSheet("Images");
-        var pictureIndex = workbook.addPicture(OneByOnePng, XSSFWorkbook.PICTURE_TYPE_PNG);
+        var pictureIndex = workbook.addPicture(imageBytes, XSSFWorkbook.PICTURE_TYPE_JPEG);
         var drawing = sheet.createDrawingPatriarch();
         var anchor = workbook.getCreationHelper().createClientAnchor();
         anchor.setCol1(1);
         anchor.setRow1(2);
-        anchor.setCol2(3);
-        anchor.setRow2(4);
+        anchor.setCol2(5);
+        anchor.setRow2(15);
 
         drawing.createPicture(anchor, pictureIndex);
 
@@ -29,13 +30,14 @@ public class XSSFPictureTests
 
         stream.Position = 0;
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-        Assert.NotNull(archive.GetEntry("xl/media/image1.png"));
+
+        Assert.NotNull(archive.GetEntry("xl/media/image1.jpeg"));
         Assert.NotNull(archive.GetEntry("xl/drawings/drawing1.xml"));
         Assert.NotNull(archive.GetEntry("xl/drawings/_rels/drawing1.xml.rels"));
         Assert.NotNull(archive.GetEntry("xl/worksheets/_rels/sheet1.xml.rels"));
 
         var contentTypes = ReadEntry(archive, "[Content_Types].xml");
-        Assert.Contains("<Default Extension=\"png\" ContentType=\"image/png\"/>", contentTypes);
+        Assert.Contains("<Default Extension=\"jpeg\" ContentType=\"image/jpeg\"/>", contentTypes);
         Assert.Contains("<Override PartName=\"/xl/drawings/drawing1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\"/>", contentTypes);
 
         var sheetXml = ReadEntry(archive, "xl/worksheets/sheet1.xml");
@@ -46,7 +48,7 @@ public class XSSFPictureTests
         Assert.Contains("Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\"", sheetRelationships);
 
         var drawingRelationships = ReadEntry(archive, "xl/drawings/_rels/drawing1.xml.rels");
-        Assert.Contains("Target=\"../media/image1.png\"", drawingRelationships);
+        Assert.Contains("Target=\"../media/image1.jpeg\"", drawingRelationships);
         Assert.Contains("Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\"", drawingRelationships);
 
         var drawingXml = ReadEntry(archive, "xl/drawings/drawing1.xml");
@@ -54,13 +56,21 @@ public class XSSFPictureTests
         Assert.Contains("<xdr:col>1</xdr:col>", drawingXml);
         Assert.Contains("<xdr:row>2</xdr:row>", drawingXml);
         Assert.Contains("<a:blip r:embed=\"rId1\"/>", drawingXml);
+
+        // Verify media bytes are stored faithfully
+        using var mediaEntry = archive.GetEntry("xl/media/image1.jpeg")!.Open();
+        using var ms = new MemoryStream();
+        mediaEntry.CopyTo(ms);
+        Assert.Equal(imageBytes, ms.ToArray());
     }
 
     [Fact]
-    public void Read_WorkbookWithMediaPart_RestoresPictureData()
+    public void Read_WorkbookWithJpegMedia_RestoresPictureData()
     {
+        var imageBytes = LoadTestImage();
+
         using var original = new XSSFWorkbook();
-        original.addPicture(OneByOnePng, XSSFWorkbook.PICTURE_TYPE_PNG);
+        original.addPicture(imageBytes, XSSFWorkbook.PICTURE_TYPE_JPEG);
 
         using var stream = new MemoryStream();
         original.write(stream);
@@ -69,10 +79,38 @@ public class XSSFPictureTests
         using var loaded = new XSSFWorkbook(stream);
 
         var picture = Assert.Single(loaded.getAllPictures());
-        Assert.Equal(XSSFWorkbook.PICTURE_TYPE_PNG, picture.getPictureType());
-        Assert.Equal("png", picture.suggestFileExtension());
-        Assert.Equal("image/png", picture.getMimeType());
-        Assert.Equal(OneByOnePng, picture.getData());
+        Assert.Equal(XSSFWorkbook.PICTURE_TYPE_JPEG, picture.getPictureType());
+        Assert.Equal("jpeg", picture.suggestFileExtension());
+        Assert.Equal("image/jpeg", picture.getMimeType());
+        Assert.Equal(imageBytes, picture.getData());
+    }
+
+    [Fact]
+    public void Write_MultipleSheets_EachWithOwnDrawing()
+    {
+        var imageBytes = LoadTestImage();
+
+        using var workbook = new XSSFWorkbook();
+
+        foreach (var sheetName in new[] { "Sheet1", "Sheet2" })
+        {
+            var sheet = workbook.createSheet(sheetName);
+            var idx = workbook.addPicture(imageBytes, XSSFWorkbook.PICTURE_TYPE_JPEG);
+            var anchor = workbook.getCreationHelper().createClientAnchor();
+            anchor.setCol1(0); anchor.setRow1(0);
+            anchor.setCol2(3); anchor.setRow2(5);
+            sheet.createDrawingPatriarch().createPicture(anchor, idx);
+        }
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+
+        stream.Position = 0;
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        Assert.NotNull(archive.GetEntry("xl/drawings/drawing1.xml"));
+        Assert.NotNull(archive.GetEntry("xl/drawings/drawing2.xml"));
+        Assert.NotNull(archive.GetEntry("xl/media/image1.jpeg"));
+        Assert.NotNull(archive.GetEntry("xl/media/image2.jpeg"));
     }
 
     private static string ReadEntry(ZipArchive archive, string name)

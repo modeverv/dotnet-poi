@@ -1,4 +1,4 @@
-namespace DotnetPoi.XSSF.UserModel;
+namespace DotnetPoi.SS.UserModel;
 
 public enum BorderStyle : short
 {

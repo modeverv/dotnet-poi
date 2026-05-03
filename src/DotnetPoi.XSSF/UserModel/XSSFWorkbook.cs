@@ -2,11 +2,12 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
+using DotnetPoi.SS.UserModel;
 using DotnetPoi.SS.Xml;
 
 namespace DotnetPoi.XSSF.UserModel;
 
-public sealed class XSSFWorkbook : IDisposable
+public sealed class XSSFWorkbook : IWorkbook
 {
     public const int PICTURE_TYPE_EMF = 2;
     public const int PICTURE_TYPE_WMF = 3;
@@ -134,6 +135,28 @@ public sealed class XSSFWorkbook : IDisposable
     {
         return _pictures;
     }
+
+    IReadOnlyList<IPictureData> IWorkbook.getAllPictures() => _pictures;
+
+    ISheet IWorkbook.createSheet() => createSheet();
+
+    ISheet IWorkbook.createSheet(string sheetname) => createSheet(sheetname);
+
+    ISheet IWorkbook.getSheetAt(int index) => getSheetAt(index);
+
+    ISheet? IWorkbook.getSheet(string name) => getSheet(name);
+
+    ICreationHelper IWorkbook.getCreationHelper() => getCreationHelper();
+
+    ICellStyle IWorkbook.createCellStyle() => createCellStyle();
+
+    ICellStyle IWorkbook.getCellStyleAt(int idx) => getCellStyleAt(idx);
+
+    IDataFormat IWorkbook.createDataFormat() => createDataFormat();
+
+    IFont IWorkbook.createFont() => createFont();
+
+    IFont IWorkbook.getFontAt(int idx) => getFontAt(idx);
 
     public void write(Stream stream)
     {
@@ -268,7 +291,7 @@ public sealed class XSSFWorkbook : IDisposable
             {
                 foreach (var cell in row.Cells)
                 {
-                    if (cell.getCellType() != XSSFCellType.String)
+                    if (cell.getCellType() != CellType.String)
                     {
                         continue;
                     }
@@ -1135,7 +1158,7 @@ public sealed class XSSFWorkbook : IDisposable
         {
             foreach (var row in sheet.Rows)
             {
-                count += row.Cells.Count(cell => cell.getCellType() == XSSFCellType.String);
+                count += row.Cells.Count(cell => cell.getCellType() == CellType.String);
             }
         }
 
@@ -1189,7 +1212,7 @@ public sealed class XSSFWorkbook : IDisposable
         writer.WriteAttributeString("r", (row.getRowNum() + 1).ToString(CultureInfo.InvariantCulture));
         foreach (var cell in row.Cells)
         {
-            if (cell.getCellType() == XSSFCellType.Blank)
+            if (cell.getCellType() == CellType.Blank)
             {
                 continue;
             }
@@ -1201,13 +1224,13 @@ public sealed class XSSFWorkbook : IDisposable
             {
                 writer.WriteAttributeString("s", styleIndex.ToString(CultureInfo.InvariantCulture));
             }
-            if (cell.getCellType() == XSSFCellType.String)
+            if (cell.getCellType() == CellType.String)
             {
                 writer.WriteAttributeString("t", "s");
             }
 
             writer.WriteStartElement("v");
-            if (cell.getCellType() == XSSFCellType.String)
+            if (cell.getCellType() == CellType.String)
             {
                 writer.WriteString(GetSharedStringIndex(cell.getStringCellValue()).ToString(CultureInfo.InvariantCulture));
             }
@@ -1239,7 +1262,7 @@ public sealed class XSSFWorkbook : IDisposable
             maxRow = Math.Max(maxRow, row.getRowNum());
             foreach (var cell in row.Cells)
             {
-                if (cell.getCellType() == XSSFCellType.Blank)
+                if (cell.getCellType() == CellType.Blank)
                 {
                     continue;
                 }

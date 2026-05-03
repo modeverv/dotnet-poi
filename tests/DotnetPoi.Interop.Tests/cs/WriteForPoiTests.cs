@@ -1,3 +1,4 @@
+using DotnetPoi.SS.UserModel;
 using DotnetPoi.XSSF.UserModel;
 using Xunit;
 
@@ -5,8 +6,7 @@ namespace DotnetPoi.Interop.Tests;
 
 public class WriteForPoiTests
 {
-    private static readonly byte[] OneByOnePng =
-        Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2O8WcAAAAASUVORK5CYII=");
+    private static byte[] LoadTestImage() => File.ReadAllBytes("image.jpg");
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
@@ -74,7 +74,7 @@ public class WriteForPoiTests
         var sheet = workbook.createSheet("Phase2.5");
         sheet.createRow(0).createCell(0).setCellValue("image");
 
-        var pictureIndex = workbook.addPicture(OneByOnePng, XSSFWorkbook.PICTURE_TYPE_PNG);
+        var pictureIndex = workbook.addPicture(LoadTestImage(), XSSFWorkbook.PICTURE_TYPE_JPEG);
         var anchor = workbook.getCreationHelper().createClientAnchor();
         anchor.setCol1(0);
         anchor.setRow1(0);

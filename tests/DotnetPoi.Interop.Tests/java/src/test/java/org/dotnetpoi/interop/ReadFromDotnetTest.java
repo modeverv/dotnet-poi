@@ -20,9 +20,9 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 public class ReadFromDotnetTest {
-    private static final byte[] ONE_BY_ONE_PNG = java.util.Base64.getDecoder().decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2O8WcAAAAASUVORK5CYII="
-    );
+    private static byte[] loadTestImage() throws IOException {
+        return Files.readAllBytes(findRepoRoot().resolve("tests/image.jpg"));
+    }
 
     @Test
     void readPhase0BasicWorkbook() throws IOException {
@@ -77,9 +77,9 @@ public class ReadFromDotnetTest {
             assertEquals(1, workbook.getAllPictures().size());
 
             PictureData picture = workbook.getAllPictures().get(0);
-            assertEquals(XSSFWorkbook.PICTURE_TYPE_PNG, picture.getPictureType());
-            assertEquals("png", picture.suggestFileExtension());
-            assertTrue(java.util.Arrays.equals(ONE_BY_ONE_PNG, picture.getData()));
+            assertEquals(XSSFWorkbook.PICTURE_TYPE_JPEG, picture.getPictureType());
+            assertEquals("jpeg", picture.suggestFileExtension());
+            assertTrue(java.util.Arrays.equals(loadTestImage(), picture.getData()));
             assertEquals(1, ((XSSFDrawing)sheet.createDrawingPatriarch()).getShapes().size());
         }
     }
