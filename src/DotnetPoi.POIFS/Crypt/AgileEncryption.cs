@@ -2,8 +2,7 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml;
-using System.Xml.Linq;
-using OpenMcdf;
+using DotnetPoi.SS.Xml;
 
 namespace DotnetPoi.POIFS.Crypt;
 
@@ -35,7 +34,7 @@ public sealed class EncryptionInfo
     public EncryptionInfo(Stream poifsStream)
     {
         ArgumentNullException.ThrowIfNull(poifsStream);
-        var streams = OpenMcdfStreams.ReadStreams(poifsStream);
+        var streams = CompoundFile.ReadStreams(poifsStream);
         if (!streams.TryGetValue("EncryptionInfo", out var encryptionInfo))
         {
             throw new InvalidDataException("The OLE2 file does not contain an EncryptionInfo stream.");
@@ -122,7 +121,11 @@ public sealed class Encryptor
         BinaryPrimitives.WriteInt64LittleEndian(encryptedPackage, packageBytes.Length);
         Buffer.BlockCopy(encryptedPackageBody, 0, encryptedPackage, 8, encryptedPackageBody.Length);
 
-        OpenMcdfStreams.Write(output, _parameters.WriteEncryptionInfo(), encryptedPackage);
+        CompoundFile.Write(output, new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            ["EncryptionInfo"] = _parameters.WriteEncryptionInfo(),
+            [Decryptor.DEFAULT_POIFS_ENTRY] = encryptedPackage
+        });
     }
 }
 
@@ -215,19 +218,10 @@ internal sealed class AgileEncryptionParameters
             throw new NotSupportedException("Only Agile EncryptionInfo version 4.4 is supported.");
         }
 
-        using var xml = new MemoryStream(encryptionInfo, 8, encryptionInfo.Length - 8);
-        var doc = new XmlDocument { PreserveWhitespace = true };
-        doc.Load(xml);
-        var ns = new XmlNamespaceManager(doc.NameTable);
-        ns.AddNamespace("e", EncNs);
-        ns.AddNamespace("p", PassNs);
-
-        var keyData = (XmlElement?)doc.SelectSingleNode("/e:encryption/e:keyData", ns)
-            ?? throw new InvalidDataException("Missing keyData.");
-        var encryptedKey = (XmlElement?)doc.SelectSingleNode("/e:encryption/e:keyEncryptors/e:keyEncryptor/p:encryptedKey", ns)
-            ?? throw new InvalidDataException("Missing password encryptedKey.");
-        var dataIntegrity = (XmlElement?)doc.SelectSingleNode("/e:encryption/e:dataIntegrity", ns)
-            ?? throw new InvalidDataException("Missing dataIntegrity.");
+        var elements = ReadEncryptionInfoElements(encryptionInfo);
+        var keyData = elements.KeyData ?? throw new InvalidDataException("Missing keyData.");
+        var encryptedKey = elements.EncryptedKey ?? throw new InvalidDataException("Missing password encryptedKey.");
+        var dataIntegrity = elements.DataIntegrity ?? throw new InvalidDataException("Missing dataIntegrity.");
 
         return new AgileEncryptionParameters
         {
@@ -282,58 +276,118 @@ internal sealed class AgileEncryptionParameters
 
     private string BuildEncryptionInfoXml()
     {
-        XNamespace ns = EncNs;
-        XNamespace p = PassNs;
+        using var text = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
+        using var writer = new PoiXmlWriter(text);
+        writer.WriteStartElement("encryption");
+        writer.WriteAttributeString("xmlns:p", PassNs);
+        writer.WriteAttributeString("xmlns", EncNs);
 
-        var keyData = new XElement(ns + "keyData",
-            new XAttribute("blockSize", BlockSize),
-            new XAttribute("cipherAlgorithm", "AES"),
-            new XAttribute("cipherChaining", "ChainingModeCBC"),
-            new XAttribute("hashAlgorithm", "SHA1"),
-            new XAttribute("hashSize", HashSize),
-            new XAttribute("keyBits", KeyBits),
-            new XAttribute("saltSize", BlockSize),
-            new XAttribute("saltValue", Convert.ToBase64String(KeySalt)));
+        writer.WriteStartElement("keyData");
+        writer.WriteAttributeString("blockSize", BlockSize.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("cipherAlgorithm", "AES");
+        writer.WriteAttributeString("cipherChaining", "ChainingModeCBC");
+        writer.WriteAttributeString("hashAlgorithm", "SHA1");
+        writer.WriteAttributeString("hashSize", HashSize.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("keyBits", KeyBits.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("saltSize", BlockSize.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("saltValue", Convert.ToBase64String(KeySalt));
+        writer.WriteEndElement();
 
-        var dataIntegrity = new XElement(ns + "dataIntegrity",
-            new XAttribute("encryptedHmacKey", Convert.ToBase64String(EncryptedHmacKey)),
-            new XAttribute("encryptedHmacValue", Convert.ToBase64String(EncryptedHmacValue)));
+        writer.WriteStartElement("dataIntegrity");
+        writer.WriteAttributeString("encryptedHmacKey", Convert.ToBase64String(EncryptedHmacKey));
+        writer.WriteAttributeString("encryptedHmacValue", Convert.ToBase64String(EncryptedHmacValue));
+        writer.WriteEndElement();
 
-        var encryptedKey = new XElement(p + "encryptedKey",
-            new XAttribute("blockSize", BlockSize),
-            new XAttribute("cipherAlgorithm", "AES"),
-            new XAttribute("cipherChaining", "ChainingModeCBC"),
-            new XAttribute("encryptedKeyValue", Convert.ToBase64String(EncryptedKeyValue)),
-            new XAttribute("encryptedVerifierHashInput", Convert.ToBase64String(EncryptedVerifierHashInput)),
-            new XAttribute("encryptedVerifierHashValue", Convert.ToBase64String(EncryptedVerifierHashValue)),
-            new XAttribute("hashAlgorithm", "SHA1"),
-            new XAttribute("hashSize", HashSize),
-            new XAttribute("keyBits", KeyBits),
-            new XAttribute("saltSize", BlockSize),
-            new XAttribute("saltValue", Convert.ToBase64String(VerifierSalt)),
-            new XAttribute("spinCount", SpinCount));
+        writer.WriteStartElement("keyEncryptors");
+        writer.WriteStartElement("keyEncryptor");
+        writer.WriteAttributeString("uri", PassNs);
+        writer.WriteStartElement("p", "encryptedKey");
+        writer.WriteAttributeString("blockSize", BlockSize.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("cipherAlgorithm", "AES");
+        writer.WriteAttributeString("cipherChaining", "ChainingModeCBC");
+        writer.WriteAttributeString("encryptedKeyValue", Convert.ToBase64String(EncryptedKeyValue));
+        writer.WriteAttributeString("encryptedVerifierHashInput", Convert.ToBase64String(EncryptedVerifierHashInput));
+        writer.WriteAttributeString("encryptedVerifierHashValue", Convert.ToBase64String(EncryptedVerifierHashValue));
+        writer.WriteAttributeString("hashAlgorithm", "SHA1");
+        writer.WriteAttributeString("hashSize", HashSize.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("keyBits", KeyBits.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("saltSize", BlockSize.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("saltValue", Convert.ToBase64String(VerifierSalt));
+        writer.WriteAttributeString("spinCount", SpinCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteEndElement();
 
-        var doc = new XDocument(
-            new XElement(ns + "encryption",
-                new XAttribute(XNamespace.Xmlns + "p", PassNs),
-                keyData,
-                dataIntegrity,
-                new XElement(ns + "keyEncryptors",
-                    new XElement(ns + "keyEncryptor",
-                        new XAttribute("uri", PassNs),
-                        encryptedKey))));
-
-        return doc.ToString(SaveOptions.DisableFormatting);
+        return text.ToString();
     }
 
-    private static int ReadInt(XmlElement element, string name)
+    private static EncryptionInfoElements ReadEncryptionInfoElements(byte[] encryptionInfo)
     {
-        return int.Parse(element.GetAttribute(name), System.Globalization.CultureInfo.InvariantCulture);
+        var result = new EncryptionInfoElements();
+        using var xml = new MemoryStream(encryptionInfo, 8, encryptionInfo.Length - 8);
+        using var reader = XmlReader.Create(xml, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit });
+        while (reader.Read())
+        {
+            if (reader.NodeType != XmlNodeType.Element)
+            {
+                continue;
+            }
+
+            if (reader.NamespaceURI == EncNs && reader.LocalName == "keyData")
+            {
+                result.KeyData = ReadAttributes(reader);
+            }
+            else if (reader.NamespaceURI == EncNs && reader.LocalName == "dataIntegrity")
+            {
+                result.DataIntegrity = ReadAttributes(reader);
+            }
+            else if (reader.NamespaceURI == PassNs && reader.LocalName == "encryptedKey")
+            {
+                result.EncryptedKey = ReadAttributes(reader);
+            }
+        }
+
+        return result;
     }
 
-    private static byte[] ReadBin(XmlElement element, string name)
+    private static Dictionary<string, string> ReadAttributes(XmlReader reader)
     {
-        return Convert.FromBase64String(element.GetAttribute(name));
+        var attributes = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (!reader.HasAttributes)
+        {
+            return attributes;
+        }
+
+        while (reader.MoveToNextAttribute())
+        {
+            if (reader.Prefix == "xmlns" || reader.Name == "xmlns")
+            {
+                continue;
+            }
+
+            attributes[reader.LocalName] = reader.Value;
+        }
+
+        reader.MoveToElement();
+        return attributes;
+    }
+
+    private static int ReadInt(IReadOnlyDictionary<string, string> element, string name)
+    {
+        return int.Parse(element[name], System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static byte[] ReadBin(IReadOnlyDictionary<string, string> element, string name)
+    {
+        return Convert.FromBase64String(element[name]);
+    }
+
+    private sealed class EncryptionInfoElements
+    {
+        public Dictionary<string, string>? KeyData { get; set; }
+        public Dictionary<string, string>? DataIntegrity { get; set; }
+        public Dictionary<string, string>? EncryptedKey { get; set; }
     }
 }
 
@@ -500,42 +554,5 @@ internal static class AgileCrypto
         var bytes = new byte[8];
         BinaryPrimitives.WriteUInt64BigEndian(bytes, value);
         return bytes;
-    }
-}
-
-internal static class OpenMcdfStreams
-{
-    public static void Write(Stream output, byte[] encryptionInfo, byte[] encryptedPackage)
-    {
-        using var root = RootStorage.Create(output, OpenMcdf.Version.V3, StorageModeFlags.LeaveOpen);
-        using (var stream = root.CreateStream("EncryptionInfo"))
-        {
-            stream.Write(encryptionInfo);
-        }
-
-        using (var stream = root.CreateStream(Decryptor.DEFAULT_POIFS_ENTRY))
-        {
-            stream.Write(encryptedPackage);
-        }
-
-        root.Flush(consolidate: true);
-    }
-
-    public static Dictionary<string, byte[]> ReadStreams(Stream input)
-    {
-        using var root = RootStorage.Open(input, StorageModeFlags.LeaveOpen);
-        return new Dictionary<string, byte[]>(StringComparer.Ordinal)
-        {
-            ["EncryptionInfo"] = ReadStream(root, "EncryptionInfo"),
-            [Decryptor.DEFAULT_POIFS_ENTRY] = ReadStream(root, Decryptor.DEFAULT_POIFS_ENTRY)
-        };
-    }
-
-    private static byte[] ReadStream(RootStorage root, string name)
-    {
-        using var stream = root.OpenStream(name);
-        using var memory = new MemoryStream();
-        stream.CopyTo(memory);
-        return memory.ToArray();
     }
 }

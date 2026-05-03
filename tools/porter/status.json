@@ -45,8 +45,8 @@
     {
       "phase": "3.4",
       "name": "Agile Encryption",
-      "status": "in_progress",
-      "notes": "Initial Agile write/decrypt slice is present: AES-128/SHA-1 agile password verifier, chunked EncryptedPackage encryption, HMAC metadata, OpenMcdf-backed CFB wrapper, XSSFWorkbook.writeEncrypted, and POI interop read test for a password-protected xlsx. Excel-compatible integrity HMAC details and OpenMcdf removal handoff are documented in PHASE_3_4_AGILE_ENCRYPTION_NOTES.md."
+      "status": "done",
+      "notes": "Initial Agile write/decrypt slice is complete: AES-128/SHA-1 agile password verifier, chunked EncryptedPackage encryption, HMAC metadata, in-repo CFB writer/reader with mini FAT support for the Agile two-stream OLE2 wrapper, XSSFWorkbook.writeEncrypted, POI interop read test for a password-protected xlsx, Excel manual open verification, and a Phase34 runnable example. Excel-compatible integrity HMAC details and CFB writer notes are documented in PHASE_3_4_AGILE_ENCRYPTION_NOTES.md."
     }
   ],
   "classes": [

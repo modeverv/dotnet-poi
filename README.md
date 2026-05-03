@@ -4,7 +4,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-WIP-yellow)
-![Phase](https://img.shields.io/badge/phase-3.3%20%E2%80%94%20done%2C%20next%3A%20Phase%203.3.5-green)
+![Phase](https://img.shields.io/badge/phase-3.4%20%E2%80%94%20done%2C%20next%3A%20Phase%204-green)
 
 ## Philosophy
 
@@ -18,7 +18,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ## Status
 
-### Current Phase: Phase 3.3.5 — AGILE encryption (next up)
+### Current Phase: Phase 3.4 — AGILE encryption done, next up Phase 4
 
 | Phase | Description | Target | Status |
 |---|---|---|---|
@@ -31,7 +31,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | **3.1** | **Image rotation (XSSFPicture.setRotation/getRotation)** | **—** | ✅ Done |
 | **3.2** | **docx support (XWPF — text, images, rotation)** | **—** | ✅ Done |
 | **3.3** | **pptx support (XSLF — slides, images, rotation, flip)** | **—** | ✅ Done |
-| 3.3.5 | AGILE encryption | — | ⬜ Not started |
+| **3.4** | **AGILE encryption (XSSF write/read decrypt path)** | **—** | ✅ Done |
 | 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
 | 5 | Formula engine (FormulaEvaluator) | v1.0 | ⬜ Not started |
 | 6 | Word / PowerPoint formats | v1.x | ⬜ Not started |
@@ -232,6 +232,52 @@ examples/output/phase3_3-pptx-example.pptx
 
 Scope note: Phase 3.3 covers the core XSLF write/read surface — slides, picture shapes with anchor/rotation/flip, and picture data deduplication. Text boxes, animations, charts, and themes are later-phase work.
 
+### Phase 3.4 Verification
+
+Phase 3.4 is complete for the initial OOXML Agile encryption surface: write a password-protected `.xlsx`, wrap it as an OLE2 compound file with `EncryptionInfo` and `EncryptedPackage`, decrypt it through dotnet-poi, and validate the encrypted fixture with Apache POI Java and Microsoft Excel.
+
+Implemented surface:
+
+- `XSSFWorkbook.writeEncrypted(Stream, password)`
+- `EncryptionInfo(EncryptionMode.agile)`
+- `EncryptionInfo(Stream)` for reading the OLE2 wrapper
+- `Encryptor.confirmPassword(...)` and `Encryptor.encryptPackage(...)`
+- `Decryptor.verifyPassword(...)` and `Decryptor.getData()`
+- in-repo CFB writer/reader for the Agile two-stream POIFS wrapper, including mini FAT support
+
+Verification currently covers:
+
+- 8 unit tests for Agile payload encryption/decryption across chunk and padding boundaries
+- C# write fixture: dotnet-poi writes an Agile-encrypted `.xlsx`
+- Java interop in the write direction: Apache POI reads and decrypts the dotnet-poi encrypted fixture
+- Microsoft Excel manual verification: the generated encrypted workbook opens with password `f`
+- a runnable example under `examples/Phase34AgileEncryptionExample`
+
+Commands:
+
+```bash
+dotnet test tests/DotnetPoi.POIFS.Tests/DotnetPoi.POIFS.Tests.csproj
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Write_AgileEncryptedWorkbook_CreatesFixtureForPoi"
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest#readPhase34AgileEncryptedWorkbook
+dotnet run --project examples/Phase34AgileEncryptionExample/Phase34AgileEncryptionExample.csproj
+```
+
+The example writes:
+
+```text
+examples/output/phase3_4-agile-encrypted-example.xlsx
+```
+
+Password:
+
+```text
+f
+```
+
+**Byte-level XML parity note**: Phase 3.4 keeps the existing POI/XMLBeans byte-level XML fixture guarantee for normal OOXML parts. The Agile `EncryptionInfo` XML is intentionally generated in the known Excel-compatible shape documented in `PHASE_3_4_AGILE_ENCRYPTION_NOTES.md`; full encrypted OLE2 file byte-for-byte parity with Apache POI is not claimed because salts, keys, encrypted bytes, sector layout, and package metadata vary. The current guarantee is semantic compatibility with Apache POI and Excel for the implemented AES-128/SHA1 Agile path.
+
+Scope note: Phase 3.4 currently covers the default AES-128/SHA1 Agile encryption path for OOXML `.xlsx`. AES-192/AES-256, SHA-256+, broader POIFS/HSSF, and general-purpose OLE2 document authoring remain later work.
+
 ---
 
 ## Quick Start
@@ -268,6 +314,7 @@ dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
 dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
 dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
 dotnet run --project examples/Phase33PptxExample/Phase33PptxExample.csproj
+dotnet run --project examples/Phase34AgileEncryptionExample/Phase34AgileEncryptionExample.csproj
 ```
 
 pptx example:
@@ -382,7 +429,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 
 ## 対応状況
 
-### 現在のフェーズ: Phase 3.3.5 — AGILE 暗号化（次のフェーズ）
+### 現在のフェーズ: Phase 3.4 — AGILE 暗号化完了、次は Phase 4
 
 | Phase | 内容 | バージョン目標 | 状態 |
 |---|---|---|---|
@@ -395,7 +442,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | **3.1** | **画像の回転（XSSFPicture.setRotation/getRotation）** | **—** | ✅ 完了 |
 | **3.2** | **docx 対応（XWPF — テキスト・画像・回転）** | **—** | ✅ 完了 |
 | **3.3** | **pptx 対応（XSLF — スライド・画像・回転・フリップ）** | **—** | ✅ 完了 |
-| 3.3.5 | AGILE 暗号化 | — | ⬜ 未着手 |
+| **3.4** | **AGILE 暗号化（XSSF write / read decrypt path）** | **—** | ✅ 完了 |
 | 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
 | 5 | 数式エンジン（FormulaEvaluator） | v1.0 | ⬜ 未着手 |
 | 6 | Word / PowerPoint 形式 | v1.x | ⬜ 未着手 |
@@ -567,6 +614,52 @@ examples/output/phase3_3-pptx-example.pptx
 
 範囲の注意: Phase 3.3 が対象にしているのは XSLF の書き出し・読み込みコアサーフェス（スライド・アンカー付き画像シェイプ・回転・フリップ・重複排除）です。テキストボックス・アニメーション・グラフ・テーマは後続フェーズの対象です。
 
+### Phase 3.4 検証
+
+Phase 3.4 は最初の OOXML Agile encryption surface として完了しています。対象は password protected `.xlsx` の書き出し、`EncryptionInfo` / `EncryptedPackage` を持つ OLE2 compound file へのラップ、dotnet-poi での復号、Apache POI Java と Microsoft Excel での読み込み確認です。
+
+実装済み API:
+
+- `XSSFWorkbook.writeEncrypted(Stream, password)`
+- `EncryptionInfo(EncryptionMode.agile)`
+- `EncryptionInfo(Stream)` による OLE2 wrapper 読み込み
+- `Encryptor.confirmPassword(...)` / `Encryptor.encryptPackage(...)`
+- `Decryptor.verifyPassword(...)` / `Decryptor.getData()`
+- Agile の 2 stream POIFS wrapper 用 in-repo CFB writer/reader（mini FAT 対応）
+
+現在の検証内容:
+
+- chunk / padding 境界を含む Agile payload 暗号化・復号 unit test 8 件
+- dotnet-poi が Agile encrypted `.xlsx` fixture を書く C# interop test
+- Apache POI(Java) が dotnet-poi 生成の暗号化 fixture を復号・読み込みする相互運用テスト
+- Microsoft Excel で password `f` による手動オープン確認
+- `examples/Phase34AgileEncryptionExample` の実行サンプル
+
+確認コマンド:
+
+```bash
+dotnet test tests/DotnetPoi.POIFS.Tests/DotnetPoi.POIFS.Tests.csproj
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Write_AgileEncryptedWorkbook_CreatesFixtureForPoi"
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest#readPhase34AgileEncryptedWorkbook
+dotnet run --project examples/Phase34AgileEncryptionExample/Phase34AgileEncryptionExample.csproj
+```
+
+サンプルの出力先:
+
+```text
+examples/output/phase3_4-agile-encrypted-example.xlsx
+```
+
+password:
+
+```text
+f
+```
+
+**byte-level XML parity に関する注意**: 通常の OOXML part については、既存の Apache POI/XMLBeans byte-level XML fixture guarantee を維持しています。Agile の `EncryptionInfo` XML は `PHASE_3_4_AGILE_ENCRYPTION_NOTES.md` に記録した Excel-compatible shape で意図的に生成しています。暗号化済み OLE2 file 全体の Apache POI との byte-for-byte parity は、salt / key / encrypted bytes / sector layout / package metadata が変わるため主張していません。現時点の保証は、実装済み AES-128/SHA1 Agile path の Apache POI と Excel との意味的な互換性です。
+
+範囲の注意: Phase 3.4 が対象にしているのは OOXML `.xlsx` の default AES-128/SHA1 Agile encryption path です。AES-192/AES-256、SHA-256+、より広い POIFS/HSSF、汎用 OLE2 document authoring は後続フェーズの対象です。
+
 ### Phase 3.2 検証
 
 Phase 3.2 は最初の docx 書き出し面として完了しています。対象は段落テキスト・インライン画像・bold/italic・画像の回転・docx 保存・読み込みです。
@@ -632,6 +725,7 @@ dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
 dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
 dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
 dotnet run --project examples/Phase33PptxExample/Phase33PptxExample.csproj
+dotnet run --project examples/Phase34AgileEncryptionExample/Phase34AgileEncryptionExample.csproj
 ```
 
 pptx example:

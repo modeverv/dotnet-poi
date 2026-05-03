@@ -1,13 +1,13 @@
 # Phase 3.4 Agile Encryption Notes
 
-This note captures the working state of the OOXML Agile encryption slice and the traps found while making Excel accept the generated file. Read this before changing `src/DotnetPoi.POIFS/Crypt/AgileEncryption.cs`, especially before removing the temporary `OpenMcdf` dependency.
+This note captures the working state of the OOXML Agile encryption slice and the traps found while making Excel accept the generated file. Read this before changing `src/DotnetPoi.POIFS/Crypt/AgileEncryption.cs` or the in-repo CFB writer in `src/DotnetPoi.POIFS/Crypt/CompoundFile.cs`.
 
 ## Current Working State
 
 - `XSSFWorkbook.writeEncrypted(Stream, string)` writes a normal xlsx package to memory, then wraps it as an Agile-encrypted OLE2 compound file.
-- `EncryptionInfo` / `EncryptedPackage` CFB streams are currently written with `OpenMcdf`.
+- `EncryptionInfo` / `EncryptedPackage` CFB streams are written with the in-repo `CompoundFile` writer.
 - Apache POI can decrypt and read the generated fixture.
-- Microsoft Excel opens the generated encrypted xlsx without the previous corruption warning after the integrity HMAC fixes below.
+- Microsoft Excel opens the in-repo CFB writer generated encrypted xlsx without the previous corruption warning after the integrity HMAC fixes below.
 
 The generated interop fixture is:
 
@@ -21,7 +21,7 @@ Password used by tests:
 f
 ```
 
-## Why OpenMcdf Is Currently Used
+## Why OpenMcdf Was Used Temporarily
 
 An earlier hand-written minimal CFB writer produced files Apache POI could read, but Excel still treated them as corrupt or suspicious. POI is permissive enough that "POI can decrypt" is not sufficient for Excel compatibility.
 
@@ -32,7 +32,7 @@ The known fragile CFB areas are:
 - root storage mini-stream metadata
 - sector allocation and stream cutoff behavior
 
-For Phase 3.4, `OpenMcdf` is intentionally used as a compatibility crutch so the cryptographic work can stabilize independently from a full POIFS writer. Removing it should be treated as POIFS work, not as a simple dependency cleanup.
+For the first Phase 3.4 slice, `OpenMcdf` was intentionally used as a compatibility crutch so the cryptographic work could stabilize independently from a full POIFS writer. It has since been removed from `DotnetPoi.POIFS`; CFB changes should still be treated as POIFS work, not as incidental encryption cleanup.
 
 ## Excel-Critical Agile Details
 
@@ -82,7 +82,7 @@ The XML is currently written without an XML declaration and with attribute order
 /Users/seijiro/Sync/sync_work/me/SetPassToExceldotNet/src/ExcelEncryptor/Encrypt.cs
 ```
 
-The current implementation builds the XML with `XDocument.ToString(SaveOptions.DisableFormatting)` to match that working file shape.
+The current implementation builds the XML with `PoiXmlWriter` to keep the Phase -1 XML gate intact while preserving that working file shape.
 
 Do not "clean up" this XML writer casually. Byte-level XML shape has caused previous Office encryption integrity mismatches.
 
@@ -100,31 +100,32 @@ The xUnit runner may need elevated sandbox permissions because it opens a local 
 
 Manual Excel verification is still required for this phase. POI interop alone does not validate the same integrity path Excel validates.
 
-## OpenMcdf Removal Plan
+## In-Repo CFB Writer Notes
 
-When replacing `OpenMcdf` with an in-repo POIFS writer, preserve behavior first and refactor second.
+The current in-repo writer supports the two stream shape required by OOXML Agile encryption and the reader supports regular FAT and mini FAT streams.
 
-Recommended sequence:
+Current behavior:
 
-1. Keep `AgileEncryption.cs` cryptographic output unchanged.
-2. Add a POIFS writer test that writes exactly two streams:
+- sector size: 512 bytes
+- mini sector size: 64 bytes
+- mini stream cutoff: 4096 bytes
+- streams below cutoff, including `EncryptionInfo`, are stored in the root mini stream with mini FAT chains
+- directory child ordering follows POI's `DirectoryProperty.PropertyComparator` length-then-case-insensitive ordering
+
+Validated sequence:
+
+1. Kept `AgileEncryption.cs` cryptographic output unchanged.
+2. Replaced `OpenMcdf` with `CompoundFile.Write` for exactly two streams:
    - `EncryptionInfo`
    - `EncryptedPackage`
-3. Compare the resulting CFB with an `OpenMcdf`-generated file structurally:
-   - stream names and lengths
-   - FAT chain lengths
-   - mini FAT usage
-   - root storage directory tree
-   - sector size and mini stream cutoff
-4. Validate with Apache POI.
-5. Validate manually with Excel and confirm no corruption/tamper warning appears.
-6. Only then remove `OpenMcdf` from `src/DotnetPoi.POIFS/DotnetPoi.POIFS.csproj`.
+3. Validated with Apache POI using `ReadFromDotnetTest#readPhase34AgileEncryptedWorkbook`.
+4. Removed `OpenMcdf` from `src/DotnetPoi.POIFS/DotnetPoi.POIFS.csproj`.
 
-Avoid padding streams just to dodge mini FAT behavior. Excel notices more CFB detail than POI. A proper in-repo implementation should either support mini streams correctly or intentionally store streams in regular FAT while keeping header/directory metadata consistent.
+Manual Excel verification should still be repeated after future CFB writer changes because POI interop does not validate every integrity path Excel validates.
 
 ## Known Backlog
 
-- Implement full in-repo POIFS/CFB writer and reader.
+- Expand the in-repo POIFS/CFB writer and reader beyond the Agile two-stream scenario.
 - Add a test helper that recomputes Agile integrity HMAC from `EncryptedPackage` and `EncryptionInfo`.
 - Add an Excel/manual verification checklist artifact for release candidates.
 - Consider supporting AES-192/AES-256 and SHA-256+ after the AES-128/SHA1 path is fully stabilized.

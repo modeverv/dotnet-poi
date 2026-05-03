@@ -145,3 +145,30 @@ Requires `tests/image.jpg` (present in the repository).
 Slide 1: photo filling the entire slide at 0° rotation.  
 Slide 2: same photo at 3×2.25 inch, 45° rotation, horizontal flip.  
 Slide 3: same photo at 3×2.25 inch, 90° rotation.
+
+## Phase34AgileEncryptionExample
+
+Creates an Agile-encrypted `.xlsx` file using the Phase 3.4 XSSF encryption API, then decrypts it with dotnet-poi and reads the workbook back:
+
+```bash
+dotnet run --project examples/Phase34AgileEncryptionExample/Phase34AgileEncryptionExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase3_4-agile-encrypted-example.xlsx
+```
+
+Password:
+
+```text
+f
+```
+
+The example demonstrates:
+
+- `XSSFWorkbook.writeEncrypted(Stream, password)`
+- OLE2 `EncryptionInfo` / `EncryptedPackage` wrapper generation through the in-repo POIFS CFB writer
+- `EncryptionInfo(Stream)` and `Decryptor.verifyPassword(...)`
+- Decrypted package read back via `XSSFWorkbook(Stream)`
