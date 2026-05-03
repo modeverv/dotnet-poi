@@ -29,6 +29,11 @@ jobs:
       - name: Generate XML parity fixtures
         run: mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=XmlParityFixtureGeneratorTest
 
+      - name: Upload generated fixtures
+        uses: actions/upload-artifact@v4
+        with:
+          name: xml-parity-fixtures
+          path: tests/DotnetPoi.Interop.Tests/fixtures/xml-parity
+
       - name: Ensure fixtures are up to date
         run: git diff --exit-code -- tests/DotnetPoi.Interop.Tests/fixtures/xml-parity
-
