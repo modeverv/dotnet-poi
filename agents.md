@@ -1,5 +1,8 @@
 # dotnet-poi — LLM Agent Instructions
 
+## rule 
+do not commit via llm
+
 ## Project Overview
 
 This repository is an **unofficial, faithful .NET port of Apache POI (Java)**.

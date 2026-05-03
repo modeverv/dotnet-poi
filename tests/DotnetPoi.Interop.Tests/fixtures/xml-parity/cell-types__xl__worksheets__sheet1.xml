@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:E1"/><sheetViews><sheetView workbookViewId="0" tabSelected="true"/></sheetViews><sheetFormatPr defaultRowHeight="15.0"/><sheetData><row r="1"><c r="A1" t="s" s="0"><v>0</v></c><c r="B1" t="n" s="0"><v>42.5</v></c><c r="C1" t="b" s="0"><v>1</v></c><c r="D1" t="n" s="1"><v>25569.375</v></c><c r="E1" s="0"><f>SUM(1,2,3)</f></c></row></sheetData><pageMargins bottom="0.75" footer="0.3" header="0.3" left="0.7" right="0.7" top="0.75"/></worksheet>
