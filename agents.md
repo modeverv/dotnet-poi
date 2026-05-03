@@ -241,7 +241,9 @@ Goal: `v0.4`. `IWorkbook` / `ISheet` / `IRow` / `ICell`.
 
 ### Phase 3.4 agile 暗号化
 
-
+Working notes and handoff for this phase live in `PHASE_3_4_AGILE_ENCRYPTION_NOTES.md`.
+Read that file before changing Agile encryption, `EncryptionInfo` XML output, `EncryptedPackage`
+chunking/HMAC code, or before removing the temporary `OpenMcdf` dependency.
 
 ### Phase 4 — POIFS + HSSF (xls support)
 
@@ -687,6 +689,10 @@ Phase 3 の前には、共通インターフェースの形に影響する Phase
 - `tests/DotnetPoi.XSLF.Tests/UserModel/XMLSlideShowTests.cs` — 18テスト全パス
 
 ### Phase 3.3.5 agile 暗号化
+
+このフェーズの作業メモと引き継ぎは `PHASE_3_4_AGILE_ENCRYPTION_NOTES.md` にある。
+Agile 暗号化、`EncryptionInfo` XML 出力、`EncryptedPackage` の chunk/HMAC 処理、
+一時的な `OpenMcdf` 依存の削除に触る前に必ず読むこと。
 
 ### Phase 4 — POIFS + HSSF（xls 対応）
 

@@ -15,6 +15,9 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.PictureData;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.poifs.crypt.Decryptor;
+import org.apache.poi.poifs.crypt.EncryptionInfo;
+import org.apache.poi.poifs.filesystem.POIFSFileSystem;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFPictureShape;
 import org.apache.poi.xslf.usermodel.XSLFShape;
@@ -186,6 +189,26 @@ public class ReadFromDotnetTest {
             // Verify picture bytes
             assertTrue(java.util.Arrays.equals(loadTestImage(), picture.getPictureData().getData()),
                 "picture bytes should match test image");
+        }
+    }
+
+    @Test
+    void readPhase34AgileEncryptedWorkbook() throws Exception {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase3_4-agile-encrypted.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             POIFSFileSystem fs = new POIFSFileSystem(input)) {
+            EncryptionInfo info = new EncryptionInfo(fs);
+            Decryptor decryptor = info.getDecryptor();
+            assertTrue(decryptor.verifyPassword("f"));
+
+            try (InputStream data = decryptor.getDataStream(fs);
+                 XSSFWorkbook workbook = new XSSFWorkbook(data)) {
+                Sheet sheet = workbook.getSheet("Phase3.4");
+                assertEquals("encrypted from dotnet-poi", sheet.getRow(0).getCell(0).getStringCellValue());
+                assertEquals(34.0, sheet.getRow(0).getCell(1).getNumericCellValue());
+            }
         }
     }
 

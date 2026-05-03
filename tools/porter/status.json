@@ -41,6 +41,12 @@
       "name": "Image Rotation",
       "status": "done",
       "notes": "XSSFPicture.setRotation()/getRotation() in degrees; writes rot attribute on <a:xfrm> in 60000ths-of-a-degree OOXML units. Drawing XML parsed on workbook load to restore shapes, anchors, and rotation. Interop tested: C# writes rotated fixture, Java POI reads and verifies rot=5400000."
+    },
+    {
+      "phase": "3.4",
+      "name": "Agile Encryption",
+      "status": "in_progress",
+      "notes": "Initial Agile write/decrypt slice is present: AES-128/SHA-1 agile password verifier, chunked EncryptedPackage encryption, HMAC metadata, OpenMcdf-backed CFB wrapper, XSSFWorkbook.writeEncrypted, and POI interop read test for a password-protected xlsx. Excel-compatible integrity HMAC details and OpenMcdf removal handoff are documented in PHASE_3_4_AGILE_ENCRYPTION_NOTES.md."
     }
   ],
   "classes": [

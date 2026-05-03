@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <ProjectReference Include="../DotnetPoi.SS/DotnetPoi.SS.csproj" />
+        <ProjectReference Include="../DotnetPoi.POIFS/DotnetPoi.POIFS.csproj" />
     </ItemGroup>
 
 </Project>

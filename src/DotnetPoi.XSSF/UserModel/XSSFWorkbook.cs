@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
+using DotnetPoi.POIFS.Crypt;
 using DotnetPoi.SS.UserModel;
 using DotnetPoi.SS.Xml;
 
@@ -189,6 +190,17 @@ public sealed class XSSFWorkbook : IWorkbook
         {
             WriteBinaryEntry(archive, $"xl/media/image{picture.Index}.{picture.Extension}", picture.Data);
         }
+    }
+
+    public void writeEncrypted(Stream stream, string password)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        using var package = new MemoryStream();
+        write(package);
+
+        var info = new EncryptionInfo(EncryptionMode.agile);
+        info.Encryptor.confirmPassword(password);
+        info.Encryptor.encryptPackage(package.ToArray(), stream);
     }
 
     public void close()

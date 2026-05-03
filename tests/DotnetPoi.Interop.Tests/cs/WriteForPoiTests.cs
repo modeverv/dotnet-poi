@@ -185,6 +185,26 @@ public class WriteForPoiTests
         Assert.True(new FileInfo(fixturePath).Length > 0);
     }
 
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_AgileEncryptedWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase3_4-agile-encrypted.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Phase3.4");
+        var row = sheet.createRow(0);
+        row.createCell(0).setCellValue("encrypted from dotnet-poi");
+        row.createCell(1).setCellValue(34.0);
+
+        using var stream = File.Create(fixturePath);
+        workbook.writeEncrypted(stream, "f");
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;
