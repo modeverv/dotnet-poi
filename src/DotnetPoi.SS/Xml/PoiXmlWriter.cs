@@ -78,6 +78,11 @@ public sealed class PoiXmlWriter : IDisposable
 
     public void WriteString(string text)
     {
+        if (text.Length == 0)
+        {
+            return;
+        }
+
         CloseStartTagIfNeeded(markParentHasContent: false);
         _writer.Write(EscapeText(text));
         if (_stack.Count > 0)
