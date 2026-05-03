@@ -227,6 +227,16 @@ Key classes: `XSSFDrawing`, `XSSFPicture`, `XSSFClientAnchor`, `POIXMLDocumentPa
 
 Goal: `v0.4`. `IWorkbook` / `ISheet` / `IRow` / `ICell`.
 
+### Phase 3.1 細かいところ画像の回転
+
+### Phase 3.2 docxの対応
+
+### Phase 3.2.1 docxの画像の埋め込み、回転の動作
+
+### Phase 3.3 agile 暗号化
+
+
+
 ### Phase 4 — POIFS + HSSF (xls support)
 
 Goal: `v0.5`. OLE2 container → BIFF read/write. Heaviest phase.
@@ -650,6 +660,14 @@ C# の System.Xml.XmlWriter でこの XML を再現する際に
 ### Phase 3 — SS 共通インターフェース
 
 目標: `v0.4`。`IWorkbook` / `ISheet` / `IRow` / `ICell` の共通化。
+
+### Phase 3.1 細かいところ画像の回転
+
+### Phase 3.2 docxの対応
+
+### Phase 3.2.1 docxの画像の埋め込み、回転の動作
+
+### Phase 3.3 agile 暗号化
 
 ### Phase 4 — POIFS + HSSF（xls 対応）
 
