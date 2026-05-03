@@ -16,6 +16,7 @@ public sealed class XSSFCell
     private XSSFCellType _cellType = XSSFCellType.Blank;
     private string? _stringValue;
     private double _numericValue;
+    private XSSFCellStyle? _cellStyle;
 
     internal XSSFCell(XSSFRow row, int cellNum)
     {
@@ -81,8 +82,28 @@ public sealed class XSSFCell
         return _numericValue;
     }
 
+    public XSSFCellStyle getCellStyle()
+    {
+        return _cellStyle ?? getSheet().getWorkbook().getCellStyleAt(0);
+    }
+
+    public void setCellStyle(XSSFCellStyle? style)
+    {
+        if (style is not null && !ReferenceEquals(style.Workbook, getSheet().getWorkbook()))
+        {
+            throw new ArgumentException("This Style does not belong to the supplied Workbook Styles Source. Are you trying to assign a style from one workbook to the cell of a different workbook?", nameof(style));
+        }
+
+        _cellStyle = style;
+    }
+
     internal string GetNumericText()
     {
         return _numericValue.ToString("G15", CultureInfo.InvariantCulture);
+    }
+
+    internal void SetCellStyleIndex(int styleIndex)
+    {
+        _cellStyle = getSheet().getWorkbook().getCellStyleAt(styleIndex);
     }
 }

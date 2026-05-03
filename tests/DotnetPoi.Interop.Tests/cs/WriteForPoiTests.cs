@@ -26,6 +26,40 @@ public class WriteForPoiTests
         Assert.True(new FileInfo(fixturePath).Length > 0);
     }
 
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_StyledWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase2-styles.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new XSSFWorkbook();
+        var font = workbook.createFont();
+        font.setBold(true);
+        font.setItalic(true);
+        font.setFontName("Arial");
+        font.setFontHeightInPoints(14);
+        font.setColor((short)IndexedColors.Red);
+
+        var style = workbook.createCellStyle();
+        style.setFont(font);
+        style.setDataFormat(workbook.createDataFormat().getFormat("0.00"));
+        style.setFillForegroundColor((short)IndexedColors.Yellow);
+        style.setFillPattern(FillPatternType.SolidForeground);
+        style.setBorderBottom(BorderStyle.Thin);
+
+        var sheet = workbook.createSheet("Phase2");
+        var cell = sheet.createRow(0).createCell(0);
+        cell.setCellValue(123.456);
+        cell.setCellStyle(style);
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;

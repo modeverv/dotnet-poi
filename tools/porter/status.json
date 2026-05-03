@@ -1,0 +1,94 @@
+{
+  "phases": [
+    {
+      "phase": "-1",
+      "name": "XML Output Parity",
+      "status": "done",
+      "notes": "PoiXmlWriter and XML parity fixtures/tests are present."
+    },
+    {
+      "phase": "0",
+      "name": "Minimal xlsx Write",
+      "status": "done",
+      "notes": "XSSFWorkbook/XSSFSheet/XSSFRow/XSSFCell can write string and numeric cells."
+    },
+    {
+      "phase": "1",
+      "name": "xlsx Read",
+      "status": "done",
+      "notes": "Basic shared string, inline string, and numeric cell read path is present."
+    },
+    {
+      "phase": "2",
+      "name": "Styles & Formatting",
+      "status": "done",
+      "notes": "Initial Phase 2 support for cell styles, fonts, indexed colors, fills, borders, built-in formats, and custom number formats."
+    }
+  ],
+  "classes": [
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFWorkbook.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFWorkbook.cs",
+      "status": "done",
+      "testStatus": "done",
+      "phase": "2",
+      "notes": "Workbook read/write exists; Phase 2 style table APIs are present."
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFSheet.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFSheet.cs",
+      "status": "done",
+      "testStatus": "done",
+      "phase": "1",
+      "notes": ""
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFRow.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFRow.cs",
+      "status": "done",
+      "testStatus": "done",
+      "phase": "1",
+      "notes": ""
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFCell.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFCell.cs",
+      "status": "done",
+      "testStatus": "done",
+      "phase": "2",
+      "notes": "String/numeric values and cell style assignment exist. Formulas remain Phase 5."
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFCreationHelper.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFCreationHelper.cs",
+      "status": "done",
+      "testStatus": "done",
+      "phase": "0",
+      "notes": ""
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFCellStyle.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFCellStyle.cs",
+      "status": "done",
+      "testStatus": "done",
+      "phase": "2",
+      "notes": "Initial Phase 2 subset: font, data format, fill foreground/pattern, and borders."
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFFont.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFFont.cs",
+      "status": "done",
+      "testStatus": "done",
+      "phase": "2",
+      "notes": "Initial Phase 2 subset: name, height, indexed color, bold, italic, strikeout, underline."
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFDataFormat.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFDataFormat.cs",
+      "status": "done",
+      "testStatus": "done",
+      "phase": "2",
+      "notes": "Built-in formats plus custom formats starting at POI's first user-defined index."
+    }
+  ]
+}

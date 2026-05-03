@@ -11,15 +11,24 @@ public sealed class XSSFWorkbook : IDisposable
     private readonly List<XSSFSheet> _sheets = new();
     private readonly Dictionary<string, int> _sharedStringIndexes = new(StringComparer.Ordinal);
     private readonly List<string> _sharedStrings = new();
+    private readonly List<XSSFFont> _fonts = new();
+    private readonly List<XSSFCellStyle> _cellStyles = new();
+    private readonly List<XSSFCellStyle?> _fills = new();
+    private readonly List<XSSFCellStyle?> _borders = new();
+    private readonly Dictionary<string, int> _customNumberFormatIndexes = new(StringComparer.Ordinal);
+    private readonly SortedDictionary<int, string> _customNumberFormats = new();
     private XSSFCreationHelper? _creationHelper;
+    private XSSFDataFormat? _dataFormat;
 
     public XSSFWorkbook()
     {
+        InitializeDefaultStyles();
     }
 
     public XSSFWorkbook(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
+        InitializeDefaultStyles();
         Load(stream);
     }
 
@@ -60,6 +69,35 @@ public sealed class XSSFWorkbook : IDisposable
         return _creationHelper ??= new XSSFCreationHelper(this);
     }
 
+    public XSSFCellStyle createCellStyle()
+    {
+        var style = new XSSFCellStyle(this, _cellStyles.Count);
+        _cellStyles.Add(style);
+        return style;
+    }
+
+    public XSSFCellStyle getCellStyleAt(int idx)
+    {
+        return _cellStyles[idx];
+    }
+
+    public XSSFDataFormat createDataFormat()
+    {
+        return _dataFormat ??= new XSSFDataFormat(this);
+    }
+
+    public XSSFFont createFont()
+    {
+        var font = new XSSFFont(_fonts.Count);
+        _fonts.Add(font);
+        return font;
+    }
+
+    public XSSFFont getFontAt(int idx)
+    {
+        return _fonts[idx];
+    }
+
     public void write(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -97,6 +135,63 @@ public sealed class XSSFWorkbook : IDisposable
         {
             createSheet();
         }
+    }
+
+    private void InitializeDefaultStyles()
+    {
+        _fonts.Clear();
+        _cellStyles.Clear();
+        _fills.Clear();
+        _borders.Clear();
+        _customNumberFormatIndexes.Clear();
+        _customNumberFormats.Clear();
+        _dataFormat = null;
+
+        _fonts.Add(new XSSFFont(0));
+        _fills.Add(null);
+        _fills.Add(null);
+        _borders.Add(null);
+        _cellStyles.Add(new XSSFCellStyle(this, 0));
+    }
+
+    internal void VerifyFontBelongsToWorkbook(XSSFFont font)
+    {
+        if ((uint)font.getIndex() >= (uint)_fonts.Count || !ReferenceEquals(_fonts[font.getIndex()], font))
+        {
+            throw new ArgumentException("This Font does not belong to this Workbook.");
+        }
+    }
+
+    internal int GetOrAddCustomNumberFormat(string format)
+    {
+        if (_customNumberFormatIndexes.TryGetValue(format, out var existingIndex))
+        {
+            return existingIndex;
+        }
+
+        var nextIndex = _customNumberFormats.Count == 0
+            ? XSSFDataFormat.FIRST_USER_DEFINED_FORMAT_INDEX
+            : Math.Max(XSSFDataFormat.FIRST_USER_DEFINED_FORMAT_INDEX, _customNumberFormats.Keys.Max() + 1);
+        _customNumberFormats[nextIndex] = format;
+        _customNumberFormatIndexes[format] = nextIndex;
+        return nextIndex;
+    }
+
+    internal string? GetCustomNumberFormat(int index)
+    {
+        return _customNumberFormats.TryGetValue(index, out var format) ? format : null;
+    }
+
+    internal int GetOrAddFill(XSSFCellStyle style)
+    {
+        _fills.Add(style);
+        return _fills.Count - 1;
+    }
+
+    internal int GetOrAddBorder(XSSFCellStyle style)
+    {
+        _borders.Add(style);
+        return _borders.Count - 1;
     }
 
     private void BuildSharedStrings()
@@ -144,8 +239,12 @@ public sealed class XSSFWorkbook : IDisposable
 
     private void Load(Stream stream)
     {
+        _sheets.Clear();
+        InitializeDefaultStyles();
+
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
         var sharedStrings = ReadSharedStrings(archive);
+        ReadStyles(archive);
 
         foreach (var sheetInfo in ReadWorkbookSheets(archive))
         {
@@ -290,6 +389,11 @@ public sealed class XSSFWorkbook : IDisposable
                 var columnIndex = reference is null ? nextColumnIndex : ParseColumnIndex(reference);
                 currentCell = currentRow.createCell(columnIndex);
                 currentCellType = reader.GetAttribute("t");
+                var styleIndexText = reader.GetAttribute("s");
+                if (styleIndexText is not null)
+                {
+                    currentCell.SetCellStyleIndex(int.Parse(styleIndexText, CultureInfo.InvariantCulture));
+                }
                 inlineText.Clear();
                 nextColumnIndex = columnIndex + 1;
 
@@ -323,6 +427,142 @@ public sealed class XSSFWorkbook : IDisposable
                 currentCell = null;
                 currentCellType = null;
             }
+        }
+    }
+
+    private void ReadStyles(ZipArchive archive)
+    {
+        var entry = archive.GetEntry("xl/styles.xml");
+        if (entry is null)
+        {
+            return;
+        }
+
+        InitializeDefaultStyles();
+        using var stream = entry.Open();
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
+
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "numFmt")
+            {
+                var id = int.Parse(reader.GetAttribute("numFmtId") ?? "0", CultureInfo.InvariantCulture);
+                var code = reader.GetAttribute("formatCode") ?? string.Empty;
+                _customNumberFormats[id] = code;
+                _customNumberFormatIndexes[code] = id;
+                continue;
+            }
+
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "fonts")
+            {
+                ReadFonts(reader);
+                continue;
+            }
+
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "cellXfs")
+            {
+                ReadCellXfs(reader);
+            }
+        }
+    }
+
+    private void ReadFonts(XmlReader reader)
+    {
+        _fonts.Clear();
+        if (reader.IsEmptyElement)
+        {
+            _fonts.Add(new XSSFFont(0));
+            return;
+        }
+
+        using var subtree = reader.ReadSubtree();
+        XSSFFont? font = null;
+        while (subtree.Read())
+        {
+            if (subtree.NodeType == XmlNodeType.Element && subtree.LocalName == "font")
+            {
+                font = new XSSFFont(_fonts.Count);
+                _fonts.Add(font);
+                continue;
+            }
+
+            if (font is null || subtree.NodeType != XmlNodeType.Element)
+            {
+                continue;
+            }
+
+            switch (subtree.LocalName)
+            {
+                case "b":
+                    font.setBold(ParseBooleanAttribute(subtree.GetAttribute("val"), defaultValue: true));
+                    break;
+                case "i":
+                    font.setItalic(ParseBooleanAttribute(subtree.GetAttribute("val"), defaultValue: true));
+                    break;
+                case "strike":
+                    font.setStrikeout(ParseBooleanAttribute(subtree.GetAttribute("val"), defaultValue: true));
+                    break;
+                case "u":
+                    font.setUnderline(1);
+                    break;
+                case "color":
+                    if (short.TryParse(subtree.GetAttribute("indexed"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var color))
+                    {
+                        font.setColor(color);
+                    }
+                    break;
+                case "sz":
+                    if (double.TryParse(subtree.GetAttribute("val"), NumberStyles.Float, CultureInfo.InvariantCulture, out var size))
+                    {
+                        font.setFontHeightInPoints((short)size);
+                    }
+                    break;
+                case "name":
+                    font.setFontName(subtree.GetAttribute("val"));
+                    break;
+            }
+        }
+
+        if (_fonts.Count == 0)
+        {
+            _fonts.Add(new XSSFFont(0));
+        }
+    }
+
+    private void ReadCellXfs(XmlReader reader)
+    {
+        _cellStyles.Clear();
+        if (reader.IsEmptyElement)
+        {
+            _cellStyles.Add(new XSSFCellStyle(this, 0));
+            return;
+        }
+
+        using var subtree = reader.ReadSubtree();
+        while (subtree.Read())
+        {
+            if (subtree.NodeType != XmlNodeType.Element || subtree.LocalName != "xf")
+            {
+                continue;
+            }
+
+            var style = new XSSFCellStyle(this, _cellStyles.Count);
+            if (int.TryParse(subtree.GetAttribute("numFmtId"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var numFmtId))
+            {
+                style.setDataFormat(numFmtId);
+            }
+
+            if (int.TryParse(subtree.GetAttribute("fontId"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var fontId) && fontId != 0)
+            {
+                style.setFont(getFontAt(fontId));
+            }
+
+            _cellStyles.Add(style);
+        }
+
+        if (_cellStyles.Count == 0)
+        {
+            _cellStyles.Add(new XSSFCellStyle(this, 0));
         }
     }
 
@@ -444,6 +684,107 @@ public sealed class XSSFWorkbook : IDisposable
         writer.WriteEndElement();
     }
 
+    private static void WriteFont(PoiXmlWriter writer, XSSFFont font)
+    {
+        writer.WriteStartElement("font");
+        if (font.getBold())
+        {
+            writer.WriteStartElement("b");
+            writer.WriteEndElement();
+        }
+
+        if (font.getItalic())
+        {
+            writer.WriteStartElement("i");
+            writer.WriteEndElement();
+        }
+
+        if (font.getStrikeout())
+        {
+            writer.WriteStartElement("strike");
+            writer.WriteEndElement();
+        }
+
+        if (font.getUnderline() != 0)
+        {
+            writer.WriteStartElement("u");
+            writer.WriteEndElement();
+        }
+
+        WriteValElement(writer, "sz", font.GetFontHeightText());
+        writer.WriteStartElement("color");
+        writer.WriteAttributeString("indexed", font.getColor().ToString(CultureInfo.InvariantCulture));
+        writer.WriteEndElement();
+        WriteValElement(writer, "name", font.getFontName());
+        WriteValElement(writer, "family", "2");
+        WriteValElement(writer, "scheme", "minor");
+        writer.WriteEndElement();
+    }
+
+    private static void WriteFill(PoiXmlWriter writer, XSSFCellStyle? style)
+    {
+        writer.WriteStartElement("fill");
+        writer.WriteStartElement("patternFill");
+        writer.WriteAttributeString("patternType", GetPatternName(style?.FillPattern ?? FillPatternType.NoFill));
+        if (style?.FillForegroundColor is short foreground)
+        {
+            writer.WriteStartElement("fgColor");
+            writer.WriteAttributeString("indexed", foreground.ToString(CultureInfo.InvariantCulture));
+            writer.WriteEndElement();
+        }
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+    }
+
+    private static void WriteBorder(PoiXmlWriter writer, XSSFCellStyle? style)
+    {
+        writer.WriteStartElement("border");
+        WriteBorderSide(writer, "left", style?.BorderLeft ?? BorderStyle.None);
+        WriteBorderSide(writer, "right", style?.BorderRight ?? BorderStyle.None);
+        WriteBorderSide(writer, "top", style?.BorderTop ?? BorderStyle.None);
+        WriteBorderSide(writer, "bottom", style?.BorderBottom ?? BorderStyle.None);
+        writer.WriteStartElement("diagonal");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+    }
+
+    private static void WriteBorderSide(PoiXmlWriter writer, string sideName, BorderStyle style)
+    {
+        writer.WriteStartElement(sideName);
+        if (style != BorderStyle.None)
+        {
+            writer.WriteAttributeString("style", GetBorderStyleName(style));
+        }
+        writer.WriteEndElement();
+    }
+
+    private static void WriteCellXf(PoiXmlWriter writer, XSSFCellStyle style)
+    {
+        writer.WriteStartElement("xf");
+        writer.WriteAttributeString("numFmtId", style.NumFmtId.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("fontId", style.FontId.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("fillId", style.FillId.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("borderId", style.BorderId.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("xfId", "0");
+        if (style.ApplyFont)
+        {
+            writer.WriteAttributeString("applyFont", "true");
+        }
+        if (style.ApplyNumberFormat)
+        {
+            writer.WriteAttributeString("applyNumberFormat", "true");
+        }
+        if (style.ApplyFill)
+        {
+            writer.WriteAttributeString("applyFill", "true");
+        }
+        if (style.ApplyBorder)
+        {
+            writer.WriteAttributeString("applyBorder", "true");
+        }
+        writer.WriteEndElement();
+    }
+
     private static void WriteCoreProperties(PoiXmlWriter writer)
     {
         writer.WriteStartDocument("UTF-8", standalone: true);
@@ -499,29 +840,31 @@ public sealed class XSSFWorkbook : IDisposable
         writer.WriteEndElement();
     }
 
-    private static void WriteStyles(PoiXmlWriter writer)
+    private void WriteStyles(PoiXmlWriter writer)
     {
         writer.WriteStartDocument("UTF-8", standalone: false);
         writer.WriteString("\n");
         writer.WriteStartElement("styleSheet");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
         writer.WriteStartElement("numFmts");
-        writer.WriteAttributeString("count", "0");
+        writer.WriteAttributeString("count", _customNumberFormats.Count.ToString(CultureInfo.InvariantCulture));
+        foreach (var format in _customNumberFormats)
+        {
+            writer.WriteStartElement("numFmt");
+            writer.WriteAttributeString("numFmtId", format.Key.ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("formatCode", format.Value);
+            writer.WriteEndElement();
+        }
         writer.WriteEndElement();
         writer.WriteStartElement("fonts");
-        writer.WriteAttributeString("count", "1");
-        writer.WriteStartElement("font");
-        WriteValElement(writer, "sz", "11.0");
-        writer.WriteStartElement("color");
-        writer.WriteAttributeString("indexed", "8");
-        writer.WriteEndElement();
-        WriteValElement(writer, "name", "Calibri");
-        WriteValElement(writer, "family", "2");
-        WriteValElement(writer, "scheme", "minor");
-        writer.WriteEndElement();
+        writer.WriteAttributeString("count", _fonts.Count.ToString(CultureInfo.InvariantCulture));
+        foreach (var font in _fonts)
+        {
+            WriteFont(writer, font);
+        }
         writer.WriteEndElement();
         writer.WriteStartElement("fills");
-        writer.WriteAttributeString("count", "2");
+        writer.WriteAttributeString("count", _fills.Count.ToString(CultureInfo.InvariantCulture));
         writer.WriteStartElement("fill");
         writer.WriteStartElement("patternFill");
         writer.WriteAttributeString("patternType", "none");
@@ -532,21 +875,18 @@ public sealed class XSSFWorkbook : IDisposable
         writer.WriteAttributeString("patternType", "darkGray");
         writer.WriteEndElement();
         writer.WriteEndElement();
+        for (var i = 2; i < _fills.Count; i++)
+        {
+            WriteFill(writer, _fills[i]);
+        }
         writer.WriteEndElement();
         writer.WriteStartElement("borders");
-        writer.WriteAttributeString("count", "1");
-        writer.WriteStartElement("border");
-        writer.WriteStartElement("left");
-        writer.WriteEndElement();
-        writer.WriteStartElement("right");
-        writer.WriteEndElement();
-        writer.WriteStartElement("top");
-        writer.WriteEndElement();
-        writer.WriteStartElement("bottom");
-        writer.WriteEndElement();
-        writer.WriteStartElement("diagonal");
-        writer.WriteEndElement();
-        writer.WriteEndElement();
+        writer.WriteAttributeString("count", _borders.Count.ToString(CultureInfo.InvariantCulture));
+        WriteBorder(writer, null);
+        for (var i = 1; i < _borders.Count; i++)
+        {
+            WriteBorder(writer, _borders[i]);
+        }
         writer.WriteEndElement();
         writer.WriteStartElement("cellStyleXfs");
         writer.WriteAttributeString("count", "1");
@@ -558,14 +898,11 @@ public sealed class XSSFWorkbook : IDisposable
         writer.WriteEndElement();
         writer.WriteEndElement();
         writer.WriteStartElement("cellXfs");
-        writer.WriteAttributeString("count", "1");
-        writer.WriteStartElement("xf");
-        writer.WriteAttributeString("numFmtId", "0");
-        writer.WriteAttributeString("fontId", "0");
-        writer.WriteAttributeString("fillId", "0");
-        writer.WriteAttributeString("borderId", "0");
-        writer.WriteAttributeString("xfId", "0");
-        writer.WriteEndElement();
+        writer.WriteAttributeString("count", _cellStyles.Count.ToString(CultureInfo.InvariantCulture));
+        foreach (var style in _cellStyles)
+        {
+            WriteCellXf(writer, style);
+        }
         writer.WriteEndElement();
         writer.WriteEndElement();
     }
@@ -651,6 +988,11 @@ public sealed class XSSFWorkbook : IDisposable
 
             writer.WriteStartElement("c");
             writer.WriteAttributeString("r", FormatCellReference(cell.getRowIndex(), cell.getColumnIndex()));
+            var styleIndex = cell.getCellStyle().getIndex();
+            if (styleIndex != 0)
+            {
+                writer.WriteAttributeString("s", styleIndex.ToString(CultureInfo.InvariantCulture));
+            }
             if (cell.getCellType() == XSSFCellType.String)
             {
                 writer.WriteAttributeString("t", "s");
@@ -750,6 +1092,64 @@ public sealed class XSSFWorkbook : IDisposable
         }
 
         return columnIndex - 1;
+    }
+
+    private static bool ParseBooleanAttribute(string? value, bool defaultValue)
+    {
+        if (value is null)
+        {
+            return defaultValue;
+        }
+
+        return value == "1" || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetPatternName(FillPatternType pattern)
+    {
+        return pattern switch
+        {
+            FillPatternType.NoFill => "none",
+            FillPatternType.SolidForeground => "solid",
+            FillPatternType.FineDots => "mediumGray",
+            FillPatternType.AltBars => "darkGray",
+            FillPatternType.SparseDots => "lightGray",
+            FillPatternType.ThickHorizontalBands => "darkHorizontal",
+            FillPatternType.ThickVerticalBands => "darkVertical",
+            FillPatternType.ThickBackwardDiagonals => "darkDown",
+            FillPatternType.ThickForwardDiagonals => "darkUp",
+            FillPatternType.BigSpots => "darkGrid",
+            FillPatternType.Bricks => "darkTrellis",
+            FillPatternType.ThinHorizontalBands => "lightHorizontal",
+            FillPatternType.ThinVerticalBands => "lightVertical",
+            FillPatternType.ThinBackwardDiagonals => "lightDown",
+            FillPatternType.ThinForwardDiagonals => "lightUp",
+            FillPatternType.Squares => "lightGrid",
+            FillPatternType.Diamonds => "lightTrellis",
+            FillPatternType.LessDots => "gray125",
+            FillPatternType.LeastDots => "gray0625",
+            _ => "none"
+        };
+    }
+
+    private static string GetBorderStyleName(BorderStyle style)
+    {
+        return style switch
+        {
+            BorderStyle.Thin => "thin",
+            BorderStyle.Medium => "medium",
+            BorderStyle.Dashed => "dashed",
+            BorderStyle.Dotted => "dotted",
+            BorderStyle.Thick => "thick",
+            BorderStyle.Double => "double",
+            BorderStyle.Hair => "hair",
+            BorderStyle.MediumDashed => "mediumDashed",
+            BorderStyle.DashDot => "dashDot",
+            BorderStyle.MediumDashDot => "mediumDashDot",
+            BorderStyle.DashDotDot => "dashDotDot",
+            BorderStyle.MediumDashDotDot => "mediumDashDotDot",
+            BorderStyle.SlantedDashDot => "slantDashDot",
+            _ => "none"
+        };
     }
 
     private static void WriteDefault(PoiXmlWriter writer, string extension, string contentType)

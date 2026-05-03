@@ -217,6 +217,10 @@ Goal: `v0.2`. Round-trip: read back what was written.
 
 Goal: `v0.3`. Font, color, borders, number formats.
 
+Phase 2 is a practical baseline, not full XSSF parity. Track the remaining work in `PHASE_2_X_BACKLOG.md` and implement it in small POI-compatible slices with xUnit and Java interop coverage.
+
+Before Phase 3, prioritize Phase 2.x items that affect public API shape: boolean/date/blank/error cells, row/column layout, merged regions, and style properties that belong on common interfaces. Do not block Phase 3 on formula evaluation; formula write/read may be added earlier, but evaluator work belongs to Phase 5.
+
 ### Phase 2.5 — Images & Drawing
 
 Goal: `v0.35`. Embed images into xlsx sheets. No HSSF dependency — OOXML only.
@@ -650,6 +654,10 @@ C# の System.Xml.XmlWriter でこの XML を再現する際に
 ### Phase 2 — スタイル・書式
 
 目標: `v0.3`。フォント・色・罫線など。
+
+Phase 2 は実用的な基準線であり、XSSF 全体の完全互換を意味しない。残作業は `PHASE_2_X_BACKLOG.md` に記録し、xUnit と Java interop を伴う小さな POI 互換スライスとして実装する。
+
+Phase 3 の前には、共通インターフェースの形に影響する Phase 2.x 項目を優先する: boolean/date/blank/error cell、行/列レイアウト、merged regions、共通インターフェースに載る style property。数式評価エンジンで Phase 3 を止めないこと。formula の write/read は先に追加してよいが、評価器は Phase 5 として扱う。
 
 ### Phase 2.5 — 画像・図形
 

@@ -88,6 +88,93 @@ public class XSSFWorkbookTests
         Assert.Equal(0.0, loadedSheet.getRow(2)!.getCell(3)!.getNumericCellValue());
     }
 
+    [Fact]
+    public void Write_StyledCell_ProducesStylesAndCellStyleReference()
+    {
+        using var workbook = new XSSFWorkbook();
+        var dataFormat = workbook.createDataFormat();
+        var font = workbook.createFont();
+        font.setBold(true);
+        font.setItalic(true);
+        font.setFontName("Arial");
+        font.setFontHeightInPoints(14);
+        font.setColor((short)IndexedColors.Red);
+
+        var style = workbook.createCellStyle();
+        style.setFont(font);
+        style.setDataFormat(dataFormat.getFormat("0.00"));
+        style.setFillForegroundColor((short)IndexedColors.Yellow);
+        style.setFillPattern(FillPatternType.SolidForeground);
+        style.setBorderBottom(BorderStyle.Thin);
+
+        var sheet = workbook.createSheet("Styles");
+        var cell = sheet.createRow(0).createCell(0);
+        cell.setCellValue(12.3);
+        cell.setCellStyle(style);
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+
+        stream.Position = 0;
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var sheetXml = ReadEntry(archive, "xl/worksheets/sheet1.xml");
+        Assert.Contains("<c r=\"A1\" s=\"1\"><v>12.3</v></c>", sheetXml);
+
+        var stylesXml = ReadEntry(archive, "xl/styles.xml");
+        Assert.Contains("<fonts count=\"2\">", stylesXml);
+        Assert.Contains("<b/>", stylesXml);
+        Assert.Contains("<i/>", stylesXml);
+        Assert.Contains("<color indexed=\"10\"/>", stylesXml);
+        Assert.Contains("<name val=\"Arial\"/>", stylesXml);
+        Assert.Contains("<patternFill patternType=\"solid\"><fgColor indexed=\"13\"/></patternFill>", stylesXml);
+        Assert.Contains("<bottom style=\"thin\"/>", stylesXml);
+        Assert.Contains("<xf numFmtId=\"2\" fontId=\"1\" fillId=\"2\" borderId=\"1\" xfId=\"0\" applyFont=\"true\" applyNumberFormat=\"true\" applyFill=\"true\" applyBorder=\"true\"/>", stylesXml);
+    }
+
+    [Fact]
+    public void Read_RoundTrippedStyledCell_RestoresStyleIndexAndFormat()
+    {
+        using var original = new XSSFWorkbook();
+        var style = original.createCellStyle();
+        style.setDataFormat(original.createDataFormat().getFormat("0.00"));
+        var sheet = original.createSheet("RoundTripStyle");
+        var cell = sheet.createRow(0).createCell(0);
+        cell.setCellValue(1.25);
+        cell.setCellStyle(style);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+
+        var loadedCell = loaded.getSheet("RoundTripStyle")!.getRow(0)!.getCell(0)!;
+        Assert.Equal(1, loadedCell.getCellStyle().getIndex());
+        Assert.Equal((short)2, loadedCell.getCellStyle().getDataFormat());
+        Assert.Equal("0.00", loadedCell.getCellStyle().getDataFormatString());
+    }
+
+    [Fact]
+    public void Write_CustomDataFormat_ProducesUserDefinedNumFmt()
+    {
+        using var workbook = new XSSFWorkbook();
+        var style = workbook.createCellStyle();
+        style.setDataFormat(workbook.createDataFormat().getFormat("#,##0.000 kg"));
+        var cell = workbook.createSheet("CustomFormat").createRow(0).createCell(0);
+        cell.setCellValue(12.3456);
+        cell.setCellStyle(style);
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+
+        stream.Position = 0;
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var stylesXml = ReadEntry(archive, "xl/styles.xml");
+
+        Assert.Contains("<numFmts count=\"1\"><numFmt numFmtId=\"164\" formatCode=\"#,##0.000 kg\"/></numFmts>", stylesXml);
+        Assert.Contains("<xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"true\"/>", stylesXml);
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);
