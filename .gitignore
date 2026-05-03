@@ -1,0 +1,36 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+
+# Java/Maven build artifacts
+target/
+*.class
+*.jar
+*.war
+
+# Maven
+.classpath
+.project
+.settings/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+*.idea
+
+# Java IDEs
+.vscode/
+.DS_Store
+*.swp
+*.swo
+*~

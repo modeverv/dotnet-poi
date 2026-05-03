@@ -1,0 +1,78 @@
+﻿ 
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPOI", "DotnetPOI\DotnetPOI.csproj", "{EFAC6633-F769-4FAE-8C14-B6B245B6AD80}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.XSSF", "src\DotnetPoi.XSSF\DotnetPoi.XSSF.csproj", "{8D8E4F1A-1B2C-4D3E-9F0A-1B2C4D5E6F7A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.SS", "src\DotnetPoi.SS\DotnetPoi.SS.csproj", "{9E9F5A2B-2C3D-4E5F-0B1C-2C3D5E6F8A9B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.POIFS", "src\DotnetPoi.POIFS\DotnetPoi.POIFS.csproj", "{1F0A6B3C-3D4E-5F6A-1C2D-3D4E6F7A8B0C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.HSSF", "src\DotnetPoi.HSSF\DotnetPoi.HSSF.csproj", "{2A1B7C4D-4E5F-6A7B-2D3E-4E5F7A8B9C1D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.HWPF", "src\DotnetPoi.HWPF\DotnetPoi.HWPF.csproj", "{3B2C8D5E-5F6A-7B8C-3E4F-5F6A8B9C0D2E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.XWPF", "src\DotnetPoi.XWPF\DotnetPoi.XWPF.csproj", "{4C3D9E6F-6A7B-8C9D-4F5A-6A7B9C0D1E3F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.XSSF.Tests", "tests\DotnetPoi.XSSF.Tests\DotnetPoi.XSSF.Tests.csproj", "{5D4E0F7A-7B8C-9D0E-5A6B-7B8C0D1E2F4A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.SS.Tests", "tests\DotnetPoi.SS.Tests\DotnetPoi.SS.Tests.csproj", "{6E5F1A8B-8C9D-0E1F-6B7C-8C9D1E2F3A5B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.POIFS.Tests", "tests\DotnetPoi.POIFS.Tests\DotnetPoi.POIFS.Tests.csproj", "{7F6A2B9C-9D0E-1F2A-7C8D-9D0E2F3A4B6C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.HSSF.Tests", "tests\DotnetPoi.HSSF.Tests\DotnetPoi.HSSF.Tests.csproj", "{0A7B3C0D-0E1F-2A3B-8D9E-0E1F3A4B5C7D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.Interop.Tests", "tests\DotnetPoi.Interop.Tests\cs\DotnetPoi.Interop.Tests.csproj", "{1B8C4D1E-1F2A-3B4C-9E0F-1F2A4B5C6D8E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8D8E4F1A-1B2C-4D3E-9F0A-1B2C4D5E6F7A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D8E4F1A-1B2C-4D3E-9F0A-1B2C4D5E6F7A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D8E4F1A-1B2C-4D3E-9F0A-1B2C4D5E6F7A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D8E4F1A-1B2C-4D3E-9F0A-1B2C4D5E6F7A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E9F5A2B-2C3D-4E5F-0B1C-2C3D5E6F8A9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E9F5A2B-2C3D-4E5F-0B1C-2C3D5E6F8A9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E9F5A2B-2C3D-4E5F-0B1C-2C3D5E6F8A9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E9F5A2B-2C3D-4E5F-0B1C-2C3D5E6F8A9B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F0A6B3C-3D4E-5F6A-1C2D-3D4E6F7A8B0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F0A6B3C-3D4E-5F6A-1C2D-3D4E6F7A8B0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F0A6B3C-3D4E-5F6A-1C2D-3D4E6F7A8B0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F0A6B3C-3D4E-5F6A-1C2D-3D4E6F7A8B0C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A1B7C4D-4E5F-6A7B-2D3E-4E5F7A8B9C1D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A1B7C4D-4E5F-6A7B-2D3E-4E5F7A8B9C1D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A1B7C4D-4E5F-6A7B-2D3E-4E5F7A8B9C1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A1B7C4D-4E5F-6A7B-2D3E-4E5F7A8B9C1D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B2C8D5E-5F6A-7B8C-3E4F-5F6A8B9C0D2E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B2C8D5E-5F6A-7B8C-3E4F-5F6A8B9C0D2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B2C8D5E-5F6A-7B8C-3E4F-5F6A8B9C0D2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B2C8D5E-5F6A-7B8C-3E4F-5F6A8B9C0D2E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C3D9E6F-6A7B-8C9D-4F5A-6A7B9C0D1E3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C3D9E6F-6A7B-8C9D-4F5A-6A7B9C0D1E3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C3D9E6F-6A7B-8C9D-4F5A-6A7B9C0D1E3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C3D9E6F-6A7B-8C9D-4F5A-6A7B9C0D1E3F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D4E0F7A-7B8C-9D0E-5A6B-7B8C0D1E2F4A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D4E0F7A-7B8C-9D0E-5A6B-7B8C0D1E2F4A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D4E0F7A-7B8C-9D0E-5A6B-7B8C0D1E2F4A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D4E0F7A-7B8C-9D0E-5A6B-7B8C0D1E2F4A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E5F1A8B-8C9D-0E1F-6B7C-8C9D1E2F3A5B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E5F1A8B-8C9D-0E1F-6B7C-8C9D1E2F3A5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E5F1A8B-8C9D-0E1F-6B7C-8C9D1E2F3A5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E5F1A8B-8C9D-0E1F-6B7C-8C9D1E2F3A5B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F6A2B9C-9D0E-1F2A-7C8D-9D0E2F3A4B6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F6A2B9C-9D0E-1F2A-7C8D-9D0E2F3A4B6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F6A2B9C-9D0E-1F2A-7C8D-9D0E2F3A4B6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F6A2B9C-9D0E-1F2A-7C8D-9D0E2F3A4B6C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A7B3C0D-0E1F-2A3B-8D9E-0E1F3A4B5C7D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A7B3C0D-0E1F-2A3B-8D9E-0E1F3A4B5C7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A7B3C0D-0E1F-2A3B-8D9E-0E1F3A4B5C7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A7B3C0D-0E1F-2A3B-8D9E-0E1F3A4B5C7D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B8C4D1E-1F2A-3B4C-9E0F-1F2A4B5C6D8E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B8C4D1E-1F2A-3B4C-9E0F-1F2A4B5C6D8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B8C4D1E-1F2A-3B4C-9E0F-1F2A4B5C6D8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B8C4D1E-1F2A-3B4C-9E0F-1F2A4B5C6D8E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
