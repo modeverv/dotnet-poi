@@ -1,7 +1,5 @@
 ﻿ 
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPOI", "DotnetPOI\DotnetPOI.csproj", "{EFAC6633-F769-4FAE-8C14-B6B245B6AD80}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.XSSF", "src\DotnetPoi.XSSF\DotnetPoi.XSSF.csproj", "{8D8E4F1A-1B2C-4D3E-9F0A-1B2C4D5E6F7A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.SS", "src\DotnetPoi.SS\DotnetPoi.SS.csproj", "{9E9F5A2B-2C3D-4E5F-0B1C-2C3D5E6F8A9B}"
