@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
+using System.Xml;
 using DotnetPoi.SS.Xml;
 
 namespace DotnetPoi.XSSF.UserModel;
@@ -11,6 +12,16 @@ public sealed class XSSFWorkbook : IDisposable
     private readonly Dictionary<string, int> _sharedStringIndexes = new(StringComparer.Ordinal);
     private readonly List<string> _sharedStrings = new();
     private XSSFCreationHelper? _creationHelper;
+
+    public XSSFWorkbook()
+    {
+    }
+
+    public XSSFWorkbook(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        Load(stream);
+    }
 
     public XSSFSheet createSheet()
     {
@@ -32,6 +43,11 @@ public sealed class XSSFWorkbook : IDisposable
     public XSSFSheet getSheetAt(int index)
     {
         return _sheets[index];
+    }
+
+    public XSSFSheet? getSheet(string name)
+    {
+        return _sheets.FirstOrDefault(sheet => string.Equals(sheet.SheetName, name, StringComparison.Ordinal));
     }
 
     public int getNumberOfSheets()
@@ -124,6 +140,266 @@ public sealed class XSSFWorkbook : IDisposable
         using var textWriter = new StreamWriter(entryStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         using var writer = new PoiXmlWriter(textWriter);
         write(writer);
+    }
+
+    private void Load(Stream stream)
+    {
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
+        var sharedStrings = ReadSharedStrings(archive);
+
+        foreach (var sheetInfo in ReadWorkbookSheets(archive))
+        {
+            var sheet = createSheet(sheetInfo.Name);
+            ReadWorksheet(archive, sheetInfo.PartName, sheet, sharedStrings);
+        }
+    }
+
+    private static List<string> ReadSharedStrings(ZipArchive archive)
+    {
+        var entry = archive.GetEntry("xl/sharedStrings.xml");
+        if (entry is null)
+        {
+            return new List<string>();
+        }
+
+        using var stream = entry.Open();
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
+        var sharedStrings = new List<string>();
+
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "si")
+            {
+                sharedStrings.Add(ReadTextDescendants(reader));
+            }
+        }
+
+        return sharedStrings;
+    }
+
+    private static string ReadTextDescendants(XmlReader reader)
+    {
+        var text = new StringBuilder();
+
+        if (!reader.IsEmptyElement)
+        {
+            using var subtree = reader.ReadSubtree();
+            while (subtree.Read())
+            {
+                if (subtree.NodeType == XmlNodeType.Element && subtree.LocalName == "t")
+                {
+                    text.Append(subtree.ReadElementContentAsString());
+                }
+            }
+        }
+
+        return text.ToString();
+    }
+
+    private static List<SheetInfo> ReadWorkbookSheets(ZipArchive archive)
+    {
+        var workbookEntry = archive.GetEntry("xl/workbook.xml")
+            ?? throw new InvalidDataException("The xlsx package is missing xl/workbook.xml.");
+        var relationshipsEntry = archive.GetEntry("xl/_rels/workbook.xml.rels")
+            ?? throw new InvalidDataException("The xlsx package is missing xl/_rels/workbook.xml.rels.");
+
+        using var workbookStream = workbookEntry.Open();
+        using var relationshipsStream = relationshipsEntry.Open();
+        var targetsById = new Dictionary<string, string>(StringComparer.Ordinal);
+        using (var relationshipReader = XmlReader.Create(relationshipsStream, new XmlReaderSettings { IgnoreWhitespace = false }))
+        {
+            while (relationshipReader.Read())
+            {
+                if (relationshipReader.NodeType != XmlNodeType.Element || relationshipReader.LocalName != "Relationship")
+                {
+                    continue;
+                }
+
+                var id = relationshipReader.GetAttribute("Id");
+                var target = relationshipReader.GetAttribute("Target");
+                var type = relationshipReader.GetAttribute("Type");
+                if (id is not null
+                    && target is not null
+                    && string.Equals(type, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet", StringComparison.Ordinal))
+                {
+                    targetsById[id] = NormalizeWorkbookRelationshipTarget(target);
+                }
+            }
+        }
+
+        var sheets = new List<SheetInfo>();
+        using (var workbookReader = XmlReader.Create(workbookStream, new XmlReaderSettings { IgnoreWhitespace = false }))
+        {
+            while (workbookReader.Read())
+            {
+                if (workbookReader.NodeType != XmlNodeType.Element || workbookReader.LocalName != "sheet")
+                {
+                    continue;
+                }
+
+                var name = workbookReader.GetAttribute("name")
+                    ?? throw new InvalidDataException("A workbook sheet is missing its name attribute.");
+                var relationshipId = GetAttributeByLocalName(workbookReader, "id")
+                    ?? throw new InvalidDataException($"Sheet '{name}' is missing its relationship id.");
+                if (!targetsById.TryGetValue(relationshipId, out var target))
+                {
+                    throw new InvalidDataException($"Sheet '{name}' references missing relationship '{relationshipId}'.");
+                }
+
+                sheets.Add(new SheetInfo(name, target));
+            }
+        }
+
+        return sheets;
+    }
+
+    private static void ReadWorksheet(ZipArchive archive, string partName, XSSFSheet sheet, IReadOnlyList<string> sharedStrings)
+    {
+        var entry = archive.GetEntry(partName)
+            ?? throw new InvalidDataException($"The xlsx package is missing {partName}.");
+
+        using var stream = entry.Open();
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
+        XSSFRow? currentRow = null;
+        XSSFCell? currentCell = null;
+        string? currentCellType = null;
+        var inlineText = new StringBuilder();
+        var nextRowIndex = 0;
+        var nextColumnIndex = 0;
+
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "row")
+            {
+                var rowIndex = ParseOneBasedAttribute(reader.GetAttribute("r"), nextRowIndex + 1);
+                currentRow = sheet.createRow(rowIndex);
+                nextRowIndex = rowIndex + 1;
+                nextColumnIndex = 0;
+                continue;
+            }
+
+            if (reader.NodeType == XmlNodeType.EndElement && reader.LocalName == "row")
+            {
+                currentRow = null;
+                continue;
+            }
+
+            if (currentRow is not null && reader.NodeType == XmlNodeType.Element && reader.LocalName == "c")
+            {
+                var reference = reader.GetAttribute("r");
+                var columnIndex = reference is null ? nextColumnIndex : ParseColumnIndex(reference);
+                currentCell = currentRow.createCell(columnIndex);
+                currentCellType = reader.GetAttribute("t");
+                inlineText.Clear();
+                nextColumnIndex = columnIndex + 1;
+
+                if (reader.IsEmptyElement)
+                {
+                    currentCell = null;
+                    currentCellType = null;
+                }
+                continue;
+            }
+
+            if (currentCell is not null && reader.NodeType == XmlNodeType.Element && reader.LocalName == "v")
+            {
+                ApplyCellValue(currentCell, currentCellType, reader.ReadElementContentAsString(), sharedStrings);
+                continue;
+            }
+
+            if (currentCell is not null && currentCellType == "inlineStr" && reader.NodeType == XmlNodeType.Element && reader.LocalName == "t")
+            {
+                inlineText.Append(reader.ReadElementContentAsString());
+                continue;
+            }
+
+            if (currentCell is not null && reader.NodeType == XmlNodeType.EndElement && reader.LocalName == "c")
+            {
+                if (currentCellType == "inlineStr")
+                {
+                    currentCell.setCellValue(inlineText.ToString());
+                }
+
+                currentCell = null;
+                currentCellType = null;
+            }
+        }
+    }
+
+    private static void ApplyCellValue(XSSFCell cell, string? cellType, string valueText, IReadOnlyList<string> sharedStrings)
+    {
+        if (cellType == "s")
+        {
+            var sharedStringIndex = int.Parse(valueText, CultureInfo.InvariantCulture);
+            if ((uint)sharedStringIndex >= (uint)sharedStrings.Count)
+            {
+                throw new InvalidDataException($"Shared string index {sharedStringIndex} is outside the shared string table.");
+            }
+
+            cell.setCellValue(sharedStrings[sharedStringIndex]);
+        }
+        else
+        {
+            cell.setCellValue(double.Parse(valueText, CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static int ParseOneBasedAttribute(string? value, int defaultOneBasedValue)
+    {
+        var oneBasedValue = value is null
+            ? defaultOneBasedValue
+            : int.Parse(value, CultureInfo.InvariantCulture);
+        return oneBasedValue - 1;
+    }
+
+    private static string NormalizeWorkbookRelationshipTarget(string target)
+    {
+        var partName = target.StartsWith("/", StringComparison.Ordinal)
+            ? target.TrimStart('/')
+            : "xl/" + target;
+        var segments = new Stack<string>();
+
+        foreach (var segment in partName.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (segment == ".")
+            {
+                continue;
+            }
+
+            if (segment == "..")
+            {
+                if (segments.Count > 0)
+                {
+                    segments.Pop();
+                }
+                continue;
+            }
+
+            segments.Push(segment);
+        }
+
+        return string.Join("/", segments.Reverse());
+    }
+
+    private static string? GetAttributeByLocalName(XmlReader reader, string localName)
+    {
+        if (!reader.HasAttributes)
+        {
+            return null;
+        }
+
+        while (reader.MoveToNextAttribute())
+        {
+            if (reader.LocalName == localName)
+            {
+                var value = reader.Value;
+                reader.MoveToElement();
+                return value;
+            }
+        }
+
+        reader.MoveToElement();
+        return null;
     }
 
     private void WriteContentTypes(PoiXmlWriter writer)
@@ -452,6 +728,30 @@ public sealed class XSSFWorkbook : IDisposable
         return name;
     }
 
+    private static int ParseColumnIndex(string cellReference)
+    {
+        var columnIndex = 0;
+        var seenColumn = false;
+
+        foreach (var character in cellReference)
+        {
+            if (!char.IsLetter(character))
+            {
+                break;
+            }
+
+            seenColumn = true;
+            columnIndex = (columnIndex * 26) + char.ToUpperInvariant(character) - 'A' + 1;
+        }
+
+        if (!seenColumn)
+        {
+            throw new FormatException($"Cell reference '{cellReference}' does not contain a column.");
+        }
+
+        return columnIndex - 1;
+    }
+
     private static void WriteDefault(PoiXmlWriter writer, string extension, string contentType)
     {
         writer.WriteStartElement("Default");
@@ -483,4 +783,6 @@ public sealed class XSSFWorkbook : IDisposable
         writer.WriteAttributeString("val", value);
         writer.WriteEndElement();
     }
+
+    private sealed record SheetInfo(string Name, string PartName);
 }

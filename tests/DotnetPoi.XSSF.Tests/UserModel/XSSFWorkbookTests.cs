@@ -62,6 +62,32 @@ public class XSSFWorkbookTests
         Assert.Same(workbook, helper.getWorkbook());
     }
 
+    [Fact]
+    public void Read_RoundTrippedStringAndNumberCells_RestoresWorkbookModel()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("RoundTrip");
+        var firstRow = sheet.createRow(0);
+        firstRow.createCell(0).setCellValue("hello");
+        firstRow.createCell(1).setCellValue(42.5);
+        var secondRow = sheet.createRow(2);
+        secondRow.createCell(3).setCellValue(0.0);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+
+        Assert.Equal(1, loaded.getNumberOfSheets());
+        var loadedSheet = loaded.getSheet("RoundTrip");
+        Assert.NotNull(loadedSheet);
+        Assert.Equal(2, loadedSheet.getLastRowNum());
+        Assert.Equal("hello", loadedSheet.getRow(0)!.getCell(0)!.getStringCellValue());
+        Assert.Equal(42.5, loadedSheet.getRow(0)!.getCell(1)!.getNumericCellValue());
+        Assert.Equal(0.0, loadedSheet.getRow(2)!.getCell(3)!.getNumericCellValue());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

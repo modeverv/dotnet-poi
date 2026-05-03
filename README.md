@@ -4,7 +4,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-WIP-yellow)
-![Phase](https://img.shields.io/badge/phase-0%20%E2%80%94%20xlsx%20write%20done-green)
+![Phase](https://img.shields.io/badge/phase-1%20%E2%80%94%20minimal%20xlsx%20read%2Fwrite%20interop%20done-green)
 
 ## Philosophy
 
@@ -18,14 +18,14 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ## Status
 
-### Current Phase: Phase 1 — xlsx Read (Next)
+### Current Phase: Phase 2 — Styles & Formatting (Next)
 
 | Phase | Description | Target | Status |
 |---|---|---|---|
 | **-1** | **XML output parity (Java vs .NET)** | **—** | ✅ Done |
 | **0** | **xlsx write (string / number)** | **v0.1** | ✅ Done |
-| 1 | xlsx read | v0.2 | 🚧 Next |
-| 2 | Styles & formatting (font, color, border) | v0.3 | ⬜ Not started |
+| **1** | **xlsx read (string / number)** | **v0.2** | ✅ Done |
+| 2 | Styles & formatting (font, color, border) | v0.3 | 🚧 Next |
 | 2.5 | Images & drawing (XSSFPicture, XSSFDrawing) | v0.35 | ⬜ Not started |
 | 3 | SS common interface (IWorkbook / ISheet) | v0.4 | ⬜ Not started |
 | 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
@@ -89,6 +89,36 @@ examples/output/phase0-write-example.xlsx
 
 Note: full `.xlsx` zip files are not expected to be byte-for-byte identical to Apache POI output because zip metadata and document timestamps can vary. Byte-level parity is asserted at the XML writer fixture layer; Phase 0 interoperability is asserted by Apache POI successfully reading dotnet-poi output.
 
+### Phase 1 Verification
+
+Phase 1 is complete for the minimal readable surface: open a simple `.xlsx`, restore sheets/rows/cells, and read string and numeric cell values.
+
+Verification currently covers:
+
+- unit tests for C# write → C# read round-trips
+- Java interop in the read direction: Apache POI writes an `.xlsx`, then dotnet-poi reads and asserts the cell values
+- Java interop in the write direction remains green: dotnet-poi writes an `.xlsx`, then Apache POI reads it
+- a runnable interoperability example under `examples/Phase1InteropExample`
+
+Commands:
+
+```bash
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest
+dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --no-restore
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
+```
+
+The example checks:
+
+```text
+examples/output/phase1-dotnet-poi-write.xlsx
+tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase1-basic.xlsx
+```
+
+Scope note: Phase 1 covers simple `.xlsx` files with shared-string cells, numeric cells, explicit zero values, sparse cells, and multiple sheets. Formulas, styles, dates, booleans, images, and rich text remain later-phase work unless otherwise noted by tests.
+
 ---
 
 ## Quick Start
@@ -121,6 +151,7 @@ Runnable example:
 
 ```bash
 dotnet run --project examples/Phase0WriteExample/Phase0WriteExample.csproj
+dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
 ```
 
 ---
@@ -203,14 +234,14 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 
 ## 対応状況
 
-### 現在のフェーズ: Phase 1 — xlsx 読み込み（次）
+### 現在のフェーズ: Phase 2 — スタイル・書式（次）
 
 | Phase | 内容 | バージョン目標 | 状態 |
 |---|---|---|---|
 | **-1** | **XML 出力挙動の統一（Java vs .NET）** | **—** | ✅ 完了 |
 | **0** | **xlsx 書き出し（文字・数値）** | **v0.1** | ✅ 完了 |
-| 1 | xlsx 読み込み | v0.2 | 🚧 次 |
-| 2 | スタイル・書式（フォント・色・罫線） | v0.3 | ⬜ 未着手 |
+| **1** | **xlsx 読み込み（文字・数値）** | **v0.2** | ✅ 完了 |
+| 2 | スタイル・書式（フォント・色・罫線） | v0.3 | 🚧 次 |
 | 2.5 | 画像・図形（XSSFPicture、XSSFDrawing） | v0.35 | ⬜ 未着手 |
 | 3 | SS 共通インターフェース（IWorkbook / ISheet） | v0.4 | ⬜ 未着手 |
 | 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
@@ -274,6 +305,36 @@ examples/output/phase0-write-example.xlsx
 
 注意: `.xlsx` 全体の zip ファイルは、zip metadata や document timestamp により Apache POI 出力と完全なバイト列一致にはなりません。バイト列一致は XML writer fixture 層で確認し、Phase 0 の相互運用性は Apache POI が dotnet-poi 出力を読めることで確認しています。
 
+### Phase 1 検証
+
+Phase 1 は、シンプルな `.xlsx` を開き、シート・行・セルを復元し、文字列セルと数値セルを読み取れる最小の読み込み面として完了しています。
+
+現在の検証内容:
+
+- C# 書き出し → C# 読み込みの round-trip unit test
+- Apache POI(Java) が `.xlsx` を書き、dotnet-poi が読み取ってセル値を検証する相互運用テスト
+- dotnet-poi が `.xlsx` を書き、Apache POI(Java) が読み取る既存の相互運用テストも green
+- `examples/Phase1InteropExample` の実行サンプル
+
+確認コマンド:
+
+```bash
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest
+dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --no-restore
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
+```
+
+サンプルが確認するファイル:
+
+```text
+examples/output/phase1-dotnet-poi-write.xlsx
+tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase1-basic.xlsx
+```
+
+範囲の注意: Phase 1 が対象にしているのは shared string の文字列セル、数値セル、明示的なゼロ値、疎なセル、複数シートを含むシンプルな `.xlsx` です。数式、スタイル、日付、真偽値、画像、rich text は、テストで明示されるまでは後続フェーズの対象です。
+
 ---
 
 ## クイックスタート
@@ -306,6 +367,7 @@ workbook.write(fs);
 
 ```bash
 dotnet run --project examples/Phase0WriteExample/Phase0WriteExample.csproj
+dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
 ```
 
 ---
