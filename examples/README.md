@@ -49,3 +49,24 @@ For the reverse direction, Java POI reading dotnet-poi output, run the interop t
 dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --filter Category=WriteForPoi
 mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
 ```
+
+## Phase25ImagesExample
+
+Generates an `.xlsx` file with a small embedded PNG using the Phase 2.5 XSSF image API:
+
+```bash
+dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase2_5-images-example.xlsx
+```
+
+The workbook uses:
+
+- `XSSFWorkbook.addPicture(...)`
+- `XSSFCreationHelper.createClientAnchor()`
+- `XSSFSheet.createDrawingPatriarch()`
+- `XSSFDrawing.createPicture(...)`

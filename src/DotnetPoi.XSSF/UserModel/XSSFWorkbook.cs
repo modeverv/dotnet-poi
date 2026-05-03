@@ -8,7 +8,20 @@ namespace DotnetPoi.XSSF.UserModel;
 
 public sealed class XSSFWorkbook : IDisposable
 {
+    public const int PICTURE_TYPE_EMF = 2;
+    public const int PICTURE_TYPE_WMF = 3;
+    public const int PICTURE_TYPE_PICT = 4;
+    public const int PICTURE_TYPE_JPEG = 5;
+    public const int PICTURE_TYPE_PNG = 6;
+    public const int PICTURE_TYPE_DIB = 7;
+    public const int PICTURE_TYPE_GIF = 8;
+    public const int PICTURE_TYPE_TIFF = 9;
+    public const int PICTURE_TYPE_EPS = 10;
+    public const int PICTURE_TYPE_BMP = 11;
+    public const int PICTURE_TYPE_WPG = 12;
+
     private readonly List<XSSFSheet> _sheets = new();
+    private readonly List<XSSFPictureData> _pictures = new();
     private readonly Dictionary<string, int> _sharedStringIndexes = new(StringComparer.Ordinal);
     private readonly List<string> _sharedStrings = new();
     private readonly List<XSSFFont> _fonts = new();
@@ -19,6 +32,7 @@ public sealed class XSSFWorkbook : IDisposable
     private readonly SortedDictionary<int, string> _customNumberFormats = new();
     private XSSFCreationHelper? _creationHelper;
     private XSSFDataFormat? _dataFormat;
+    private int _nextDrawingIndex = 1;
 
     public XSSFWorkbook()
     {
@@ -98,6 +112,29 @@ public sealed class XSSFWorkbook : IDisposable
         return _fonts[idx];
     }
 
+    public int addPicture(byte[] pictureData, int format)
+    {
+        ArgumentNullException.ThrowIfNull(pictureData);
+        ValidatePictureType(format);
+
+        var picture = new XSSFPictureData(pictureData, format, _pictures.Count + 1);
+        _pictures.Add(picture);
+        return picture.Index - 1;
+    }
+
+    public int addPicture(Stream stream, int format)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return addPicture(memory.ToArray(), format);
+    }
+
+    public IReadOnlyList<XSSFPictureData> getAllPictures()
+    {
+        return _pictures;
+    }
+
     public void write(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -117,6 +154,17 @@ public sealed class XSSFWorkbook : IDisposable
         foreach (var sheet in _sheets)
         {
             WriteEntry(archive, $"xl/worksheets/sheet{sheet.SheetIndex}.xml", writer => WriteWorksheet(writer, sheet));
+            if (sheet.Drawing is not null)
+            {
+                WriteEntry(archive, $"xl/worksheets/_rels/sheet{sheet.SheetIndex}.xml.rels", writer => WriteSheetRelationships(writer, sheet));
+                WriteEntry(archive, $"xl/drawings/drawing{sheet.Drawing.DrawingIndex}.xml", writer => WriteDrawing(writer, sheet.Drawing));
+                WriteEntry(archive, $"xl/drawings/_rels/drawing{sheet.Drawing.DrawingIndex}.xml.rels", writer => WriteDrawingRelationships(writer, sheet.Drawing));
+            }
+        }
+
+        foreach (var picture in _pictures)
+        {
+            WriteBinaryEntry(archive, $"xl/media/image{picture.Index}.{picture.Extension}", picture.Data);
         }
     }
 
@@ -194,6 +242,21 @@ public sealed class XSSFWorkbook : IDisposable
         return _borders.Count - 1;
     }
 
+    internal int GetNextDrawingIndex()
+    {
+        return _nextDrawingIndex++;
+    }
+
+    internal XSSFPictureData GetPictureData(int pictureIndex)
+    {
+        if ((uint)pictureIndex >= (uint)_pictures.Count)
+        {
+            throw new ArgumentException("Picture index does not exist in this workbook.", nameof(pictureIndex));
+        }
+
+        return _pictures[pictureIndex];
+    }
+
     private void BuildSharedStrings()
     {
         _sharedStringIndexes.Clear();
@@ -237,6 +300,13 @@ public sealed class XSSFWorkbook : IDisposable
         write(writer);
     }
 
+    private static void WriteBinaryEntry(ZipArchive archive, string name, byte[] data)
+    {
+        var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
+        using var entryStream = entry.Open();
+        entryStream.Write(data, 0, data.Length);
+    }
+
     private void Load(Stream stream)
     {
         _sheets.Clear();
@@ -245,11 +315,26 @@ public sealed class XSSFWorkbook : IDisposable
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
         var sharedStrings = ReadSharedStrings(archive);
         ReadStyles(archive);
+        ReadPictures(archive);
 
         foreach (var sheetInfo in ReadWorkbookSheets(archive))
         {
             var sheet = createSheet(sheetInfo.Name);
             ReadWorksheet(archive, sheetInfo.PartName, sheet, sharedStrings);
+        }
+    }
+
+    private void ReadPictures(ZipArchive archive)
+    {
+        _pictures.Clear();
+        foreach (var entry in archive.Entries
+            .Where(entry => entry.FullName.StartsWith("xl/media/image", StringComparison.Ordinal))
+            .OrderBy(entry => entry.FullName, StringComparer.Ordinal))
+        {
+            using var entryStream = entry.Open();
+            using var memory = new MemoryStream();
+            entryStream.CopyTo(memory);
+            _pictures.Add(new XSSFPictureData(memory.ToArray(), GetPictureTypeFromExtension(Path.GetExtension(entry.FullName)), _pictures.Count + 1));
         }
     }
 
@@ -648,6 +733,13 @@ public sealed class XSSFWorkbook : IDisposable
         writer.WriteStartElement("Types");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/content-types");
         WriteDefault(writer, "rels", "application/vnd.openxmlformats-package.relationships+xml");
+        foreach (var pictureDefault in _pictures
+            .GroupBy(picture => picture.Extension, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .OrderBy(picture => picture.Extension, StringComparer.Ordinal))
+        {
+            WriteDefault(writer, pictureDefault.Extension, pictureDefault.ContentType);
+        }
         WriteDefault(writer, "xml", "application/xml");
         WriteOverride(writer, "/docProps/app.xml", "application/vnd.openxmlformats-officedocument.extended-properties+xml");
         WriteOverride(writer, "/docProps/core.xml", "application/vnd.openxmlformats-package.core-properties+xml");
@@ -657,6 +749,10 @@ public sealed class XSSFWorkbook : IDisposable
         foreach (var sheet in _sheets)
         {
             WriteOverride(writer, $"/xl/worksheets/sheet{sheet.SheetIndex}.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml");
+            if (sheet.Drawing is not null)
+            {
+                WriteOverride(writer, $"/xl/drawings/drawing{sheet.Drawing.DrawingIndex}.xml", "application/vnd.openxmlformats-officedocument.drawing+xml");
+            }
         }
         writer.WriteEndElement();
     }
@@ -669,6 +765,112 @@ public sealed class XSSFWorkbook : IDisposable
         WriteRelationship(writer, "rId1", "xl/workbook.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument");
         WriteRelationship(writer, "rId2", "docProps/app.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties");
         WriteRelationship(writer, "rId3", "docProps/core.xml", "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties");
+        writer.WriteEndElement();
+    }
+
+    private static void WriteSheetRelationships(PoiXmlWriter writer, XSSFSheet sheet)
+    {
+        writer.WriteStartDocument("UTF-8", standalone: true);
+        writer.WriteStartElement("Relationships");
+        writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
+        WriteRelationship(writer, "rId1", $"../drawings/drawing{sheet.Drawing!.DrawingIndex}.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing");
+        writer.WriteEndElement();
+    }
+
+    private void WriteDrawingRelationships(PoiXmlWriter writer, XSSFDrawing drawing)
+    {
+        writer.WriteStartDocument("UTF-8", standalone: true);
+        writer.WriteStartElement("Relationships");
+        writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
+        foreach (var picture in drawing.Pictures)
+        {
+            var pictureData = GetPictureData(picture.PictureIndex);
+            WriteRelationship(writer, picture.RelationshipId, $"../media/image{pictureData.Index}.{pictureData.Extension}", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image");
+        }
+        writer.WriteEndElement();
+    }
+
+    private void WriteDrawing(PoiXmlWriter writer, XSSFDrawing drawing)
+    {
+        writer.WriteStartDocument("UTF-8", standalone: false);
+        writer.WriteString("\n");
+        writer.WriteStartElement("xdr", "wsDr");
+        writer.WriteAttributeString("xmlns:xdr", "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing");
+        writer.WriteAttributeString("xmlns:a", "http://schemas.openxmlformats.org/drawingml/2006/main");
+        writer.WriteAttributeString("xmlns:r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships");
+        foreach (var picture in drawing.Pictures)
+        {
+            WritePictureAnchor(writer, picture);
+        }
+        writer.WriteEndElement();
+    }
+
+    private static void WritePictureAnchor(PoiXmlWriter writer, XSSFPicture picture)
+    {
+        var anchor = picture.Anchor;
+        writer.WriteStartElement("xdr", "twoCellAnchor");
+        writer.WriteAttributeString("editAs", GetEditAs(anchor.getAnchorType()));
+        WriteMarker(writer, "from", anchor.Col1, anchor.Dx1, anchor.Row1, anchor.Dy1);
+        WriteMarker(writer, "to", anchor.Col2, anchor.Dx2, anchor.Row2, anchor.Dy2);
+        writer.WriteStartElement("xdr", "pic");
+        writer.WriteStartElement("xdr", "nvPicPr");
+        writer.WriteStartElement("xdr", "cNvPr");
+        writer.WriteAttributeString("id", picture.ShapeId.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("name", "Picture " + picture.ShapeId.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("descr", "Picture");
+        writer.WriteEndElement();
+        writer.WriteStartElement("xdr", "cNvPicPr");
+        writer.WriteStartElement("a", "picLocks");
+        writer.WriteAttributeString("noChangeAspect", "true");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteStartElement("xdr", "blipFill");
+        writer.WriteStartElement("a", "blip");
+        writer.WriteAttributeString("r", "embed", picture.RelationshipId);
+        writer.WriteEndElement();
+        writer.WriteStartElement("a", "stretch");
+        writer.WriteStartElement("a", "fillRect");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteStartElement("xdr", "spPr");
+        writer.WriteStartElement("a", "xfrm");
+        writer.WriteStartElement("a", "off");
+        writer.WriteAttributeString("x", anchor.Dx1.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("y", anchor.Dy1.ToString(CultureInfo.InvariantCulture));
+        writer.WriteEndElement();
+        writer.WriteStartElement("a", "ext");
+        writer.WriteAttributeString("cx", Math.Max(0, anchor.Dx2 - anchor.Dx1).ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("cy", Math.Max(0, anchor.Dy2 - anchor.Dy1).ToString(CultureInfo.InvariantCulture));
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteStartElement("a", "prstGeom");
+        writer.WriteAttributeString("prst", "rect");
+        writer.WriteStartElement("a", "avLst");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteStartElement("xdr", "clientData");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+    }
+
+    private static void WriteMarker(PoiXmlWriter writer, string markerName, int column, int columnOffset, int row, int rowOffset)
+    {
+        writer.WriteStartElement("xdr", markerName);
+        WriteTextElement(writer, "xdr", "col", column.ToString(CultureInfo.InvariantCulture));
+        WriteTextElement(writer, "xdr", "colOff", columnOffset.ToString(CultureInfo.InvariantCulture));
+        WriteTextElement(writer, "xdr", "row", row.ToString(CultureInfo.InvariantCulture));
+        WriteTextElement(writer, "xdr", "rowOff", rowOffset.ToString(CultureInfo.InvariantCulture));
+        writer.WriteEndElement();
+    }
+
+    private static void WriteTextElement(PoiXmlWriter writer, string prefix, string localName, string text)
+    {
+        writer.WriteStartElement(prefix, localName);
+        writer.WriteString(text);
         writer.WriteEndElement();
     }
 
@@ -972,6 +1174,12 @@ public sealed class XSSFWorkbook : IDisposable
         writer.WriteAttributeString("right", "0.7");
         writer.WriteAttributeString("top", "0.75");
         writer.WriteEndElement();
+        if (sheet.Drawing is not null)
+        {
+            writer.WriteStartElement("drawing");
+            writer.WriteAttributeString("r", "id", "rId1");
+            writer.WriteEndElement();
+        }
         writer.WriteEndElement();
     }
 
@@ -1149,6 +1357,41 @@ public sealed class XSSFWorkbook : IDisposable
             BorderStyle.MediumDashDotDot => "mediumDashDotDot",
             BorderStyle.SlantedDashDot => "slantDashDot",
             _ => "none"
+        };
+    }
+
+    private static string GetEditAs(AnchorType anchorType)
+    {
+        return anchorType switch
+        {
+            AnchorType.DONT_MOVE_AND_RESIZE => "absolute",
+            AnchorType.MOVE_DONT_RESIZE => "oneCell",
+            _ => "twoCell"
+        };
+    }
+
+    private static void ValidatePictureType(int format)
+    {
+        _ = format switch
+        {
+            PICTURE_TYPE_JPEG or PICTURE_TYPE_PNG or PICTURE_TYPE_DIB or PICTURE_TYPE_GIF or PICTURE_TYPE_TIFF or PICTURE_TYPE_EPS or PICTURE_TYPE_BMP or PICTURE_TYPE_WPG => true,
+            _ => throw new ArgumentException($"Picture type {format} is not supported by the Phase 2.5 XSSF writer.", nameof(format))
+        };
+    }
+
+    private static int GetPictureTypeFromExtension(string extension)
+    {
+        return extension.TrimStart('.').ToLowerInvariant() switch
+        {
+            "jpg" or "jpeg" => PICTURE_TYPE_JPEG,
+            "png" => PICTURE_TYPE_PNG,
+            "dib" => PICTURE_TYPE_DIB,
+            "gif" => PICTURE_TYPE_GIF,
+            "tif" or "tiff" => PICTURE_TYPE_TIFF,
+            "eps" => PICTURE_TYPE_EPS,
+            "bmp" => PICTURE_TYPE_BMP,
+            "wpg" => PICTURE_TYPE_WPG,
+            _ => throw new NotSupportedException($"Picture extension '{extension}' is not supported by the Phase 2.5 XSSF reader.")
         };
     }
 

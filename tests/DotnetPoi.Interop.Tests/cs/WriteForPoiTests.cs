@@ -5,6 +5,9 @@ namespace DotnetPoi.Interop.Tests;
 
 public class WriteForPoiTests
 {
+    private static readonly byte[] OneByOnePng =
+        Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2O8WcAAAAASUVORK5CYII=");
+
     [Fact]
     [Trait("Category", "WriteForPoi")]
     public void Write_StringAndNumberWorkbook_CreatesFixtureForPoi()
@@ -52,6 +55,32 @@ public class WriteForPoiTests
         var cell = sheet.createRow(0).createCell(0);
         cell.setCellValue(123.456);
         cell.setCellStyle(style);
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_PictureWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase2_5-images.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Phase2.5");
+        sheet.createRow(0).createCell(0).setCellValue("image");
+
+        var pictureIndex = workbook.addPicture(OneByOnePng, XSSFWorkbook.PICTURE_TYPE_PNG);
+        var anchor = workbook.getCreationHelper().createClientAnchor();
+        anchor.setCol1(0);
+        anchor.setRow1(0);
+        anchor.setCol2(1);
+        anchor.setRow2(1);
+        sheet.createDrawingPatriarch().createPicture(anchor, pictureIndex);
 
         using var stream = File.Create(fixturePath);
         workbook.write(stream);

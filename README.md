@@ -4,7 +4,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-WIP-yellow)
-![Phase](https://img.shields.io/badge/phase-1%20%E2%80%94%20minimal%20xlsx%20read%2Fwrite%20interop%20done-green)
+![Phase](https://img.shields.io/badge/phase-2.5%20%E2%80%94%20done%2C%20next%3A%20Phase%203-green)
 
 ## Philosophy
 
@@ -18,15 +18,15 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ## Status
 
-### Current Phase: Phase 2 — Styles & Formatting (Next)
+### Current Phase: Phase 3 — SS Common Interface (next up)
 
 | Phase | Description | Target | Status |
 |---|---|---|---|
 | **-1** | **XML output parity (Java vs .NET)** | **—** | ✅ Done |
 | **0** | **xlsx write (string / number)** | **v0.1** | ✅ Done |
 | **1** | **xlsx read (string / number)** | **v0.2** | ✅ Done |
-| 2 | Styles & formatting (font, color, border) | v0.3 | 🚧 Next |
-| 2.5 | Images & drawing (XSSFPicture, XSSFDrawing) | v0.35 | ⬜ Not started |
+| **2** | **Styles & formatting (font, color, border)** | **v0.3** | ✅ Done |
+| **2.5** | **Images & drawing (XSSFPicture, XSSFDrawing)** | **v0.35** | ✅ Done |
 | 3 | SS common interface (IWorkbook / ISheet) | v0.4 | ⬜ Not started |
 | 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
 | 5 | Formula engine (FormulaEvaluator) | v1.0 | ⬜ Not started |
@@ -119,6 +119,55 @@ tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase1-basic.xlsx
 
 Scope note: Phase 1 covers simple `.xlsx` files with shared-string cells, numeric cells, explicit zero values, sparse cells, and multiple sheets. Formulas, styles, dates, booleans, images, and rich text remain later-phase work unless otherwise noted by tests.
 
+### Phase 2 Verification
+
+Phase 2 is complete for the initial practical style subset: fonts, indexed colors, foreground fills, basic borders, built-in number formats, custom number formats, and cell style references.
+
+Verification currently covers:
+
+- unit tests for style table generation and style readback
+- Java interop in the write direction: Apache POI reads the dotnet-poi styled workbook fixture
+- the XML parity writer tests remain green
+
+Scope note: Phase 2 does not claim full style byte-level parity for every Apache POI style feature. The supported subset is semantically interoperable with Apache POI; additional style properties are tracked as Phase 2.x work.
+
+### Phase 2.5 Verification
+
+Phase 2.5 has its first completed slice: embedding PNG/JPEG-style image parts in `.xlsx` output through POI-compatible APIs.
+
+Implemented surface:
+
+- `XSSFWorkbook.addPicture(...)`
+- `XSSFWorkbook.getAllPictures()`
+- `XSSFCreationHelper.createClientAnchor()`
+- `XSSFSheet.createDrawingPatriarch()`
+- `XSSFDrawing.createPicture(...)`
+- `XSSFClientAnchor`, `XSSFDrawing`, `XSSFPicture`, and `XSSFPictureData`
+
+Verification currently covers:
+
+- unit tests for generated media, drawing, worksheet relationship, drawing relationship, and content type parts
+- C# write → C# read picture data round-trip
+- Java interop in the write direction: dotnet-poi writes an image workbook, then Apache POI reads the image data and drawing shape
+- a runnable example under `examples/Phase25ImagesExample`
+
+Commands:
+
+```bash
+dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --no-restore --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
+```
+
+The example writes:
+
+```text
+examples/output/phase2_5-images-example.xlsx
+```
+
+Byte-level note: the low-level XML writer parity fixture suite is still the source of truth for POI/XMLBeans byte-level XML behavior and remains green. Full workbook ZIP byte parity is not claimed because ZIP metadata and document timestamps vary. Full byte-for-byte parity for every new drawing-related package part is also not claimed yet; current Phase 2.5 verification is semantic package interoperability with Apache POI plus continued `PoiXmlWriter` fixture parity.
+
 ---
 
 ## Quick Start
@@ -152,6 +201,7 @@ Runnable example:
 ```bash
 dotnet run --project examples/Phase0WriteExample/Phase0WriteExample.csproj
 dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
+dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
 ```
 
 ---
@@ -234,15 +284,15 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 
 ## 対応状況
 
-### 現在のフェーズ: Phase 2 — スタイル・書式（次）
+### 現在のフェーズ: Phase 3 — SS 共通インターフェース（次のフェーズ）
 
 | Phase | 内容 | バージョン目標 | 状態 |
 |---|---|---|---|
 | **-1** | **XML 出力挙動の統一（Java vs .NET）** | **—** | ✅ 完了 |
 | **0** | **xlsx 書き出し（文字・数値）** | **v0.1** | ✅ 完了 |
 | **1** | **xlsx 読み込み（文字・数値）** | **v0.2** | ✅ 完了 |
-| 2 | スタイル・書式（フォント・色・罫線） | v0.3 | 🚧 次 |
-| 2.5 | 画像・図形（XSSFPicture、XSSFDrawing） | v0.35 | ⬜ 未着手 |
+| **2** | **スタイル・書式（フォント・色・罫線）** | **v0.3** | ✅ 完了 |
+| **2.5** | **画像・図形（XSSFPicture、XSSFDrawing）** | **v0.35** | ✅ 完了 |
 | 3 | SS 共通インターフェース（IWorkbook / ISheet） | v0.4 | ⬜ 未着手 |
 | 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
 | 5 | 数式エンジン（FormulaEvaluator） | v1.0 | ⬜ 未着手 |
@@ -335,6 +385,55 @@ tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase1-basic.xlsx
 
 範囲の注意: Phase 1 が対象にしているのは shared string の文字列セル、数値セル、明示的なゼロ値、疎なセル、複数シートを含むシンプルな `.xlsx` です。数式、スタイル、日付、真偽値、画像、rich text は、テストで明示されるまでは後続フェーズの対象です。
 
+### Phase 2 検証
+
+Phase 2 は、実用的な最初の style subset として完了しています。対象は font、indexed color、foreground fill、basic border、built-in/custom number format、cell style reference です。
+
+現在の検証内容:
+
+- style table 生成と style readback の unit test
+- dotnet-poi が styled workbook を書き、Apache POI(Java) が読み取る相互運用テスト
+- XML parity writer test が green のまま維持されていること
+
+注意: Apache POI の全 style feature について byte-level parity を主張する段階ではありません。現時点の保証は、実装済み subset の意味的な相互運用性です。
+
+### Phase 2.5 検証
+
+Phase 2.5 は、最初の完了 slice として `.xlsx` への画像埋め込みに対応しています。
+
+実装済み API:
+
+- `XSSFWorkbook.addPicture(...)`
+- `XSSFWorkbook.getAllPictures()`
+- `XSSFCreationHelper.createClientAnchor()`
+- `XSSFSheet.createDrawingPatriarch()`
+- `XSSFDrawing.createPicture(...)`
+- `XSSFClientAnchor`、`XSSFDrawing`、`XSSFPicture`、`XSSFPictureData`
+
+現在の検証内容:
+
+- media / drawing / worksheet rels / drawing rels / content types の生成 unit test
+- C# 書き出し → C# 読み込みで picture data を round-trip
+- dotnet-poi が image workbook を書き、Apache POI(Java) が画像データと drawing shape を読み取る相互運用テスト
+- `examples/Phase25ImagesExample` の実行サンプル
+
+確認コマンド:
+
+```bash
+dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --no-restore --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
+```
+
+サンプルの出力先:
+
+```text
+examples/output/phase2_5-images-example.xlsx
+```
+
+byte-level に関する注意: Apache POI/XMLBeans の XML byte-level 挙動は、引き続き低レイヤの `PoiXmlWriter` fixture test で固定しており green です。一方で `.xlsx` 全体の zip byte-level 一致は、zip metadata や document timestamp が変わるため主張していません。また drawing 関連の全 package part について完全な byte-for-byte parity を主張する段階でもありません。Phase 2.5 の現時点の保証は、Apache POI との意味的な package 相互運用性と、`PoiXmlWriter` fixture parity の維持です。
+
 ---
 
 ## クイックスタート
@@ -368,6 +467,7 @@ workbook.write(fs);
 ```bash
 dotnet run --project examples/Phase0WriteExample/Phase0WriteExample.csproj
 dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
+dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
 ```
 
 ---

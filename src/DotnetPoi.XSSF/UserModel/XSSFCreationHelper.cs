@@ -13,4 +13,9 @@ public sealed class XSSFCreationHelper
     {
         return _workbook;
     }
+
+    public XSSFClientAnchor createClientAnchor()
+    {
+        return new XSSFClientAnchor();
+    }
 }

@@ -23,6 +23,12 @@
       "name": "Styles & Formatting",
       "status": "done",
       "notes": "Initial Phase 2 support for cell styles, fonts, indexed colors, fills, borders, built-in formats, and custom number formats."
+    },
+    {
+      "phase": "2.5",
+      "name": "Images & Drawing",
+      "status": "in_progress",
+      "notes": "Initial XSSF image embedding slice is present: addPicture, createDrawingPatriarch, XSSFClientAnchor, XSSFDrawing, XSSFPicture, and package relationships. Advanced resize/read shape parity remains."
     }
   ],
   "classes": [
@@ -89,6 +95,38 @@
       "testStatus": "done",
       "phase": "2",
       "notes": "Built-in formats plus custom formats starting at POI's first user-defined index."
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFClientAnchor.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFClientAnchor.cs",
+      "status": "in_progress",
+      "testStatus": "done",
+      "phase": "2.5",
+      "notes": "Cell-based anchors and anchor type are ported for picture creation."
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFDrawing.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFDrawing.cs",
+      "status": "in_progress",
+      "testStatus": "done",
+      "phase": "2.5",
+      "notes": "Picture creation and drawing/image relationships are ported; charts, comments, shapes, and object data remain unported."
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFPicture.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFPicture.cs",
+      "status": "in_progress",
+      "testStatus": "done",
+      "phase": "2.5",
+      "notes": "Picture shape metadata is present for OOXML serialization; resize APIs remain unported."
+    },
+    {
+      "javaPath": "org/apache/poi/xssf/usermodel/XSSFPictureData.java",
+      "csPath": "src/DotnetPoi.XSSF/UserModel/XSSFPictureData.cs",
+      "status": "in_progress",
+      "testStatus": "done",
+      "phase": "2.5",
+      "notes": "Picture bytes, content type, extension, and basic readback are ported."
     }
   ]
 }

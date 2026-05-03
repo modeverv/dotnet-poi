@@ -12,12 +12,18 @@ import java.nio.file.Paths;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.PictureData;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 public class ReadFromDotnetTest {
+    private static final byte[] ONE_BY_ONE_PNG = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2O8WcAAAAASUVORK5CYII="
+    );
+
     @Test
     void readPhase0BasicWorkbook() throws IOException {
         Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase0-basic.xlsx");
@@ -55,6 +61,26 @@ public class ReadFromDotnetTest {
             assertEquals(14, font.getFontHeightInPoints());
             assertTrue(font.getBold());
             assertTrue(font.getItalic());
+        }
+    }
+
+    @Test
+    void readPhase25PictureWorkbook() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase2_5-images.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XSSFWorkbook workbook = new XSSFWorkbook(input)) {
+            Sheet sheet = workbook.getSheet("Phase2.5");
+
+            assertEquals("image", sheet.getRow(0).getCell(0).getStringCellValue());
+            assertEquals(1, workbook.getAllPictures().size());
+
+            PictureData picture = workbook.getAllPictures().get(0);
+            assertEquals(XSSFWorkbook.PICTURE_TYPE_PNG, picture.getPictureType());
+            assertEquals("png", picture.suggestFileExtension());
+            assertTrue(java.util.Arrays.equals(ONE_BY_ONE_PNG, picture.getData()));
+            assertEquals(1, ((XSSFDrawing)sheet.createDrawingPatriarch()).getShapes().size());
         }
     }
 

@@ -4,6 +4,7 @@ public sealed class XSSFSheet
 {
     private readonly SortedDictionary<int, XSSFRow> _rows = new();
     private readonly XSSFWorkbook _workbook;
+    private XSSFDrawing? _drawing;
 
     internal XSSFSheet(XSSFWorkbook workbook, string sheetName, int sheetIndex)
     {
@@ -38,10 +39,17 @@ public sealed class XSSFSheet
         return _rows.TryGetValue(rownum, out var row) ? row : null;
     }
 
+    public XSSFDrawing createDrawingPatriarch()
+    {
+        return _drawing ??= new XSSFDrawing(this, _workbook.GetNextDrawingIndex());
+    }
+
     public int getLastRowNum()
     {
         return _rows.Count == 0 ? 0 : _rows.Keys.Max();
     }
 
     internal IReadOnlyCollection<XSSFRow> Rows => _rows.Values;
+
+    internal XSSFDrawing? Drawing => _drawing;
 }
