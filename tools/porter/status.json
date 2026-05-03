@@ -35,6 +35,12 @@
       "name": "SS Common Interface",
       "status": "done",
       "notes": "IWorkbook, ISheet, IRow, ICell, ICellStyle, IFont, ICreationHelper, IDataFormat, IPictureData defined in DotnetPoi.SS. BorderStyle, FillPatternType, IndexedColors, CellType moved to SS. All XSSF classes implement the interfaces via explicit interface implementation."
+    },
+    {
+      "phase": "3.1",
+      "name": "Image Rotation",
+      "status": "done",
+      "notes": "XSSFPicture.setRotation()/getRotation() in degrees; writes rot attribute on <a:xfrm> in 60000ths-of-a-degree OOXML units. Drawing XML parsed on workbook load to restore shapes, anchors, and rotation. Interop tested: C# writes rotated fixture, Java POI reads and verifies rot=5400000."
     }
   ],
   "classes": [

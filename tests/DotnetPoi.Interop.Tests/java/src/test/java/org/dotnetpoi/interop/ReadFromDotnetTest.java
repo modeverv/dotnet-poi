@@ -17,6 +17,10 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFPicture;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.junit.jupiter.api.Test;
 
 public class ReadFromDotnetTest {
@@ -81,6 +85,77 @@ public class ReadFromDotnetTest {
             assertEquals("jpeg", picture.suggestFileExtension());
             assertTrue(java.util.Arrays.equals(loadTestImage(), picture.getData()));
             assertEquals(1, ((XSSFDrawing)sheet.createDrawingPatriarch()).getShapes().size());
+        }
+    }
+
+    @Test
+    void readPhase31RotatedPictureWorkbook() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase3_1-rotation.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XSSFWorkbook workbook = new XSSFWorkbook(input)) {
+            Sheet sheet = workbook.getSheet("Phase3.1");
+            assertEquals("rotated", sheet.getRow(0).getCell(0).getStringCellValue());
+            assertEquals(1, workbook.getAllPictures().size());
+
+            PictureData picture = workbook.getAllPictures().get(0);
+            assertEquals(XSSFWorkbook.PICTURE_TYPE_JPEG, picture.getPictureType());
+
+            // Verify rotation is stored in the drawing XML (90° = 5400000 in OOXML units)
+            org.apache.poi.xssf.usermodel.XSSFSheet xssfSheet =
+                (org.apache.poi.xssf.usermodel.XSSFSheet) sheet;
+            org.apache.poi.xssf.usermodel.XSSFDrawing drawing =
+                (org.apache.poi.xssf.usermodel.XSSFDrawing) xssfSheet.createDrawingPatriarch();
+            var shapes = drawing.getShapes();
+            assertEquals(1, shapes.size());
+            org.apache.poi.xssf.usermodel.XSSFPicture xssfPicture =
+                (org.apache.poi.xssf.usermodel.XSSFPicture) shapes.get(0);
+            int rotAttribute = xssfPicture.getCTPicture().getSpPr().getXfrm().getRot();
+            assertEquals(5400000, rotAttribute);
+        }
+    }
+
+    @Test
+    void readPhase32BasicDocx() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase3_2-basic.docx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XWPFDocument doc = new XWPFDocument(input)) {
+
+            java.util.List<XWPFParagraph> paragraphs = doc.getParagraphs();
+            assertTrue(paragraphs.size() >= 2);
+
+            XWPFRun run1 = paragraphs.get(0).getRuns().get(0);
+            assertEquals("from dotnet-poi docx", run1.getText(0));
+            assertTrue(run1.isBold());
+
+            XWPFRun run2 = paragraphs.get(1).getRuns().get(0);
+            assertEquals("second paragraph", run2.getText(0));
+            assertTrue(run2.isItalic());
+        }
+    }
+
+    @Test
+    void readPhase321DocxWithImageAndRotation() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase3_2_1-image-rotation.docx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XWPFDocument doc = new XWPFDocument(input)) {
+
+            assertEquals(1, doc.getAllPictures().size());
+
+            XWPFParagraph para = doc.getParagraphs().get(0);
+            XWPFRun run = para.getRuns().get(0);
+            java.util.List<XWPFPicture> pics = run.getEmbeddedPictures();
+            assertEquals(1, pics.size());
+
+            XWPFPicture pic = pics.get(0);
+            // 90° = 5 400 000 in OOXML 60000ths-of-a-degree units
+            int rot = pic.getCTPicture().getSpPr().getXfrm().getRot();
+            assertEquals(5400000, rot);
         }
     }
 

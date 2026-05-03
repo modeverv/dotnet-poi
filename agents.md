@@ -675,6 +675,8 @@ Phase 3 の前には、共通インターフェースの形に影響する Phase
 
 ### Phase 3.2.1 docxの画像の埋め込み、回転の動作
 
+### phase 3.3 pptxの対応,pptxの画像の埋め込み、回転の動作
+
 ### Phase 3.3 agile 暗号化
 
 ### Phase 4 — POIFS + HSSF（xls 対応）

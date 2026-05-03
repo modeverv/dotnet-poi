@@ -344,6 +344,7 @@ public sealed class XSSFWorkbook : IWorkbook
         {
             var sheet = createSheet(sheetInfo.Name);
             ReadWorksheet(archive, sheetInfo.PartName, sheet, sharedStrings);
+            ReadSheetDrawing(archive, sheetInfo.PartName, sheet);
         }
     }
 
@@ -536,6 +537,213 @@ public sealed class XSSFWorkbook : IWorkbook
                 currentCellType = null;
             }
         }
+    }
+
+    private void ReadSheetDrawing(ZipArchive archive, string sheetPartName, XSSFSheet sheet)
+    {
+        // e.g. "xl/worksheets/sheet1.xml" → "xl/worksheets/_rels/sheet1.xml.rels"
+        var dir = Path.GetDirectoryName(sheetPartName)?.Replace('\\', '/') ?? string.Empty;
+        var file = Path.GetFileName(sheetPartName);
+        var relsPath = $"{dir}/_rels/{file}.rels";
+
+        var relsEntry = archive.GetEntry(relsPath);
+        if (relsEntry is null) return;
+
+        string? drawingTarget = null;
+        using (var relsStream = relsEntry.Open())
+        using (var relsReader = XmlReader.Create(relsStream, new XmlReaderSettings { IgnoreWhitespace = false }))
+        {
+            while (relsReader.Read())
+            {
+                if (relsReader.NodeType != XmlNodeType.Element || relsReader.LocalName != "Relationship") continue;
+                if (!string.Equals(relsReader.GetAttribute("Type"),
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+                        StringComparison.Ordinal))
+                    continue;
+                drawingTarget = relsReader.GetAttribute("Target");
+                break;
+            }
+        }
+
+        if (drawingTarget is null) return;
+
+        // Target is relative to xl/worksheets/, so "../drawings/drawing1.xml" → "xl/drawings/drawing1.xml"
+        var drawingPath = NormalizeRelativePath(dir + "/" + drawingTarget);
+        var drawingDir = Path.GetDirectoryName(drawingPath)?.Replace('\\', '/') ?? string.Empty;
+        var drawingFile = Path.GetFileName(drawingPath);
+        var drawingRelsPath = $"{drawingDir}/_rels/{drawingFile}.rels";
+
+        ReadDrawing(archive, drawingPath, drawingRelsPath, sheet);
+    }
+
+    private void ReadDrawing(ZipArchive archive, string drawingPath, string drawingRelsPath, XSSFSheet sheet)
+    {
+        var drawingEntry = archive.GetEntry(drawingPath);
+        if (drawingEntry is null) return;
+
+        // Map relationship id → 0-based picture index in _pictures
+        var pictureIndexByRelId = new Dictionary<string, int>(StringComparer.Ordinal);
+        var relsEntry = archive.GetEntry(drawingRelsPath);
+        if (relsEntry is not null)
+        {
+            using var relsStream = relsEntry.Open();
+            using var relsReader = XmlReader.Create(relsStream, new XmlReaderSettings { IgnoreWhitespace = false });
+            while (relsReader.Read())
+            {
+                if (relsReader.NodeType != XmlNodeType.Element || relsReader.LocalName != "Relationship") continue;
+                if (!string.Equals(relsReader.GetAttribute("Type"),
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+                        StringComparison.Ordinal))
+                    continue;
+                var relId = relsReader.GetAttribute("Id");
+                var target = relsReader.GetAttribute("Target"); // e.g. "../media/image1.jpeg"
+                if (relId is null || target is null) continue;
+                var mediaFile = Path.GetFileNameWithoutExtension(target); // "image1"
+                if (mediaFile.StartsWith("image", StringComparison.OrdinalIgnoreCase)
+                    && int.TryParse(mediaFile["image".Length..], out var oneBasedIndex))
+                {
+                    pictureIndexByRelId[relId] = oneBasedIndex - 1;
+                }
+            }
+        }
+
+        var drawing = sheet.createDrawingPatriarch();
+
+        // Parse twoCellAnchor elements to reconstruct XSSFPicture shapes
+        using var drawingStream = drawingEntry.Open();
+        using var reader = XmlReader.Create(drawingStream, new XmlReaderSettings { IgnoreWhitespace = false });
+
+        XSSFClientAnchor? currentAnchor = null;
+        string? currentRelId = null;
+        int currentShapeId = 0;
+        bool inFrom = false, inTo = false;
+        int rotAttribute = 0;
+        // from/to marker accumulators
+        int fCol = 0, fDx = 0, fRow = 0, fDy = 0;
+        int tCol = 0, tDx = 0, tRow = 0, tDy = 0;
+        string? markerField = null;
+        int markerValue = 0;
+        bool inMarkerElement = false;
+
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.Element)
+            {
+                switch (reader.LocalName)
+                {
+                    case "twoCellAnchor":
+                        currentAnchor = null;
+                        currentRelId = null;
+                        currentShapeId = 0;
+                        rotAttribute = 0;
+                        fCol = fDx = fRow = fDy = 0;
+                        tCol = tDx = tRow = tDy = 0;
+                        break;
+                    case "from":
+                        inFrom = true; inTo = false;
+                        break;
+                    case "to":
+                        inTo = true; inFrom = false;
+                        break;
+                    case "col":
+                    case "colOff":
+                    case "row":
+                    case "rowOff":
+                        markerField = reader.LocalName;
+                        inMarkerElement = !reader.IsEmptyElement;
+                        break;
+                    case "cNvPr" when currentAnchor is null:
+                        var idAttr = reader.GetAttribute("id");
+                        if (idAttr is not null) int.TryParse(idAttr, out currentShapeId);
+                        break;
+                    case "blip":
+                        var embedAttr = reader.GetAttribute("embed");
+                        if (embedAttr is null)
+                        {
+                            // try namespace-qualified attribute
+                            embedAttr = GetAttributeByLocalName(reader, "embed");
+                        }
+                        currentRelId = embedAttr;
+                        break;
+                    case "xfrm":
+                        var rotAttr = reader.GetAttribute("rot");
+                        rotAttribute = rotAttr is not null ? int.Parse(rotAttr, CultureInfo.InvariantCulture) : 0;
+                        break;
+                }
+            }
+            else if (reader.NodeType == XmlNodeType.Text && inMarkerElement && markerField is not null)
+            {
+                if (int.TryParse(reader.Value, out markerValue))
+                {
+                    if (inFrom)
+                    {
+                        switch (markerField)
+                        {
+                            case "col": fCol = markerValue; break;
+                            case "colOff": fDx = markerValue; break;
+                            case "row": fRow = markerValue; break;
+                            case "rowOff": fDy = markerValue; break;
+                        }
+                    }
+                    else if (inTo)
+                    {
+                        switch (markerField)
+                        {
+                            case "col": tCol = markerValue; break;
+                            case "colOff": tDx = markerValue; break;
+                            case "row": tRow = markerValue; break;
+                            case "rowOff": tDy = markerValue; break;
+                        }
+                    }
+                }
+            }
+            else if (reader.NodeType == XmlNodeType.EndElement)
+            {
+                switch (reader.LocalName)
+                {
+                    case "col":
+                    case "colOff":
+                    case "row":
+                    case "rowOff":
+                        inMarkerElement = false;
+                        markerField = null;
+                        break;
+                    case "from":
+                        inFrom = false;
+                        currentAnchor = new XSSFClientAnchor(fDx, fDy, tDx, tDy, fCol, fRow, tCol, tRow);
+                        break;
+                    case "to":
+                        inTo = false;
+                        break;
+                    case "twoCellAnchor":
+                        if (currentAnchor is not null && currentRelId is not null
+                            && pictureIndexByRelId.TryGetValue(currentRelId, out var picIdx))
+                        {
+                            var picture = drawing.createPicture(currentAnchor, picIdx);
+                            picture.SetRotationAttribute(rotAttribute);
+                        }
+                        break;
+                }
+            }
+        }
+    }
+
+    private static string NormalizeRelativePath(string path)
+    {
+        var parts = path.Split('/');
+        var stack = new System.Collections.Generic.Stack<string>();
+        foreach (var part in parts)
+        {
+            if (part == "..")
+            {
+                if (stack.Count > 0) stack.Pop();
+            }
+            else if (part != "." && part != string.Empty)
+            {
+                stack.Push(part);
+            }
+        }
+        return string.Join("/", stack.Reverse());
     }
 
     private void ReadStyles(ZipArchive archive)
@@ -859,6 +1067,10 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteEndElement();
         writer.WriteStartElement("xdr", "spPr");
         writer.WriteStartElement("a", "xfrm");
+        if (picture.RotationAttribute != 0)
+        {
+            writer.WriteAttributeString("rot", picture.RotationAttribute.ToString(CultureInfo.InvariantCulture));
+        }
         writer.WriteStartElement("a", "off");
         writer.WriteAttributeString("x", anchor.Dx1.ToString(CultureInfo.InvariantCulture));
         writer.WriteAttributeString("y", anchor.Dy1.ToString(CultureInfo.InvariantCulture));

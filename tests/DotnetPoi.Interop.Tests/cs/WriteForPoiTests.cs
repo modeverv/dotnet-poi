@@ -1,5 +1,6 @@
 using DotnetPoi.SS.UserModel;
 using DotnetPoi.XSSF.UserModel;
+using DotnetPoi.XWPF.UserModel;
 using Xunit;
 
 namespace DotnetPoi.Interop.Tests;
@@ -84,6 +85,79 @@ public class WriteForPoiTests
 
         using var stream = File.Create(fixturePath);
         workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_RotatedPictureWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase3_1-rotation.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Phase3.1");
+        sheet.createRow(0).createCell(0).setCellValue("rotated");
+
+        var pictureIndex = workbook.addPicture(LoadTestImage(), XSSFWorkbook.PICTURE_TYPE_JPEG);
+        var anchor = workbook.getCreationHelper().createClientAnchor();
+        anchor.setCol1(1);
+        anchor.setRow1(1);
+        anchor.setCol2(5);
+        anchor.setRow2(15);
+        var picture = sheet.createDrawingPatriarch().createPicture(anchor, pictureIndex);
+        picture.setRotation(90.0);
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_DocxWithText_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase3_2-basic.docx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var doc = new XWPFDocument();
+        var para1 = doc.createParagraph();
+        var run1 = para1.createRun();
+        run1.setText("from dotnet-poi docx");
+        run1.setBold(true);
+
+        var para2 = doc.createParagraph();
+        var run2 = para2.createRun();
+        run2.setText("second paragraph");
+        run2.setItalic(true);
+
+        using var stream = File.Create(fixturePath);
+        doc.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_DocxWithImageAndRotation_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase3_2_1-image-rotation.docx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var doc = new XWPFDocument();
+        var para = doc.createParagraph();
+        var run = para.createRun();
+        var picture = run.addPicture(LoadTestImage(), XWPFPictureData.PICTURE_TYPE_JPEG, "image.jpg",
+            914400, 914400);
+        picture.setRotation(90.0);
+
+        using var stream = File.Create(fixturePath);
+        doc.write(stream);
 
         Assert.True(File.Exists(fixturePath));
         Assert.True(new FileInfo(fixturePath).Length > 0);

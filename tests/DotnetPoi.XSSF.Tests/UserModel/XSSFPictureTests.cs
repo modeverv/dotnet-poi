@@ -113,6 +113,74 @@ public class XSSFPictureTests
         Assert.NotNull(archive.GetEntry("xl/media/image2.jpeg"));
     }
 
+    [Fact]
+    public void SetRotation_WritesRotAttributeInDrawingXml()
+    {
+        var imageBytes = LoadTestImage();
+
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Rotated");
+        var pictureIndex = workbook.addPicture(imageBytes, XSSFWorkbook.PICTURE_TYPE_JPEG);
+        var drawing = sheet.createDrawingPatriarch();
+        var anchor = workbook.getCreationHelper().createClientAnchor();
+        anchor.setCol1(0); anchor.setRow1(0);
+        anchor.setCol2(4); anchor.setRow2(10);
+        var picture = drawing.createPicture(anchor, pictureIndex);
+
+        picture.setRotation(90.0);
+        Assert.Equal(90.0, picture.getRotation(), precision: 6);
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+
+        stream.Position = 0;
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var drawingXml = ReadEntry(archive, "xl/drawings/drawing1.xml");
+        // 90 degrees = 90 * 60000 = 5400000
+        Assert.Contains("rot=\"5400000\"", drawingXml);
+    }
+
+    [Fact]
+    public void Rotation_RoundTrip_PreservesRotation()
+    {
+        var imageBytes = LoadTestImage();
+
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("Rotated");
+        var pictureIndex = original.addPicture(imageBytes, XSSFWorkbook.PICTURE_TYPE_JPEG);
+        var drawing = sheet.createDrawingPatriarch();
+        var anchor = original.getCreationHelper().createClientAnchor();
+        anchor.setCol1(1); anchor.setRow1(2);
+        anchor.setCol2(5); anchor.setRow2(12);
+        var picture = drawing.createPicture(anchor, pictureIndex);
+        picture.setRotation(45.0);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+
+        var loadedSheet = loaded.getSheet("Rotated")!;
+        var loadedDrawing = loadedSheet.createDrawingPatriarch();
+        var shapes = loadedDrawing.getShapes();
+        Assert.Single(shapes);
+        Assert.Equal(45.0, shapes[0].getRotation(), precision: 6);
+    }
+
+    [Fact]
+    public void SetRotation_NormalisesNegativeAngles()
+    {
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet();
+        var idx = workbook.addPicture(LoadTestImage(), XSSFWorkbook.PICTURE_TYPE_JPEG);
+        var picture = sheet.createDrawingPatriarch().createPicture(
+            workbook.getCreationHelper().createClientAnchor(), idx);
+
+        picture.setRotation(-90.0);
+        Assert.Equal(270.0, picture.getRotation(), precision: 6);
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

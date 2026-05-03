@@ -4,7 +4,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-WIP-yellow)
-![Phase](https://img.shields.io/badge/phase-3%20%E2%80%94%20done%2C%20next%3A%20Phase%204-green)
+![Phase](https://img.shields.io/badge/phase-3.2%20%E2%80%94%20done%2C%20next%3A%20Phase%203.3-green)
 
 ## Philosophy
 
@@ -18,7 +18,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ## Status
 
-### Current Phase: Phase 4 — POIFS + HSSF (next up)
+### Current Phase: Phase 3.3 — AGILE encryption (next up)
 
 | Phase | Description | Target | Status |
 |---|---|---|---|
@@ -28,6 +28,9 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | **2** | **Styles & formatting (font, color, border)** | **v0.3** | ✅ Done |
 | **2.5** | **Images & drawing (XSSFPicture, XSSFDrawing)** | **v0.35** | ✅ Done |
 | **3** | **SS common interface (IWorkbook / ISheet / IRow / ICell)** | **v0.4** | ✅ Done |
+| **3.1** | **Image rotation (XSSFPicture.setRotation/getRotation)** | **—** | ✅ Done |
+| **3.2** | **docx support (XWPF — text, images, rotation)** | **—** | ✅ Done |
+| 3.3 | AGILE encryption | — | ⬜ Not started |
 | 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
 | 5 | Formula engine (FormulaEvaluator) | v1.0 | ⬜ Not started |
 | 6 | Word / PowerPoint formats | v1.x | ⬜ Not started |
@@ -168,6 +171,35 @@ examples/output/phase2_5-images-example.xlsx
 
 Byte-level note: the low-level XML writer parity fixture suite is still the source of truth for POI/XMLBeans byte-level XML behavior and remains green. Full workbook ZIP byte parity is not claimed because ZIP metadata and document timestamps vary. Full byte-for-byte parity for every new drawing-related package part is also not claimed yet; current Phase 2.5 verification is semantic package interoperability with Apache POI plus continued `PoiXmlWriter` fixture parity.
 
+### Phase 3.2 Verification
+
+Phase 3.2 is complete for the initial docx surface: create paragraphs with text and inline images, apply bold/italic formatting, set image rotation, save as `.docx`, and read the result back.
+
+Implemented classes: `XWPFDocument`, `XWPFParagraph`, `XWPFRun`, `XWPFPicture`, `XWPFPictureData`.
+
+Verification currently covers:
+
+- unit tests for write/read round-trips (text, bold, italic, inline image, rotation, deduplication)
+- Java interop in the write direction: dotnet-poi writes a `.docx`, then Apache POI (XWPF) reads and asserts paragraph text, formatting, picture data, and rotation
+- a runnable example under `examples/Phase32DocxExample`
+
+Commands:
+
+```bash
+dotnet test tests/DotnetPoi.XWPF.Tests/ --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/ --no-restore --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
+```
+
+The example writes:
+
+```text
+examples/output/phase3_2-docx-example.docx
+```
+
+Scope note: Phase 3.2 covers the core XWPF write/read surface — paragraphs, runs, bold/italic, and inline images with rotation. Table support, headers/footers, styles, and numbering are later-phase work.
+
 ---
 
 ## Quick Start
@@ -196,12 +228,29 @@ using var fs = new FileStream("output.xlsx", FileMode.Create);
 workbook.write(fs);
 ```
 
-Runnable example:
+Runnable examples:
 
 ```bash
 dotnet run --project examples/Phase0WriteExample/Phase0WriteExample.csproj
 dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
 dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
+dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
+```
+
+docx example:
+
+```csharp
+using DotnetPoi.XWPF.UserModel;
+
+using var doc = new XWPFDocument();
+
+var para = doc.createParagraph();
+var run = para.createRun();
+run.setText("Hello from dotnet-poi");
+run.setBold(true);
+
+using var fs = new FileStream("output.docx", FileMode.Create);
+doc.write(fs);
 ```
 
 ---
@@ -284,7 +333,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 
 ## 対応状況
 
-### 現在のフェーズ: Phase 4 — POIFS + HSSF（次のフェーズ）
+### 現在のフェーズ: Phase 3.3 — AGILE 暗号化（次のフェーズ）
 
 | Phase | 内容 | バージョン目標 | 状態 |
 |---|---|---|---|
@@ -294,6 +343,9 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | **2** | **スタイル・書式（フォント・色・罫線）** | **v0.3** | ✅ 完了 |
 | **2.5** | **画像・図形（XSSFPicture、XSSFDrawing）** | **v0.35** | ✅ 完了 |
 | **3** | **SS 共通インターフェース（IWorkbook / ISheet / IRow / ICell）** | **v0.4** | ✅ 完了 |
+| **3.1** | **画像の回転（XSSFPicture.setRotation/getRotation）** | **—** | ✅ 完了 |
+| **3.2** | **docx 対応（XWPF — テキスト・画像・回転）** | **—** | ✅ 完了 |
+| 3.3 | AGILE 暗号化 | — | ⬜ 未着手 |
 | 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
 | 5 | 数式エンジン（FormulaEvaluator） | v1.0 | ⬜ 未着手 |
 | 6 | Word / PowerPoint 形式 | v1.x | ⬜ 未着手 |
@@ -434,6 +486,35 @@ examples/output/phase2_5-images-example.xlsx
 
 byte-level に関する注意: Apache POI/XMLBeans の XML byte-level 挙動は、引き続き低レイヤの `PoiXmlWriter` fixture test で固定しており green です。一方で `.xlsx` 全体の zip byte-level 一致は、zip metadata や document timestamp が変わるため主張していません。また drawing 関連の全 package part について完全な byte-for-byte parity を主張する段階でもありません。Phase 2.5 の現時点の保証は、Apache POI との意味的な package 相互運用性と、`PoiXmlWriter` fixture parity の維持です。
 
+### Phase 3.2 検証
+
+Phase 3.2 は最初の docx 書き出し面として完了しています。対象は段落テキスト・インライン画像・bold/italic・画像の回転・docx 保存・読み込みです。
+
+実装済みクラス: `XWPFDocument`、`XWPFParagraph`、`XWPFRun`、`XWPFPicture`、`XWPFPictureData`
+
+現在の検証内容:
+
+- write/read round-trip の unit test（テキスト・書式・インライン画像・回転・重複排除）
+- dotnet-poi が `.docx` を書き、Apache POI(Java / XWPF) が段落テキスト・書式・画像データ・回転を読み取る相互運用テスト
+- `examples/Phase32DocxExample` の実行サンプル
+
+確認コマンド:
+
+```bash
+dotnet test tests/DotnetPoi.XWPF.Tests/ --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/ --no-restore --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
+```
+
+サンプルの出力先:
+
+```text
+examples/output/phase3_2-docx-example.docx
+```
+
+範囲の注意: Phase 3.2 が対象にしているのは XWPF の書き出し・読み込みコアサーフェス（段落・ラン・bold/italic・回転付きインライン画像）です。表・ヘッダー/フッター・スタイル・リストは後続フェーズの対象です。
+
 ---
 
 ## クイックスタート
@@ -468,6 +549,23 @@ workbook.write(fs);
 dotnet run --project examples/Phase0WriteExample/Phase0WriteExample.csproj
 dotnet run --project examples/Phase1InteropExample/Phase1InteropExample.csproj
 dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
+dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
+```
+
+docx example:
+
+```csharp
+using DotnetPoi.XWPF.UserModel;
+
+using var doc = new XWPFDocument();
+
+var para = doc.createParagraph();
+var run = para.createRun();
+run.setText("dotnet-poi から Hello");
+run.setBold(true);
+
+using var fs = new FileStream("output.docx", FileMode.Create);
+doc.write(fs);
 ```
 
 ---
