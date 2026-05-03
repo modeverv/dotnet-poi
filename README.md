@@ -18,12 +18,12 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ## Status
 
-### Current Phase: Phase 0 — xlsx Write (In Progress)
+### Current Phase: Phase 0 — xlsx Write (Ready to Start)
 
 | Phase | Description | Target | Status |
 |---|---|---|---|
-| **-1** | **XML output parity (Java vs .NET)** | **—** | ⬜ Not started |
-| **0** | **xlsx write (string / number)** | **v0.1** | ⬜ Not started |
+| **-1** | **XML output parity (Java vs .NET)** | **—** | ✅ Done |
+| **0** | **xlsx write (string / number)** | **v0.1** | 🚧 Ready to start |
 | 1 | xlsx read | v0.2 | ⬜ Not started |
 | 2 | Styles & formatting (font, color, border) | v0.3 | ⬜ Not started |
 | 2.5 | Images & drawing (XSSFPicture, XSSFDrawing) | v0.35 | ⬜ Not started |
@@ -43,6 +43,22 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | `XSSFCreationHelper` | ⬜ | ⬜ | |
 
 Legend: ✅ Done / 🚧 In Progress / ⬜ Not started
+
+### Phase -1 Foundation
+
+Phase -1 is complete. The project now has a `PoiXmlWriter` foundation for reproducing Apache POI/XMLBeans OOXML output at byte-level fidelity.
+
+What is locked down:
+
+- Java Apache POI fixture generation under `tests/DotnetPoi.Interop.Tests/fixtures/xml-parity/`
+- byte-level fixture comparisons for XML declaration shape, empty element style, attribute order, namespace order, explicit zero/default attributes, element order, whitespace, and scalar formatting
+- a source gate test that fails if production code bypasses `PoiXmlWriter` with direct XML APIs such as `XmlWriter`, `XDocument`, `XElement`, `XmlDocument`, or `XmlSerializer`
+
+Before Phase 0 work is considered healthy, the XML parity tests must stay green:
+
+```bash
+dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter PoiXmlWriter
+```
 
 ---
 
@@ -78,7 +94,7 @@ workbook.Write(fs);
 
 The .NET Excel library landscape has structural problems:
 
-- **NPOI**: Supports both xls and xlsx, but has incomplete implementations in places, and v2.8.0+ requires a commercial maintenance fee
+- **NPOI**: Supports both xls and xlsx, but v2.8.0+ requires a commercial maintenance fee
 - **ClosedXML / EPPlus**: xlsx only — cannot handle xls (BIFF format)
 
 dotnet-poi aims to solve both problems by porting Apache POI — a battle-tested implementation — transparently and faithfully, with **no licensing strings attached, ever**.
@@ -106,7 +122,9 @@ dotnet-poi/
 │   ├── DotnetPoi.POIFS/    # OLE2 container (Phase 4+)
 │   └── DotnetPoi.HSSF/     # xls / BIFF (Phase 4+)
 ├── tests/
-│   └── DotnetPoi.XSSF.Tests/
+│   ├── DotnetPoi.SS.Tests/     # XML parity foundation tests
+│   ├── DotnetPoi.XSSF.Tests/
+│   └── DotnetPoi.Interop.Tests/ # Java/.NET fixture compatibility tests
 ├── tools/
 │   └── porter/             # Porting progress tracker
 └── agents.md               # LLM porting instructions
@@ -149,12 +167,12 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 
 ## 対応状況
 
-### 現在のフェーズ: Phase 0 — xlsx 書き出し（進行中）
+### 現在のフェーズ: Phase 0 — xlsx 書き出し（開始可能）
 
 | Phase | 内容 | バージョン目標 | 状態 |
 |---|---|---|---|
-| **-1** | **XML 出力挙動の統一（Java vs .NET）** | **—** | ⬜ 未着手 |
-| **0** | **xlsx 書き出し（文字・数値）** | **v0.1** | ⬜ 未着手 |
+| **-1** | **XML 出力挙動の統一（Java vs .NET）** | **—** | ✅ 完了 |
+| **0** | **xlsx 書き出し（文字・数値）** | **v0.1** | 🚧 開始可能 |
 | 1 | xlsx 読み込み | v0.2 | ⬜ 未着手 |
 | 2 | スタイル・書式（フォント・色・罫線） | v0.3 | ⬜ 未着手 |
 | 2.5 | 画像・図形（XSSFPicture、XSSFDrawing） | v0.35 | ⬜ 未着手 |
@@ -174,6 +192,22 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | `XSSFCreationHelper` | ⬜ | ⬜ | |
 
 凡例: ✅ 完了 / 🚧 進行中 / ⬜ 未着手
+
+### Phase -1 基盤
+
+Phase -1 は完了しました。Apache POI/XMLBeans の OOXML 出力にバイト列レベルで寄せるための基盤として `PoiXmlWriter` を追加しています。
+
+固定済みの内容:
+
+- `tests/DotnetPoi.Interop.Tests/fixtures/xml-parity/` 以下の Java Apache POI 生成 fixture
+- XML 宣言、空要素、属性順、namespace 順、ゼロ値・デフォルト値属性、要素順、空白、数値表現の byte-level fixture 比較
+- production code が `PoiXmlWriter` を迂回して `XmlWriter`、`XDocument`、`XElement`、`XmlDocument`、`XmlSerializer` などを直接使った場合に落ちるゲートテスト
+
+Phase 0 以降の作業では、まずこの XML parity テストが通っていることを確認します。
+
+```bash
+dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter PoiXmlWriter
+```
 
 ---
 
@@ -209,7 +243,7 @@ workbook.Write(fs);
 
 .NET の Excel ライブラリには構造的な問題があります。
 
-- **NPOI**: xls / xlsx 両対応だが実装が不完全な箇所があり、v2.8.0 以降は商用利用に維持費が必要
+- **NPOI**: xls / xlsx 両対応だがv2.8.0 以降は商用利用に維持費が必要
 - **ClosedXML / EPPlus**: xlsx のみ対応、xls（BIFF形式）は扱えない
 
 dotnet-poi は Apache POI という枯れた実装を正典として透過的に移植することで、**実装品質と永続的な無償提供を両立**することを目指します。
@@ -237,7 +271,9 @@ dotnet-poi/
 │   ├── DotnetPoi.POIFS/    # OLE2コンテナ（Phase 4〜）
 │   └── DotnetPoi.HSSF/     # xls / BIFF（Phase 4〜）
 ├── tests/
-│   └── DotnetPoi.XSSF.Tests/
+│   ├── DotnetPoi.SS.Tests/     # XML parity 基盤テスト
+│   ├── DotnetPoi.XSSF.Tests/
+│   └── DotnetPoi.Interop.Tests/ # Java/.NET fixture 互換テスト
 ├── tools/
 │   └── porter/             # 移植進捗管理
 └── agents.md               # LLM への移植指示
