@@ -41,7 +41,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | **5.3** | **Representative formula evaluation functions** | **—** | ✅ Done |
 | 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
 | 5 | Full FormulaEvaluator parity | v1.0 | 🚧 Partial |
-| 6 | Word / PowerPoint formats | v1.x | ⬜ Not started |
+| **6** | **HWPF (.doc text read) + HSLF (.ppt slide/text read)** | **v1.x** | ✅ Done (read-only MVP) |
 
 Minimum bar if POIFS is considered “full” (to unblock HWPF/HSLF work):
 
@@ -559,7 +559,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | **5.3** | **代表的な関数の評価** | **—** | ✅ 完了 |
 | 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
 | 5 | FormulaEvaluator 完全互換 | v1.0 | 🚧 一部対応 |
-| 6 | Word / PowerPoint 形式 | v1.x | ⬜ 未着手 |
+| **6** | **HWPF (.doc テキスト読み込み) + HSLF (.ppt スライド/テキスト読み込み)** | **v1.x** | ✅ 完了（読み込み専用 MVP）|
 
 POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSLF の土台用）:
 

@@ -3,7 +3,7 @@ using System.Text;
 
 namespace DotnetPoi.POIFS.Crypt;
 
-internal static class CompoundFile
+public static class CompoundFile
 {
     private static readonly byte[] Signature = { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 };
 
