@@ -2,6 +2,9 @@
 
 An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .NET.
 
+[![CI](https://github.com/modeverv/dotnet-poi/actions/workflows/ci.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/ci.yml)
+[![Examples](https://github.com/modeverv/dotnet-poi/actions/workflows/examples.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/examples.yml)
+[![XML Parity](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-WIP-yellow)
 ![Phase](https://img.shields.io/badge/phase-3.4%20%E2%80%94%20done%2C%20next%3A%20Phase%204-green)
@@ -459,6 +462,10 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 # dotnet-poi（日本語）
 
 [Apache POI](https://poi.apache.org/) の **非公式** で忠実な .NET 移植です。
+
+[![CI](https://github.com/modeverv/dotnet-poi/actions/workflows/ci.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/ci.yml)
+[![Examples](https://github.com/modeverv/dotnet-poi/actions/workflows/examples.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/examples.yml)
+[![XML Parity](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml)
 
 ## 理念
 
