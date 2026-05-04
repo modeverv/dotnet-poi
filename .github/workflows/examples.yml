@@ -18,13 +18,18 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
-          cache: true
-          cache-dependency-path: "**/*.csproj"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/DotnetPOI.sln') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       # Phase7CellTypesExample reads fixtures/from-poi/phase7-formulas.xlsx.
       # Phase1InteropExample reads fixtures/from-poi/phase1-basic.xlsx.
-      # Both files are committed; Java is only needed if we want to regenerate them.
-      # We skip regeneration here — the committed fixtures are the source of truth.
+      # Both files are committed; Java is not needed for these examples.
 
       - name: Phase 0 — xlsx write
         run: dotnet run --project examples/Phase0WriteExample/

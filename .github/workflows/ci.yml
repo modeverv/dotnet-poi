@@ -19,8 +19,17 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
-          cache: true
-          cache-dependency-path: "**/*.csproj"
+
+      # Use actions/cache directly to avoid the "cache folder doesn't exist"
+      # error that actions/setup-dotnet's built-in cache emits when the
+      # NuGet packages directory hasn't been created yet.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/DotnetPOI.sln') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Build solution
         run: dotnet build DotnetPOI.sln --no-incremental -c Debug
@@ -58,8 +67,14 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
-          cache: true
-          cache-dependency-path: "**/*.csproj"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/DotnetPOI.sln') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Build solution
         run: dotnet build DotnetPOI.sln --no-incremental -c Debug
