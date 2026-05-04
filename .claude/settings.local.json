@@ -24,7 +24,10 @@
       "Bash(unzip -o /Users/seijiro/Sync/sync_work/me/dotnet-poi/tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase0-basic.xlsx -d our_xlsx/)",
       "Bash(unzip -o poi_reference.xlsx -d poi_xlsx/)",
       "Bash(unzip -p /Users/seijiro/Sync/sync_work/me/dotnet-poi/tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase0-basic.xlsx xl/workbook.xml)",
-      "Bash(unzip *)"
+      "Bash(unzip *)",
+      "Bash(git -C /Users/seijiro/Sync/sync_work/me/dotnet-poi ls-files tests/image.jpg)",
+      "Bash(git -C /Users/seijiro/Sync/sync_work/me/dotnet-poi ls-files tests/DotnetPoi.Interop.Tests/fixtures/)",
+      "Bash(git -C /Users/seijiro/Sync/sync_work/me/dotnet-poi ls-files examples/output/)"
     ]
   }
 }

@@ -1,0 +1,59 @@
+name: Examples
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  run-examples:
+    name: Example Smoke Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+          cache: true
+          cache-dependency-path: "**/*.csproj"
+
+      # Phase7CellTypesExample reads fixtures/from-poi/phase7-formulas.xlsx.
+      # Phase1InteropExample reads fixtures/from-poi/phase1-basic.xlsx.
+      # Both files are committed; Java is only needed if we want to regenerate them.
+      # We skip regeneration here — the committed fixtures are the source of truth.
+
+      - name: Phase 0 — xlsx write
+        run: dotnet run --project examples/Phase0WriteExample/
+
+      - name: Phase 1 — xlsx read/write interop
+        run: dotnet run --project examples/Phase1InteropExample/
+
+      - name: Phase 2.5 — xlsx image embedding
+        run: dotnet run --project examples/Phase25ImagesExample/
+
+      - name: Phase 3 — SS common interface
+        run: dotnet run --project examples/Phase3InterfaceExample/
+
+      - name: Phase 3.2 — docx text and images
+        run: dotnet run --project examples/Phase32DocxExample/
+
+      - name: Phase 3.3 — pptx slides and images
+        run: dotnet run --project examples/Phase33PptxExample/
+
+      - name: Phase 3.4 — AGILE encryption
+        run: dotnet run --project examples/Phase34AgileEncryptionExample/
+
+      - name: Phase 7 — cell type coverage
+        run: dotnet run --project examples/Phase7CellTypesExample/
+
+      - name: Upload example outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-outputs
+          path: examples/output/
+          retention-days: 7

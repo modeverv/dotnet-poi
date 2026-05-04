@@ -1,39 +1,44 @@
-name: xml-parity-fixtures
+name: XML Parity Fixtures
+
+# Verifies that the XML parity fixtures committed to the repository are still
+# up to date with what Apache POI/XMLBeans actually produces.
+# Run on every push so drift is caught immediately.
 
 on:
-  pull_request:
-    paths:
-      - "tests/DotnetPoi.Interop.Tests/java/**"
-      - "tests/DotnetPoi.Interop.Tests/fixtures/xml-parity/**"
-      - ".github/workflows/xml-parity-fixtures.yml"
   push:
-    branches: [ "master" ]
-    paths:
-      - "tests/DotnetPoi.Interop.Tests/java/**"
-      - "tests/DotnetPoi.Interop.Tests/fixtures/xml-parity/**"
-      - ".github/workflows/xml-parity-fixtures.yml"
+    branches: [master]
+  pull_request:
 
 jobs:
-  generate-fixtures:
+  verify-fixtures:
+    name: Verify XML Parity Fixtures
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 11
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
+          distribution: temurin
           java-version: "11"
+          cache: maven
 
-      - name: Generate XML parity fixtures
-        run: mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=XmlParityFixtureGeneratorTest
+      - name: Regenerate XML parity fixtures
+        run: >
+          mvn test
+          -f tests/DotnetPoi.Interop.Tests/java/pom.xml
+          -Dtest=XmlParityFixtureGeneratorTest
+          -B --no-transfer-progress
 
-      - name: Upload generated fixtures
+      - name: Assert fixtures are up to date
+        run: git diff --exit-code -- tests/DotnetPoi.Interop.Tests/fixtures/xml-parity
+
+      - name: Upload regenerated fixtures (on drift)
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: xml-parity-fixtures
+          name: updated-xml-parity-fixtures
           path: tests/DotnetPoi.Interop.Tests/fixtures/xml-parity
-
-      - name: Ensure fixtures are up to date
-        run: git diff --exit-code -- tests/DotnetPoi.Interop.Tests/fixtures/xml-parity
+          retention-days: 7
