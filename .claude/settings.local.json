@@ -27,7 +27,9 @@
       "Bash(unzip *)",
       "Bash(git -C /Users/seijiro/Sync/sync_work/me/dotnet-poi ls-files tests/image.jpg)",
       "Bash(git -C /Users/seijiro/Sync/sync_work/me/dotnet-poi ls-files tests/DotnetPoi.Interop.Tests/fixtures/)",
-      "Bash(git -C /Users/seijiro/Sync/sync_work/me/dotnet-poi ls-files examples/output/)"
+      "Bash(git -C /Users/seijiro/Sync/sync_work/me/dotnet-poi ls-files examples/output/)",
+      "Bash(git *)",
+      "Bash(echo \"exit code: $?\")"
     ]
   }
 }

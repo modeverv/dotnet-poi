@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DotnetPoi.SS.Xml;
 using Xunit;
 
@@ -331,7 +332,10 @@ public class PoiXmlWriterCellTypesTests
             writer.WriteAttributeString("t", "n");
             writer.WriteAttributeString("s", "1");
             writer.WriteStartElement("v");
-            writer.WriteString("25569.375");
+            // Read the date serial from the fixture so the test stays valid when the
+            // Java generator is fixed to use a timezone-independent value.
+            writer.WriteString(ExtractDateSerialFromWorksheetFixture(
+                XmlFixturePaths.GetFixturePath("cell-types__xl__worksheets__sheet1.xml")));
             writer.WriteEndElement();
             writer.WriteEndElement();
 
@@ -376,6 +380,20 @@ public class PoiXmlWriterCellTypesTests
         writer.WriteStartElement(name);
         writer.WriteAttributeString("val", val);
         writer.WriteEndElement();
+    }
+
+    /// <summary>
+    /// Extracts the date serial number from the D1 cell in the cell-types worksheet fixture.
+    /// The Java fixture generator was fixed to use 25569.0 (UTC timezone-independent),
+    /// replacing the old 25569.375 (JST). Reading from the fixture keeps the test aligned.
+    /// </summary>
+    private static string ExtractDateSerialFromWorksheetFixture(string fixturePath)
+    {
+        var content = File.ReadAllText(fixturePath);
+        var match = Regex.Match(content, @"<c r=""D1""[^>]*><v>([^<]+)</v></c>");
+        if (!match.Success)
+            throw new InvalidDataException($"Could not find D1 cell value in {fixturePath}");
+        return match.Groups[1].Value;
     }
 }
 
