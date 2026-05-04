@@ -79,6 +79,7 @@ public sealed class XSSFCell : ICell
         {
             _cellType = CellType.String;
         }
+        _row.getSheet().getWorkbook().MarkDirty();
     }
 
     public void setCellValue(double value)
@@ -94,6 +95,7 @@ public sealed class XSSFCell : ICell
         {
             _cellType = CellType.Numeric;
         }
+        _row.getSheet().getWorkbook().MarkDirty();
     }
 
     public void setCellValue(bool value)
@@ -108,6 +110,7 @@ public sealed class XSSFCell : ICell
         {
             _cellType = CellType.Boolean;
         }
+        _row.getSheet().getWorkbook().MarkDirty();
     }
 
     /// <summary>
@@ -121,6 +124,7 @@ public sealed class XSSFCell : ICell
             _formula = null;
             _isFormula = false;
             _cellType = _hasCachedValue ? _cachedFormulaResultType : CellType.Blank;
+            _row.getSheet().getWorkbook().MarkDirty();
             return;
         }
 
@@ -128,6 +132,7 @@ public sealed class XSSFCell : ICell
         _isFormula = true;
         _cellType = CellType.Formula;
         _cachedFormulaResultType = _hasCachedValue ? _cachedFormulaResultType : CellType.Numeric;
+        _row.getSheet().getWorkbook().MarkDirty();
     }
 
     // ----- getters -----

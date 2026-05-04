@@ -3,6 +3,9 @@
 ## rule 
 do not commit via llm
 
+## 最重要: CHECKPOINT.md の更新
+- プロジェクトが大きくなりセッションのコンテキストに収まりきらないため、作業状況・プラン・わかったこと・TODO を `CHECKPOINT.md` に随時追記しながら進めること。
+
 ## Project Overview
 
 This repository is an **unofficial, faithful .NET port of Apache POI (Java)**.
@@ -279,14 +282,14 @@ Goal: close practical compatibility gaps left after the MVP surfaces. Implement 
 POI-compatible slices with xUnit coverage and Java POI interop wherever possible. Do not claim
 byte-level parity unless a dedicated fixture suite proves it.
 
-#### Cross-format TODO
+#### step 1 Cross-format TODO
 
 - [ ] Add format-specific XML fixture parity suites for `xlsx`, `docx`, `pptx`, `xlsm`, `docm`, and `pptm`.
 - [ ] Keep semantic POI interop tests green in both directions for every supported format.
 - [ ] Preserve unknown package parts, relationships, properties, and macro binaries byte-for-byte when round-tripping macro-enabled files.
 - [ ] Add corruption/unsupported-feature tests that fail gracefully with POI-compatible exceptions.
 
-#### xlsx / XSSF TODO
+#### step 2 xlsx / XSSF TODO
 
 - [ ] Broaden style parity: fonts, fills, borders, number formats, alignment, protection, row/column styles.
 - [ ] Implement merged regions, row heights, column widths, hidden rows/columns, freeze panes, and print settings.
@@ -294,52 +297,52 @@ byte-level parity unless a dedicated fixture suite proves it.
 - [ ] Expand formula evaluator parity beyond the representative subset: IF, VLOOKUP/XLOOKUP-style lookups, date/time, text, financial, array/shared formulas, external references, and error semantics.
 - [ ] Add richer shared strings/rich text coverage.
 
-#### xls / HSSF TODO
+#### step 3 xls / HSSF TODO
 
 - [ ] Expand BIFF record read/write beyond the bootstrap records: Row, MulRK, MulBlank, Formula, XF, Font, Format, Palette, MergeCells, ColumnInfo, Hyperlink, and drawing records.
 - [ ] Implement HSSF styles, formats, merged regions, row/column layout, formulas, pictures, charts, comments, and hyperlinks.
 - [ ] Preserve unknown OLE2 streams and BIFF records during round-trip.
 - [ ] Complete POIFS directory tree, timestamps, CLSIDs, mini FAT/FAT/DIFAT edge cases, and non-contiguous stream validation.
 
-#### docx / XWPF TODO
+#### step 4 docx / XWPF TODO
 
 - [ ] Add XML byte-level fixture parity for generated XWPF package parts.
 - [ ] Implement tables, numbering, styles, headers/footers, sections, page settings, fields, hyperlinks, comments, footnotes/endnotes, and document properties.
 - [ ] Broaden run/paragraph formatting and image layout behavior.
 - [ ] Preserve unknown parts and relationships during round-trip.
 
-#### docm TODO
+#### step 5 docm TODO
 
 - [ ] Preserve `vbaProject.bin`, macro content types, and relationships byte-for-byte through more editing scenarios.
 - [ ] Add Java POI interop coverage for dotnet-poi-written `docm` files.
 - [ ] Ensure edits to document body do not disturb macro parts or unrelated package parts.
 
-#### pptx / XSLF TODO
+#### step 6 pptx / XSLF TODO
 
 - [ ] Add XML byte-level fixture parity for generated XSLF package parts.
 - [ ] Implement text boxes, rich text, placeholders, layouts, masters, themes, tables, charts, notes, transitions, animations, grouping, and more shape types.
 - [ ] Broaden picture behavior: crop, resize helpers, transparency, z-order, connectors, and relationship preservation.
 - [ ] Preserve unknown parts and relationships during round-trip.
 
-#### pptm TODO
+#### step 7 pptm TODO
 
 - [ ] Preserve `vbaProject.bin`, macro content types, and relationships byte-for-byte through more editing scenarios.
 - [ ] Add Java POI interop coverage for dotnet-poi-written `pptm` files.
 - [ ] Ensure slide edits do not disturb macro parts, masters, themes, or unrelated package parts.
 
-#### doc / HWPF TODO
+#### step 8 doc / HWPF TODO
 
 - [ ] Move beyond read-only text MVP: paragraphs/runs, tables, headers/footers, styles, fields, pictures, and write support.
 - [ ] Preserve unknown OLE2 streams and document structures during round-trip.
 - [ ] Add Java POI interop fixtures for representative `.doc` files.
 
-#### ppt / HSLF TODO
+#### step 9 ppt / HSLF TODO
 
 - [ ] Move beyond read-only slide/text MVP: shapes, pictures, text formatting, masters, layouts, notes, and write support.
 - [ ] Preserve unknown OLE2 streams and slideshow records during round-trip.
 - [ ] Add Java POI interop fixtures for representative `.ppt` files.
 
-#### xlsm TODO
+#### step 10 xlsm TODO
 
 - [ ] Preserve `vbaProject.bin`, macro content types, and relationships byte-for-byte through more workbook editing scenarios.
 - [ ] Add Java POI interop coverage for dotnet-poi-written `xlsm` files.
