@@ -128,6 +128,42 @@ public class XSSFWorkbookTests
     }
 
     [Fact]
+    public void Write_ForceFormulaRecalculation_ProducesCalcPr()
+    {
+        using var workbook = new XSSFWorkbook();
+        workbook.createSheet("Formulas").createRow(0).createCell(0).setCellFormula("B1+C1");
+        workbook.setForceFormulaRecalculation(true);
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+
+        stream.Position = 0;
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var workbookXml = ReadEntry(archive, "xl/workbook.xml");
+
+        Assert.Contains("<calcPr calcId=\"0\" fullCalcOnLoad=\"true\"/>", workbookXml);
+    }
+
+    [Fact]
+    public void Read_RoundTrippedForceFormulaRecalculation_RestoresFlag()
+    {
+        using var original = new XSSFWorkbook();
+        original.createSheet("Formulas").createRow(0).createCell(0).setCellFormula("B1+C1");
+        original.setForceFormulaRecalculation(true);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+
+        Assert.True(loaded.getForceFormulaRecalculation());
+
+        loaded.setForceFormulaRecalculation(false);
+        Assert.False(loaded.getForceFormulaRecalculation());
+    }
+
+    [Fact]
     public void Write_StyledCell_ProducesStylesAndCellStyleReference()
     {
         using var workbook = new XSSFWorkbook();

@@ -35,6 +35,8 @@ public sealed class XSSFWorkbook : IWorkbook
     private XSSFCreationHelper? _creationHelper;
     private XSSFDataFormat? _dataFormat;
     private int _nextDrawingIndex = 1;
+    private bool _hasCalcPr;
+    private bool _forceFormulaRecalculation;
 
     // xlsm support: opaque VBA binary preserved byte-for-byte.
     // Non-null iff the loaded/constructed workbook is macro-enabled.
@@ -151,6 +153,22 @@ public sealed class XSSFWorkbook : IWorkbook
         return _pictures;
     }
 
+    /// <summary>
+    /// Tells Excel to recalculate all formulas when the workbook is opened.
+    /// Ported from XSSFWorkbook.setForceFormulaRecalculation(boolean).
+    /// </summary>
+    public void setForceFormulaRecalculation(bool value)
+    {
+        _hasCalcPr = true;
+        _forceFormulaRecalculation = value;
+    }
+
+    /// <summary>
+    /// Returns whether Excel will be asked to recalculate all formulas on open.
+    /// Ported from XSSFWorkbook.getForceFormulaRecalculation().
+    /// </summary>
+    public bool getForceFormulaRecalculation() => _hasCalcPr && _forceFormulaRecalculation;
+
     IReadOnlyList<IPictureData> IWorkbook.getAllPictures() => _pictures;
 
     ISheet IWorkbook.createSheet() => createSheet();
@@ -172,6 +190,10 @@ public sealed class XSSFWorkbook : IWorkbook
     IFont IWorkbook.createFont() => createFont();
 
     IFont IWorkbook.getFontAt(int idx) => getFontAt(idx);
+
+    void IWorkbook.setForceFormulaRecalculation(bool value) => setForceFormulaRecalculation(value);
+
+    bool IWorkbook.getForceFormulaRecalculation() => getForceFormulaRecalculation();
 
     public void write(Stream stream)
     {
@@ -371,6 +393,8 @@ public sealed class XSSFWorkbook : IWorkbook
     {
         _sheets.Clear();
         _vbaProjectBin = null;
+        _hasCalcPr = false;
+        _forceFormulaRecalculation = false;
         InitializeDefaultStyles();
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
@@ -378,6 +402,7 @@ public sealed class XSSFWorkbook : IWorkbook
         ReadStyles(archive);
         ReadPictures(archive);
         ReadVbaProject(archive);
+        ReadWorkbookCalcPr(archive);
 
         foreach (var sheetInfo in ReadWorkbookSheets(archive))
         {
@@ -386,6 +411,28 @@ public sealed class XSSFWorkbook : IWorkbook
             ReadSheetDrawing(archive, sheetInfo.PartName, sheet);
         }
     }
+
+    private void ReadWorkbookCalcPr(ZipArchive archive)
+    {
+        var workbookEntry = archive.GetEntry("xl/workbook.xml")
+            ?? throw new InvalidDataException("The xlsx package is missing xl/workbook.xml.");
+
+        using var workbookStream = workbookEntry.Open();
+        using var reader = XmlReader.Create(workbookStream, new XmlReaderSettings { IgnoreWhitespace = false });
+        while (reader.Read())
+        {
+            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "calcPr")
+                continue;
+
+            _hasCalcPr = true;
+            _forceFormulaRecalculation = ParseBooleanAttribute(reader.GetAttribute("fullCalcOnLoad"));
+            return;
+        }
+    }
+
+    private static bool ParseBooleanAttribute(string? value) =>
+        string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(value, "1", StringComparison.Ordinal);
 
     private void ReadVbaProject(ZipArchive archive)
     {
@@ -1405,6 +1452,13 @@ public sealed class XSSFWorkbook : IWorkbook
             writer.WriteEndElement();
         }
         writer.WriteEndElement();
+        if (_hasCalcPr)
+        {
+            writer.WriteStartElement("calcPr");
+            writer.WriteAttributeString("calcId", "0");
+            writer.WriteAttributeString("fullCalcOnLoad", _forceFormulaRecalculation ? "true" : "false");
+            writer.WriteEndElement();
+        }
         writer.WriteEndElement();
     }
 

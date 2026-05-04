@@ -16,6 +16,8 @@ public interface IWorkbook : IDisposable
     int addPicture(byte[] pictureData, int format);
     int addPicture(Stream stream, int format);
     IReadOnlyList<IPictureData> getAllPictures();
+    void setForceFormulaRecalculation(bool value);
+    bool getForceFormulaRecalculation();
     void write(Stream stream);
     void close();
 }

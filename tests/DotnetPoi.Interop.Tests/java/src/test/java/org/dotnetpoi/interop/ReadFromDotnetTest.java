@@ -264,6 +264,22 @@ public class ReadFromDotnetTest {
         }
     }
 
+    @Test
+    void readPhase5Step2Recalc() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase5-step2-recalc.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(input)) {
+            assertTrue(workbook.getForceFormulaRecalculation());
+
+            Sheet sheet = workbook.getSheet("Recalc");
+            Cell formula = sheet.getRow(0).getCell(0);
+            assertEquals(org.apache.poi.ss.usermodel.CellType.FORMULA, formula.getCellType());
+            assertEquals("B1+C1", formula.getCellFormula());
+        }
+    }
+
     private static Path findRepoRoot() {
         Path current = Paths.get("").toAbsolutePath();
         while (current != null) {

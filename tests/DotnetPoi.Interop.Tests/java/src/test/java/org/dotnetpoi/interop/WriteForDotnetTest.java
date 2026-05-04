@@ -85,6 +85,25 @@ public class WriteForDotnetTest {
         assertTrue(Files.size(fixture) > 0);
     }
 
+    @Test
+    void writePhase5Step2RecalcWorkbook() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase5-step2-recalc.xlsx");
+        Files.createDirectories(fixture.getParent());
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Recalc");
+            sheet.createRow(0).createCell(0).setCellFormula("B1+C1");
+            workbook.setForceFormulaRecalculation(true);
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
     private static Path findRepoRoot() {
         Path current = Paths.get("").toAbsolutePath();
         while (current != null) {

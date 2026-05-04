@@ -254,6 +254,25 @@ public class WriteForPoiTests
         Assert.True(new FileInfo(fixturePath).Length > 0);
     }
 
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_ForceFormulaRecalculation_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase5-step2-recalc.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Recalc");
+        sheet.createRow(0).createCell(0).setCellFormula("B1+C1");
+        workbook.setForceFormulaRecalculation(true);
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;

@@ -71,6 +71,22 @@ public class ReadPoiGeneratedTests
         Assert.Equal("#DIV/0!", errorCell.getErrorCellString());
     }
 
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    public void Read_ForceFormulaRecalculation_GeneratedByPoi()
+    {
+        var fixturePath = GetFixturePath("phase5-step2-recalc.xlsx");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var workbook = new XSSFWorkbook(stream);
+
+        Assert.True(workbook.getForceFormulaRecalculation());
+        var formula = workbook.getSheet("Recalc")!.getRow(0)!.getCell(0)!;
+        Assert.Equal(CellType.Formula, formula.getCellType());
+        Assert.Equal("B1+C1", formula.getCellFormula());
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;
