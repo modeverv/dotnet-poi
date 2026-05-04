@@ -13,9 +13,16 @@ public interface ICell
     /// </summary>
     CellType getCachedFormulaResultType();
 
+    /// <summary>
+    /// Returns the formula text for formula cells.
+    /// Ported from org.apache.poi.ss.usermodel.Cell#getCellFormula.
+    /// </summary>
+    string? getCellFormula();
+
     void setCellValue(string? value);
     void setCellValue(double value);
     void setCellValue(bool value);
+    void setCellFormula(string? formula);
 
     string getStringCellValue();
     double getNumericCellValue();

@@ -90,6 +90,44 @@ public class XSSFWorkbookTests
     }
 
     [Fact]
+    public void Write_FormulaCell_ProducesFormulaElementWithoutEvaluation()
+    {
+        using var workbook = new XSSFWorkbook();
+        var cell = workbook.createSheet("Formulas").createRow(0).createCell(0);
+        cell.setCellFormula("A2+B2");
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+
+        stream.Position = 0;
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var sheetXml = ReadEntry(archive, "xl/worksheets/sheet1.xml");
+
+        Assert.Contains("<c r=\"A1\"><f>A2+B2</f></c>", sheetXml);
+    }
+
+    [Fact]
+    public void Read_RoundTrippedFormulaCell_RestoresFormulaAndCachedString()
+    {
+        using var original = new XSSFWorkbook();
+        var cell = original.createSheet("Formulas").createRow(0).createCell(0);
+        cell.setCellFormula("\"hello \"&\"world\"");
+        cell.setCellValue("hello world");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+
+        var loadedCell = loaded.getSheet("Formulas")!.getRow(0)!.getCell(0)!;
+        Assert.Equal(CellType.Formula, loadedCell.getCellType());
+        Assert.Equal(CellType.String, loadedCell.getCachedFormulaResultType());
+        Assert.Equal("\"hello \"&\"world\"", loadedCell.getCellFormula());
+        Assert.Equal("hello world", loadedCell.getStringCellValue());
+    }
+
+    [Fact]
     public void Write_StyledCell_ProducesStylesAndCellStyleReference()
     {
         using var workbook = new XSSFWorkbook();

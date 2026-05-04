@@ -241,6 +241,29 @@ public class ReadFromDotnetTest {
         }
     }
 
+    @Test
+    void readPhase5Step1Formulas() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase5-step1-formulas.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(input)) {
+            Sheet sheet = workbook.getSheet("Formulas");
+
+            assertEquals(10.0, sheet.getRow(0).getCell(0).getNumericCellValue());
+            assertEquals(20.0, sheet.getRow(0).getCell(1).getNumericCellValue());
+
+            Cell numericFormula = sheet.getRow(1).getCell(0);
+            assertEquals(org.apache.poi.ss.usermodel.CellType.FORMULA, numericFormula.getCellType());
+            assertEquals("A1+B1", numericFormula.getCellFormula());
+
+            Cell stringFormula = sheet.getRow(2).getCell(0);
+            assertEquals(org.apache.poi.ss.usermodel.CellType.FORMULA, stringFormula.getCellType());
+            assertEquals("\"hello \"&\"world\"", stringFormula.getCellFormula());
+            assertEquals("hello world", stringFormula.getStringCellValue());
+        }
+    }
+
     private static Path findRepoRoot() {
         Path current = Paths.get("").toAbsolutePath();
         while (current != null) {

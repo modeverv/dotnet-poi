@@ -47,12 +47,14 @@ public class ReadPoiGeneratedTests
         // Row 1: numeric formula SUM → cached value 30
         var formulaNum = sheet.getRow(1)!.getCell(0)!;
         Assert.Equal(CellType.Formula, formulaNum.getCellType());
+        Assert.Equal("A1+B1", formulaNum.getCellFormula());
         Assert.Equal(CellType.Numeric, formulaNum.getCachedFormulaResultType());
         Assert.Equal(30.0, formulaNum.getNumericCellValue());
 
         // Row 2: string formula → cached "hello world"
         var formulaStr = sheet.getRow(2)!.getCell(0)!;
         Assert.Equal(CellType.Formula, formulaStr.getCellType());
+        Assert.Equal("\"hello \"&\"world\"", formulaStr.getCellFormula());
         Assert.Equal(CellType.String, formulaStr.getCachedFormulaResultType());
         Assert.Equal("hello world", formulaStr.getStringCellValue());
 
@@ -64,6 +66,7 @@ public class ReadPoiGeneratedTests
         // Row 4: error formula → cached #DIV/0!
         var errorCell = sheet.getRow(4)!.getCell(0)!;
         Assert.Equal(CellType.Formula, errorCell.getCellType());
+        Assert.Equal("1/0", errorCell.getCellFormula());
         Assert.Equal(CellType.Error, errorCell.getCachedFormulaResultType());
         Assert.Equal("#DIV/0!", errorCell.getErrorCellString());
     }

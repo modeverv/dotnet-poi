@@ -227,6 +227,33 @@ public class WriteForPoiTests
         Assert.True(new FileInfo(fixturePath).Length > 0);
     }
 
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_FormulaCells_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase5-step1-formulas.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Formulas");
+        var row = sheet.createRow(0);
+        row.createCell(0).setCellValue(10.0);
+        row.createCell(1).setCellValue(20.0);
+
+        var numericFormula = sheet.createRow(1).createCell(0);
+        numericFormula.setCellFormula("A1+B1");
+
+        var stringFormula = sheet.createRow(2).createCell(0);
+        stringFormula.setCellFormula("\"hello \"&\"world\"");
+        stringFormula.setCellValue("hello world");
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;
