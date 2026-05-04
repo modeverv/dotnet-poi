@@ -7,7 +7,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 [![XML Parity](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-WIP-yellow)
-![Phase](https://img.shields.io/badge/phase-3.4%20%E2%80%94%20done%2C%20next%3A%20Phase%204-green)
+![Phase](https://img.shields.io/badge/phase-5%20step%203%20%E2%80%94%20representative%20FormulaEvaluator%20slice-green)
 
 ## Philosophy
 
@@ -21,7 +21,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ## Status
 
-### Current Phase: Phase 3.4 — AGILE encryption done, next up Phase 4
+### Current Phase: Phase 5 step 3 — representative FormulaEvaluator slice done
 
 | Phase | Description | Target | Status |
 |---|---|---|---|
@@ -36,8 +36,11 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | **3.3** | **pptx support (XSLF — slides, images, rotation, flip)** | **—** | ✅ Done |
 | **3.4** | **AGILE encryption (XSSF write/read decrypt path)** | **—** | ✅ Done |
 | **7** | **Gleaning — cell type coverage (Boolean, Formula cached, Error read/write)** | **—** | ✅ Done |
+| **5.1** | **Formula save/read (`<f>` round-trip)** | **—** | ✅ Done |
+| **5.2** | **Force formula recalculation (`calcPr fullCalcOnLoad`)** | **—** | ✅ Done |
+| **5.3** | **Representative formula evaluation functions** | **—** | ✅ Done |
 | 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
-| 5 | Formula engine (FormulaEvaluator) | v1.0 | ⬜ Not started |
+| 5 | Full FormulaEvaluator parity | v1.0 | 🚧 Partial |
 | 6 | Word / PowerPoint formats | v1.x | ⬜ Not started |
 
 ### Phase 0 — Class Progress
@@ -47,8 +50,8 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | `XSSFWorkbook` | ✅ | ✅ | Minimal `.xlsx` package write |
 | `XSSFSheet` | ✅ | ✅ | Minimal sheet creation and row access |
 | `XSSFRow` | ✅ | ✅ | Minimal row creation and cell access |
-| `XSSFCell` | ✅ | ✅ | String and numeric cells only; formulas deferred to Phase 5 |
-| `XSSFCreationHelper` | ✅ | ✅ | Minimal helper instance |
+| `XSSFCell` | ✅ | ✅ | String, numeric, boolean, error, formulas with cached values |
+| `XSSFCreationHelper` | ✅ | ✅ | Data format, anchors, formula evaluator |
 
 Legend: ✅ Done / 🚧 In Progress / ⬜ Not started
 
@@ -303,7 +306,7 @@ Cell types now supported:
 | `"str"` | `Formula → String` | formula written as cached String ✅ |
 | `"b"` | `Boolean` | `t="b"`, `<v>1</v>` or `<v>0</v>` ✅ |
 | `"e"` | `Error` | `t="e"`, `<v>#DIV/0!</v>` ✅ |
-| + `<f>` | `Formula` (read cached `<v>`) | cached value only, no `<f>` (Phase 5) ✅ |
+| + `<f>` | `Formula` (read formula and cached `<v>`) | `<f>` plus optional cached `<v>` ✅ |
 
 Verification currently covers:
 
@@ -323,6 +326,48 @@ dotnet run --project examples/Phase7CellTypesExample/Phase7CellTypesExample.cspr
 ```
 
 **Byte-level XML parity**: Attribute write order is now `r t s` (matching POI/XMLBeans). The `t="n"` default and `s="0"` default are omitted (OOXML allows this), which is a remaining minor difference from POI. The `PoiXmlWriter` gate tests remain green.
+
+### Phase 5 Verification
+
+Phase 5 has a completed representative slice, not the full Apache POI formula engine. The implemented scope covers formula text save/read, asking Excel to recalculate on open, and evaluating common workbook-local formulas.
+
+Implemented surface:
+
+- `ICell.setCellFormula(...)` / `ICell.getCellFormula()`
+- formula XML read/write through `<f>` with cached `<v>` values
+- `IWorkbook.setForceFormulaRecalculation(...)` / `getForceFormulaRecalculation()`
+- `ICreationHelper.createFormulaEvaluator()`
+- `IFormulaEvaluator.evaluate(...)`, `evaluateFormulaCell(...)`, `evaluateAll()`, `evaluateInCell(...)`
+- `CellValue`
+
+Representative evaluator support:
+
+- arithmetic: `+`, `-`, `*`, `/`
+- cell references and ranges: `A1`, `A1:C1`
+- functions: `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCATENATE`
+- string concatenation with `&`
+
+Verification currently covers:
+
+- C# formula write/read round-trip with cached numeric and string results
+- C# `calcPr fullCalcOnLoad` round-trip
+- C# formula evaluator unit tests for arithmetic, ranges, aggregate functions, and string formulas
+- Direction A: Apache POI writes formulas / recalculation flag → dotnet-poi reads formula text and cached values
+- Direction B: dotnet-poi writes evaluated formulas → Apache POI reads formula text and cached values
+- a runnable example under `examples/Phase5FormulaEvaluatorExample`
+
+Commands:
+
+```bash
+dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj --no-restore
+dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --no-restore --filter Category=ReadFromPoi
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --no-restore --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase5FormulaEvaluatorExample/Phase5FormulaEvaluatorExample.csproj
+```
+
+Scope note: full Apache POI FormulaEvaluator parity is still partial. External workbook references, shared/array formulas, date functions, lookup functions, financial functions, parser edge cases, and full Excel error semantics remain later Phase 5 work.
 
 ---
 
@@ -361,6 +406,7 @@ dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
 dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
 dotnet run --project examples/Phase33PptxExample/Phase33PptxExample.csproj
 dotnet run --project examples/Phase34AgileEncryptionExample/Phase34AgileEncryptionExample.csproj
+dotnet run --project examples/Phase5FormulaEvaluatorExample/Phase5FormulaEvaluatorExample.csproj
 ```
 
 pptx example:
@@ -479,7 +525,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 
 ## 対応状況
 
-### 現在のフェーズ: Phase 3.4 — AGILE 暗号化完了、次は Phase 4
+### 現在のフェーズ: Phase 5 step 3 — 代表的な FormulaEvaluator subset 完了
 
 | Phase | 内容 | バージョン目標 | 状態 |
 |---|---|---|---|
@@ -494,8 +540,11 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | **3.3** | **pptx 対応（XSLF — スライド・画像・回転・フリップ）** | **—** | ✅ 完了 |
 | **3.4** | **AGILE 暗号化（XSSF write / read decrypt path）** | **—** | ✅ 完了 |
 | **7** | **落穂拾い — セルタイプ全対応（Boolean・Formula cached・Error 読み書き）** | **—** | ✅ 完了 |
+| **5.1** | **数式の保存・読み込み（`<f>` round-trip）** | **—** | ✅ 完了 |
+| **5.2** | **Excel に再計算させる設定（`calcPr fullCalcOnLoad`）** | **—** | ✅ 完了 |
+| **5.3** | **代表的な関数の評価** | **—** | ✅ 完了 |
 | 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
-| 5 | 数式エンジン（FormulaEvaluator） | v1.0 | ⬜ 未着手 |
+| 5 | FormulaEvaluator 完全互換 | v1.0 | 🚧 一部対応 |
 | 6 | Word / PowerPoint 形式 | v1.x | ⬜ 未着手 |
 
 ### Phase 0 クラス別進捗
@@ -505,8 +554,8 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | `XSSFWorkbook` | ✅ | ✅ | 最小 `.xlsx` パッケージ書き出し |
 | `XSSFSheet` | ✅ | ✅ | 最小のシート作成・行アクセス |
 | `XSSFRow` | ✅ | ✅ | 最小の行作成・セルアクセス |
-| `XSSFCell` | ✅ | ✅ | 文字列・数値セルのみ。数式は Phase 5 送り |
-| `XSSFCreationHelper` | ✅ | ✅ | 最小 helper |
+| `XSSFCell` | ✅ | ✅ | 文字列・数値・真偽値・エラー・cached value 付き数式 |
+| `XSSFCreationHelper` | ✅ | ✅ | data format、anchor、formula evaluator |
 
 凡例: ✅ 完了 / 🚧 進行中 / ⬜ 未着手
 
@@ -711,6 +760,39 @@ f
 
 範囲の注意: Phase 3.4 が対象にしているのは OOXML `.xlsx` の default AES-128/SHA1 Agile encryption path です。AES-192/AES-256、SHA-256+、より広い POIFS/HSSF、汎用 OLE2 document authoring は後続フェーズの対象です。
 
+### Phase 5 検証
+
+Phase 5 は代表的な subset として完了している範囲があります。Apache POI の FormulaEvaluator 全体の完全互換ではありませんが、数式文字列の保存・読み込み、Excel に再計算させる設定、代表的な workbook-local formula の評価に対応しています。
+
+実装済み API:
+
+- `ICell.setCellFormula(...)` / `ICell.getCellFormula()`
+- `<f>` と cached `<v>` の read/write
+- `IWorkbook.setForceFormulaRecalculation(...)` / `getForceFormulaRecalculation()`
+- `ICreationHelper.createFormulaEvaluator()`
+- `IFormulaEvaluator.evaluate(...)` / `evaluateFormulaCell(...)` / `evaluateAll()` / `evaluateInCell(...)`
+- `CellValue`
+
+対応済み evaluator subset:
+
+- 四則演算: `+`, `-`, `*`, `/`
+- セル参照・範囲参照: `A1`, `A1:C1`
+- 関数: `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCATENATE`
+- `&` による文字列結合
+
+確認コマンド:
+
+```bash
+dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj --no-restore
+dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --no-restore --filter Category=ReadFromPoi
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --no-restore --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase5FormulaEvaluatorExample/Phase5FormulaEvaluatorExample.csproj
+```
+
+範囲の注意: external workbook reference、shared/array formula、date/lookup/financial functions、parser edge case、Excel error semantics 全体は後続の Phase 5 作業です。
+
 ### Phase 3.2 検証
 
 Phase 3.2 は最初の docx 書き出し面として完了しています。対象は段落テキスト・インライン画像・bold/italic・画像の回転・docx 保存・読み込みです。
@@ -777,6 +859,7 @@ dotnet run --project examples/Phase25ImagesExample/Phase25ImagesExample.csproj
 dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
 dotnet run --project examples/Phase33PptxExample/Phase33PptxExample.csproj
 dotnet run --project examples/Phase34AgileEncryptionExample/Phase34AgileEncryptionExample.csproj
+dotnet run --project examples/Phase5FormulaEvaluatorExample/Phase5FormulaEvaluatorExample.csproj
 ```
 
 pptx example:

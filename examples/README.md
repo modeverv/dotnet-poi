@@ -173,6 +173,28 @@ The example demonstrates:
 - `EncryptionInfo(Stream)` and `Decryptor.verifyPassword(...)`
 - Decrypted package read back via `XSSFWorkbook(Stream)`
 
+## Phase5FormulaEvaluatorExample
+
+Creates an `.xlsx` file with formula cells, evaluates a representative Phase 5 function subset, writes cached formula results, then reads the workbook back:
+
+```bash
+dotnet run --project examples/Phase5FormulaEvaluatorExample/Phase5FormulaEvaluatorExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase5-formula-evaluator-example.xlsx
+```
+
+The example demonstrates:
+
+- `XSSFCreationHelper.createFormulaEvaluator()`
+- `IFormulaEvaluator.evaluateAll()`
+- numeric formulas: `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`
+- string formulas: `CONCATENATE(...)` and `&`
+- cached formula result readback through `getCachedFormulaResultType()`
+
 ## Phase7CellTypesExample
 
 Demonstrates reading all OOXML cell types — numeric, string, boolean, formula (with numeric/string/boolean/error cached results) — from a POI-generated fixture, and verifies Boolean cell write/read round-trip:

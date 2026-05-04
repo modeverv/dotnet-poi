@@ -26,5 +26,12 @@ public sealed class XSSFCreationHelper : ICreationHelper
         return new XSSFClientAnchor();
     }
 
+    public XSSFFormulaEvaluator createFormulaEvaluator()
+    {
+        return new XSSFFormulaEvaluator(_workbook);
+    }
+
     IDataFormat ICreationHelper.createDataFormat() => createDataFormat();
+
+    IFormulaEvaluator ICreationHelper.createFormulaEvaluator() => createFormulaEvaluator();
 }

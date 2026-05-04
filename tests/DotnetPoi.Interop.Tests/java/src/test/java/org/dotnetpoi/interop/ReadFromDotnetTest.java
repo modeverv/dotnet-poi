@@ -280,6 +280,32 @@ public class ReadFromDotnetTest {
         }
     }
 
+    @Test
+    void readPhase5Step3EvaluatedFunctions() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase5-step3-evaluated-functions.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(input)) {
+            Sheet sheet = workbook.getSheet("Eval");
+
+            Cell sum = sheet.getRow(1).getCell(0);
+            assertEquals(org.apache.poi.ss.usermodel.CellType.FORMULA, sum.getCellType());
+            assertEquals("SUM(A1:C1)", sum.getCellFormula());
+            assertEquals(60.0, sum.getNumericCellValue());
+
+            Cell average = sheet.getRow(1).getCell(1);
+            assertEquals(org.apache.poi.ss.usermodel.CellType.FORMULA, average.getCellType());
+            assertEquals("AVERAGE(A1:C1)", average.getCellFormula());
+            assertEquals(20.0, average.getNumericCellValue());
+
+            Cell text = sheet.getRow(1).getCell(2);
+            assertEquals(org.apache.poi.ss.usermodel.CellType.FORMULA, text.getCellType());
+            assertEquals("CONCATENATE(\"sum=\",SUM(A1:C1))", text.getCellFormula());
+            assertEquals("sum=60", text.getStringCellValue());
+        }
+    }
+
     private static Path findRepoRoot() {
         Path current = Paths.get("").toAbsolutePath();
         while (current != null) {

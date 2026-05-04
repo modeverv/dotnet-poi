@@ -96,6 +96,8 @@ public sealed class XSSFWorkbook : IWorkbook
         return _sheets.Count;
     }
 
+    internal IReadOnlyList<XSSFSheet> Sheets => _sheets;
+
     public XSSFCreationHelper getCreationHelper()
     {
         return _creationHelper ??= new XSSFCreationHelper(this);

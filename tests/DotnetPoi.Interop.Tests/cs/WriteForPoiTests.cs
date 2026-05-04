@@ -273,6 +273,36 @@ public class WriteForPoiTests
         Assert.True(new FileInfo(fixturePath).Length > 0);
     }
 
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_EvaluatedFormulaFunctions_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase5-step3-evaluated-functions.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Eval");
+        var row = sheet.createRow(0);
+        row.createCell(0).setCellValue(10.0);
+        row.createCell(1).setCellValue(20.0);
+        row.createCell(2).setCellValue(30.0);
+
+        var sum = sheet.createRow(1).createCell(0);
+        sum.setCellFormula("SUM(A1:C1)");
+        var average = sheet.getRow(1)!.createCell(1);
+        average.setCellFormula("AVERAGE(A1:C1)");
+        var text = sheet.getRow(1)!.createCell(2);
+        text.setCellFormula("CONCATENATE(\"sum=\",SUM(A1:C1))");
+
+        workbook.getCreationHelper().createFormulaEvaluator().evaluateAll();
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;

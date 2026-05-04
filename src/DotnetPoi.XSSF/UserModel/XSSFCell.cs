@@ -217,6 +217,34 @@ public sealed class XSSFCell : ICell
             ApplyCachedValue(cachedType, rawValue);
     }
 
+    internal void SetFormulaCachedValue(CellValue value)
+    {
+        if (_cellType != CellType.Formula)
+            throw new InvalidOperationException("Only formula cells can receive cached formula values.");
+
+        switch (value.getCellType())
+        {
+            case CellType.Numeric:
+                setCellValue(value.getNumberValue());
+                break;
+            case CellType.String:
+                setCellValue(value.getStringValue() ?? string.Empty);
+                break;
+            case CellType.Boolean:
+                setCellValue(value.getBooleanValue());
+                break;
+            case CellType.Error:
+                _cachedFormulaResultType = CellType.Error;
+                _errorString = ErrorCodeToText(value.getErrorValue());
+                _hasCachedValue = true;
+                break;
+            default:
+                _cachedFormulaResultType = CellType.Blank;
+                _hasCachedValue = false;
+                break;
+        }
+    }
+
     /// <summary>
     /// Called by the reader for non-formula cells.
     /// Matches POI's getBaseCellType() logic with the t attribute.
@@ -258,6 +286,18 @@ public sealed class XSSFCell : ICell
         _numericValue.ToString("G15", CultureInfo.InvariantCulture);
 
     internal bool HasCachedValue => _hasCachedValue;
+
+    private static string ErrorCodeToText(byte errorCode) =>
+        errorCode switch
+        {
+            7 => "#DIV/0!",
+            15 => "#VALUE!",
+            23 => "#REF!",
+            29 => "#NAME?",
+            36 => "#NUM!",
+            42 => "#N/A",
+            _ => "#VALUE!"
+        };
 
     internal void SetCellStyleIndex(int styleIndex) =>
         _cellStyle = getSheet().getWorkbook().getCellStyleAt(styleIndex);

@@ -169,5 +169,6 @@ public class CommonInterfaceTests
 
         Assert.NotNull(helper);
         Assert.NotNull(helper.createDataFormat());
+        Assert.NotNull(helper.createFormulaEvaluator());
     }
 }

@@ -164,6 +164,60 @@ public class XSSFWorkbookTests
     }
 
     [Fact]
+    public void EvaluateFormulaCell_SumAverageAndArithmetic_StoresCachedNumericValues()
+    {
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Eval");
+        var row = sheet.createRow(0);
+        row.createCell(0).setCellValue(10.0);
+        row.createCell(1).setCellValue(20.0);
+        row.createCell(2).setCellValue(30.0);
+
+        var sum = sheet.createRow(1).createCell(0);
+        sum.setCellFormula("SUM(A1:C1)");
+        var average = sheet.getRow(1)!.createCell(1);
+        average.setCellFormula("AVERAGE(A1:C1)");
+        var arithmetic = sheet.getRow(1)!.createCell(2);
+        arithmetic.setCellFormula("A1+B1*2");
+
+        var evaluator = workbook.getCreationHelper().createFormulaEvaluator();
+
+        Assert.Equal(CellType.Numeric, evaluator.evaluateFormulaCell(sum));
+        Assert.Equal(CellType.Numeric, evaluator.evaluateFormulaCell(average));
+        Assert.Equal(CellType.Numeric, evaluator.evaluateFormulaCell(arithmetic));
+        Assert.Equal(60.0, sum.getNumericCellValue());
+        Assert.Equal(20.0, average.getNumericCellValue());
+        Assert.Equal(50.0, arithmetic.getNumericCellValue());
+    }
+
+    [Fact]
+    public void EvaluateAll_RepresentativeFunctions_StoresCachedValues()
+    {
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("EvalAll");
+        var row = sheet.createRow(0);
+        row.createCell(0).setCellValue(5.0);
+        row.createCell(1).setCellValue(9.0);
+        row.createCell(2).setCellValue("text");
+
+        var min = sheet.createRow(1).createCell(0);
+        min.setCellFormula("MIN(A1:B1)");
+        var max = sheet.getRow(1)!.createCell(1);
+        max.setCellFormula("MAX(A1:B1)");
+        var count = sheet.getRow(1)!.createCell(2);
+        count.setCellFormula("COUNT(A1:C1)");
+        var text = sheet.getRow(1)!.createCell(3);
+        text.setCellFormula("CONCATENATE(\"total=\",A1+B1)");
+
+        workbook.getCreationHelper().createFormulaEvaluator().evaluateAll();
+
+        Assert.Equal(5.0, min.getNumericCellValue());
+        Assert.Equal(9.0, max.getNumericCellValue());
+        Assert.Equal(2.0, count.getNumericCellValue());
+        Assert.Equal("total=14", text.getStringCellValue());
+    }
+
+    [Fact]
     public void Write_StyledCell_ProducesStylesAndCellStyleReference()
     {
         using var workbook = new XSSFWorkbook();
