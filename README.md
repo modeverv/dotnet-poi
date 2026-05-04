@@ -43,6 +43,20 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | 5 | Full FormulaEvaluator parity | v1.0 | 🚧 Partial |
 | 6 | Word / PowerPoint formats | v1.x | ⬜ Not started |
 
+Minimum bar if POIFS is considered “full” (to unblock HWPF/HSLF work):
+
+- Read/write OLE2 header, FAT, mini FAT, and DIFAT chains for multi-stream files
+- Directory tree with storage/stream entries, sibling ordering, timestamps, and CLSIDs
+- Mini stream support with cutoff behavior and mini stream allocation
+- Sector allocation/chain validation for non-contiguous and large streams
+- Stream APIs for random access read/write (seek, length, overwrite)
+- CodePage handling and UTF-16LE name storage rules
+- Graceful handling of unknown streams/properties without data loss
+- Test fixtures:
+  - round-trip multiple streams with mixed sizes (mini + regular)
+  - verify directory tree ordering matches POI’s comparator
+  - Java POI interop: POI reads dotnet-poi CFB, dotnet-poi reads POI CFB
+
 ### Phase 0 — Class Progress
 
 | Class | Ported | Tested | Notes |
@@ -547,6 +561,20 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | 5 | FormulaEvaluator 完全互換 | v1.0 | 🚧 一部対応 |
 | 6 | Word / PowerPoint 形式 | v1.x | ⬜ 未着手 |
 
+POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSLF の土台用）:
+
+- OLE2 ヘッダ、FAT、mini FAT、DIFAT の読み書き（複数ストリーム対応）
+- Directory ツリー（storage/stream エントリ、兄弟順序、タイムスタンプ、CLSID）
+- mini stream と cutoff の扱い
+- 非連続/大容量ストリームのセクタチェーン検証
+- ランダムアクセス read/write（seek, length, overwrite）
+- CodePage と UTF-16LE 名称保存ルール
+- 未知のストリーム/プロパティを壊さずに保持
+- テストフィクスチャ:
+  - mini/regular 混在ストリームの round-trip
+  - POI の comparator に一致するディレクトリ順序
+  - Java POI 相互運用（POI が dotnet-poi CFB を読める／その逆）
+
 ### Phase 0 クラス別進捗
 
 | クラス | 移植 | テスト | 備考 |
@@ -683,6 +711,35 @@ examples/output/phase2_5-images-example.xlsx
 
 byte-level に関する注意: Apache POI/XMLBeans の XML byte-level 挙動は、引き続き低レイヤの `PoiXmlWriter` fixture test で固定しており green です。一方で `.xlsx` 全体の zip byte-level 一致は、zip metadata や document timestamp が変わるため主張していません。また drawing 関連の全 package part について完全な byte-for-byte parity を主張する段階でもありません。Phase 2.5 の現時点の保証は、Apache POI との意味的な package 相互運用性と、`PoiXmlWriter` fixture parity の維持です。
 
+### Phase 3.2 検証
+
+Phase 3.2 は最初の docx 書き出し面として完了しています。対象は段落テキスト・インライン画像・bold/italic・画像の回転・docx 保存・読み込みです。
+
+実装済みクラス: `XWPFDocument`、`XWPFParagraph`、`XWPFRun`、`XWPFPicture`、`XWPFPictureData`
+
+現在の検証内容:
+
+- write/read round-trip の unit test（テキスト・書式・インライン画像・回転・重複排除）
+- dotnet-poi が `.docx` を書き、Apache POI(Java / XWPF) が段落テキスト・書式・画像データ・回転を読み取る相互運用テスト
+- `examples/Phase32DocxExample` の実行サンプル
+
+確認コマンド:
+
+```bash
+dotnet test tests/DotnetPoi.XWPF.Tests/ --no-restore
+dotnet test tests/DotnetPoi.Interop.Tests/cs/ --no-restore --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
+```
+
+サンプルの出力先:
+
+```text
+examples/output/phase3_2-docx-example.docx
+```
+
+範囲の注意: Phase 3.2 が対象にしているのは XWPF の書き出し・読み込みコアサーフェス（段落・ラン・bold/italic・回転付きインライン画像）です。表・ヘッダー/フッター・スタイル・リストは後続フェーズの対象です。
+
 ### Phase 3.3 検証
 
 Phase 3.3 は最初の pptx 書き出し面として完了しています。対象はスライド作成・画像埋め込み・アンカー設定（EMU）・回転・水平/垂直フリップ・pptx 保存・読み込みです。
@@ -712,7 +769,7 @@ examples/output/phase3_3-pptx-example.pptx
 
 **byte-level XML parity に関する注意**: 全 XML 出力は `PoiXmlWriter` を経由しており、XSSF・XWPF と同等の基盤です（空要素スタイル `<tag/>`、XML 宣言形式、BOM なし）。PPTX 固有の XML fixture parity テスト（XSSF の `xml-parity/` fixtures に相当するもの）は未整備です。現時点の保証は `ReadFromDotnetTest` で確認した Apache POI Java との意味的な相互運用性です。
 
-範囲の注意: Phase 3.3 が対象にしているのは XSLF の書き出し・読み込みコアサーフェス（スライド・アンカー付き画像シェイプ・回転・フリップ・重複排除）です。テキストボックス・アニメーション・グラフ・テーマは後続フェーズの対象です。
+範囲の注意: Phase 3.3 が対象にしているのは XSLF の書き出し・読み込みコアサーフェス（スライド・アンカー付き画像・回転・フリップ・重複排除）です。テキストボックス・アニメーション・グラフ・テーマは後続フェーズの対象です。
 
 ### Phase 3.4 検証
 
@@ -760,6 +817,48 @@ f
 
 範囲の注意: Phase 3.4 が対象にしているのは OOXML `.xlsx` の default AES-128/SHA1 Agile encryption path です。AES-192/AES-256、SHA-256+、より広い POIFS/HSSF、汎用 OLE2 document authoring は後続フェーズの対象です。
 
+### Phase 7 検証
+
+Phase 7 (gleaning) は xlsx 読み書きパスに全セルタイプ対応を追加します。これにより、数式キャッシュ値、真偽値、エラーセルを含む Excel ファイルの読み込み時クラッシュの原因となっていたギャップが埋まります。
+
+移植元:
+- `XSSFCell.getBaseCellType()` — `STCellType` → `CellType` マッピング
+- `XSSFCell.getCachedFormulaResultType()` — キャッシュ数式結果タイプ
+- `XSSFCell.getBooleanCellValue()` — `"1"` = true, `"0"` = false
+- `XSSFCell.getErrorCellString()` — 生の OOXML エラー文字列
+- `CryptoFunctions.generateKey()` — 属性書き込み順修正 (`r t s`, XMLBeans 出力に合わせる)
+
+現在サポートされているセルタイプ:
+
+| OOXML `t` | 読み込み時 | 書き込み時 |
+|---|---|---|
+| absent / `"n"` with `<v>` | `Numeric` | no `t` attr ✅ |
+| absent / `"n"` without `<v>` | `Blank` | skipped ✅ |
+| `"s"` | `String` (shared) | `t="s"` ✅ |
+| `"str"` | `Formula → String` | formula written as cached String ✅ |
+| `"b"` | `Boolean` | `t="b"`, `<v>1</v>` or `<v>0</v>` ✅ |
+| `"e"` | `Error` | `t="e"`, `<v>#DIV/0!</v>` ✅ |
+| + `<f>` | `Formula` (数式とキャッシュ `<v>` の読み込み) | `<f>` plus optional cached `<v>` ✅ |
+
+現在の検証内容:
+
+- A 方向: Apache POI Java が数式/真偽値/エラー xlsx を書き出し → dotnet-poi が全タイプを正しく読み込み
+- B 方向: dotnet-poi が真偽値セルを書き出し → Apache POI Java がタイプと値を検証
+- C# による全セルタイプの読み書き round-trip
+- `examples/Phase7CellTypesExample` の実行サンプル
+
+確認コマンド:
+
+```bash
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest
+dotnet test tests/DotnetPoi.Interop.Tests/cs/ --filter Category=ReadFromPoi
+dotnet test tests/DotnetPoi.Interop.Tests/cs/ --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase7CellTypesExample/Phase7CellTypesExample.csproj
+```
+
+**バイト単位の XML parity**: 属性の書き込み順は `r t s` になり（POI/XMLBeans に合わせる）、`t="n"` デフォルトと `s="0"` デフォルトは省略されます（OOXML では許容される）。これは POI との残りのマイナーな違いです。`PoiXmlWriter` ゲートテストは green のままです。
+
 ### Phase 5 検証
 
 Phase 5 は代表的な subset として完了している範囲があります。Apache POI の FormulaEvaluator 全体の完全互換ではありませんが、数式文字列の保存・読み込み、Excel に再計算させる設定、代表的な workbook-local formula の評価に対応しています。
@@ -793,34 +892,6 @@ dotnet run --project examples/Phase5FormulaEvaluatorExample/Phase5FormulaEvaluat
 
 範囲の注意: external workbook reference、shared/array formula、date/lookup/financial functions、parser edge case、Excel error semantics 全体は後続の Phase 5 作業です。
 
-### Phase 3.2 検証
-
-Phase 3.2 は最初の docx 書き出し面として完了しています。対象は段落テキスト・インライン画像・bold/italic・画像の回転・docx 保存・読み込みです。
-
-実装済みクラス: `XWPFDocument`、`XWPFParagraph`、`XWPFRun`、`XWPFPicture`、`XWPFPictureData`
-
-現在の検証内容:
-
-- write/read round-trip の unit test（テキスト・書式・インライン画像・回転・重複排除）
-- dotnet-poi が `.docx` を書き、Apache POI(Java / XWPF) が段落テキスト・書式・画像データ・回転を読み取る相互運用テスト
-- `examples/Phase32DocxExample` の実行サンプル
-
-確認コマンド:
-
-```bash
-dotnet test tests/DotnetPoi.XWPF.Tests/ --no-restore
-dotnet test tests/DotnetPoi.Interop.Tests/cs/ --no-restore --filter Category=WriteForPoi
-mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
-dotnet run --project examples/Phase32DocxExample/Phase32DocxExample.csproj
-```
-
-サンプルの出力先:
-
-```text
-examples/output/phase3_2-docx-example.docx
-```
-
-範囲の注意: Phase 3.2 が対象にしているのは XWPF の書き出し・読み込みコアサーフェス（段落・ラン・bold/italic・回転付きインライン画像）です。表・ヘッダー/フッター・スタイル・リストは後続フェーズの対象です。
 
 ---
 

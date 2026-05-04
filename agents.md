@@ -257,6 +257,20 @@ Goal: `v1.0`. `FormulaEvaluator`. Expect several months standalone.
 
 Goal: `v1.x`. HWPF / XWPF / HSLF / XSLF. Low priority.
 
+Minimum bar if POIFS is considered “full” (to unblock HWPF/HSLF work):
+
+- Read/write OLE2 header, FAT, mini FAT, and DIFAT chains for multi-stream files
+- Directory tree with storage/stream entries, sibling ordering, timestamps, and CLSIDs
+- Mini stream support with cutoff behavior and mini stream allocation
+- Sector allocation/chain validation for non-contiguous and large streams
+- Stream APIs for random access read/write (seek, length, overwrite)
+- CodePage handling and UTF-16LE name storage rules
+- Graceful handling of unknown streams/properties without data loss
+- Test fixtures:
+  - round-trip multiple streams with mixed sizes (mini + regular)
+  - verify directory tree ordering matches POI’s comparator
+  - Java POI interop: POI reads dotnet-poi CFB, dotnet-poi reads POI CFB
+
 ---
 
 ## Porting Procedure (Per Class)
@@ -679,16 +693,9 @@ Phase 3 の前には、共通インターフェースの形に影響する Phase
 
 ### Phase 3.2.1 docxの画像の埋め込み、回転の動作
 
-### phase 3.3 pptxの対応,pptxの画像の埋め込み、回転の動作
+### Phase 3.3 pptxの対応,pptxの画像の埋め込み、回転の動作
 
-#### 実装済み
-- `src/DotnetPoi.XSLF/UserModel/XMLSlideShow.cs` — PPTX 書き出し・読み込み
-- `src/DotnetPoi.XSLF/UserModel/XSLFSlide.cs` — スライド
-- `src/DotnetPoi.XSLF/UserModel/XSLFPictureData.cs` — 画像データ
-- `src/DotnetPoi.XSLF/UserModel/XSLFPictureShape.cs` — 画像シェイプ（アンカー・回転・フリップ）
-- `tests/DotnetPoi.XSLF.Tests/UserModel/XMLSlideShowTests.cs` — 18テスト全パス
-
-### Phase 3.3.5 agile 暗号化
+### Phase 3.4 agile 暗号化
 
 このフェーズの作業メモと引き継ぎは `PHASE_3_4_AGILE_ENCRYPTION_NOTES.md` にある。
 Agile 暗号化、`EncryptionInfo` XML 出力、`EncryptedPackage` の chunk/HMAC 処理、
@@ -710,11 +717,23 @@ Agile 暗号化、`EncryptionInfo` XML 出力、`EncryptedPackage` の chunk/HMA
 ##### step3. 代表的な関数だけ評価
 代表的な関数の評価（SUM, AVERAGE, IF, VLOOKUP など）
 
-### Phase 6 — Word / PowerPoint 形式
+### Phase 6 — Xls / Word / PowerPoint 形式
 
 目標: `v1.x`。HWPF / XWPF / HSLF / XSLF。優先度低。
 
-### Phase 7 落穂拾い。透過的なPOIの移植として足りていないところを実装する。~~
+POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSLF の土台用）:
+
+- OLE2 ヘッダ、FAT、mini FAT、DIFAT の読み書き（複数ストリーム対応）
+- Directory ツリー（storage/stream エントリ、兄弟順序、タイムスタンプ、CLSID）
+- mini stream と cutoff の扱い
+- 非連続/大容量ストリームのセクタチェーン検証
+- ランダムアクセス read/write（seek, length, overwrite）
+- CodePage と UTF-16LE 名称保存ルール
+- 未知のストリーム/プロパティを壊さずに保持
+- テストフィクスチャ:
+  - mini/regular 混在ストリームの round-trip
+  - POI の comparator に一致するディレクトリ順序
+  - Java POI 相互運用（POI が dotnet-poi CFB を読める／その逆）~~
 
 ---
 
