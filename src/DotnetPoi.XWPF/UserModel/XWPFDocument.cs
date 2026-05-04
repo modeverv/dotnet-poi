@@ -16,6 +16,16 @@ public sealed class XWPFDocument : IDisposable
 
     private const string RelTypeSettings = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings";
     private const string ContentTypeSettings = "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml";
+    private const string ContentTypeDocx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+    private const string ContentTypeDocm = "application/vnd.ms-word.document.macroEnabled.main+xml";
+    private const string ContentTypeVbaProject = "application/vnd.ms-office.vbaProject";
+    private const string ContentTypeVbaData = "application/vnd.ms-word.vbaData+xml";
+    private const string RelTypeVbaProject = "http://schemas.microsoft.com/office/2006/relationships/vbaProject";
+
+    /// <summary>True if this document was loaded from docm (has a vbaProject.bin).</summary>
+    public bool HasMacros => _vbaProjectBin != null;
+
+    public bool isMacroEnabled() => HasMacros;
 
     // rId1 is always reserved for settings.xml; image rIds start at rId{Index + 1}.
     private const int ImageRelIdOffset = 1;
@@ -23,6 +33,11 @@ public sealed class XWPFDocument : IDisposable
     private readonly List<XWPFParagraph> _paragraphs = new();
     private readonly List<XWPFPictureData> _pictures = new();
     private long _nextDrawingId = 1;
+
+    // docm support: opaque VBA binaries preserved byte-for-byte.
+    private byte[]? _vbaProjectBin;
+    private byte[]? _vbaDataXml;
+    private byte[]? _vbaProjectBinRels;
 
     public XWPFDocument() { }
 
@@ -64,11 +79,37 @@ public sealed class XWPFDocument : IDisposable
         {
             WriteBinaryEntry(archive, $"word/media/{pic.getFileName()}", pic.Data);
         }
+
+        // docm: write VBA binaries back verbatim
+        if (_vbaProjectBin != null)
+        {
+            WriteBinaryEntry(archive, "word/vbaProject.bin", _vbaProjectBin);
+            if (_vbaDataXml != null)
+                WriteBinaryEntry(archive, "word/vbaData.xml", _vbaDataXml);
+            if (_vbaProjectBinRels != null)
+                WriteBinaryEntry(archive, "word/_rels/vbaProject.bin.rels", _vbaProjectBinRels);
+        }
     }
 
     public void close() { }
 
     public void Dispose() => close();
+
+    public void setVBAProject(byte[] vbaProjectData)
+    {
+        ArgumentNullException.ThrowIfNull(vbaProjectData);
+        _vbaProjectBin = vbaProjectData.ToArray();
+        _vbaDataXml = null;
+        _vbaProjectBinRels = null;
+    }
+
+    public void setVBAProject(Stream vbaProjectStream)
+    {
+        ArgumentNullException.ThrowIfNull(vbaProjectStream);
+        using var ms = new MemoryStream();
+        vbaProjectStream.CopyTo(ms);
+        setVBAProject(ms.ToArray());
+    }
 
     internal XWPFPictureData AddPictureData(byte[] data, int format)
     {
@@ -86,11 +127,32 @@ public sealed class XWPFDocument : IDisposable
         _paragraphs.Clear();
         _pictures.Clear();
         _nextDrawingId = 1;
+        _vbaProjectBin = null;
+        _vbaDataXml = null;
+        _vbaProjectBinRels = null;
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
 
         ReadPictures(archive);
         ReadDocument(archive);
+        ReadVbaFiles(archive);
+    }
+
+    private void ReadVbaFiles(ZipArchive archive)
+    {
+        _vbaProjectBin    = ReadEntryBytes(archive, "word/vbaProject.bin");
+        _vbaDataXml       = ReadEntryBytes(archive, "word/vbaData.xml");
+        _vbaProjectBinRels = ReadEntryBytes(archive, "word/_rels/vbaProject.bin.rels");
+    }
+
+    private static byte[]? ReadEntryBytes(ZipArchive archive, string path)
+    {
+        var entry = archive.GetEntry(path);
+        if (entry is null) return null;
+        using var s = entry.Open();
+        using var ms = new MemoryStream();
+        s.CopyTo(ms);
+        return ms.Length > 0 ? ms.ToArray() : null;
     }
 
     private void ReadPictures(ZipArchive archive)
@@ -324,9 +386,16 @@ public sealed class XWPFDocument : IDisposable
             WriteDefault(writer, ext, _pictures.First(p => p.Extension == ext).ContentType);
         }
         WriteDefault(writer, "xml", "application/xml");
+        // docm uses macroEnabled content type; docx uses the standard one.
         WriteOverride(writer, "/word/document.xml",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml");
+            _vbaProjectBin != null ? ContentTypeDocm : ContentTypeDocx);
         WriteOverride(writer, "/word/settings.xml", ContentTypeSettings);
+        if (_vbaProjectBin != null)
+        {
+            WriteOverride(writer, "/word/vbaProject.bin", ContentTypeVbaProject);
+            if (_vbaDataXml != null)
+                WriteOverride(writer, "/word/vbaData.xml", ContentTypeVbaData);
+        }
         writer.WriteEndElement();
     }
 
@@ -351,6 +420,12 @@ public sealed class XWPFDocument : IDisposable
         {
             WriteRelationship(writer, $"rId{pic.Index + ImageRelIdOffset}", $"media/{pic.getFileName()}",
                 "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image");
+        }
+        // docm: vbaProject relationship after images
+        if (_vbaProjectBin != null)
+        {
+            var vbaRelId = $"rId{_pictures.Count + 2}";
+            WriteRelationship(writer, vbaRelId, "vbaProject.bin", RelTypeVbaProject);
         }
         writer.WriteEndElement();
     }

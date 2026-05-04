@@ -6,7 +6,7 @@ var outputDirectory = Path.Combine(repoRoot, "examples", "output");
 Directory.CreateDirectory(outputDirectory);
 
 var outputPath = Path.Combine(outputDirectory, "phase3_3-pptx-example.pptx");
-var imageBytes = File.ReadAllBytes(Path.Combine(repoRoot, "tests", "image.jpg"));
+var imageBytes = File.ReadAllBytes(Path.Combine(repoRoot, "tests", "test-files", "image.jpg"));
 
 WritePresentation(outputPath, imageBytes);
 ReadAndAssertPresentation(outputPath);

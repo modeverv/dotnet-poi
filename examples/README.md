@@ -140,7 +140,7 @@ The presentation demonstrates:
 - `XMLSlideShow.write(Stream)`
 - Round-trip read back via `XMLSlideShow(Stream)`
 
-Requires `tests/image.jpg` (present in the repository).
+Requires `tests/test-files/image.jpg` (present in the repository).
 
 Slide 1: photo filling the entire slide at 0° rotation.  
 Slide 2: same photo at 3×2.25 inch, 45° rotation, horizontal flip.  

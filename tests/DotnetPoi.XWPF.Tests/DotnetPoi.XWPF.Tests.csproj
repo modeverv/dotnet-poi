@@ -18,11 +18,13 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="../../src/DotnetPoi.POIFS/DotnetPoi.POIFS.csproj" />
         <ProjectReference Include="../../src/DotnetPoi.XWPF/DotnetPoi.XWPF.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="../../tests/image.jpg" CopyToOutputDirectory="PreserveNewest" Link="image.jpg" />
+        <Content Include="../../tests/test-files/image.jpg" CopyToOutputDirectory="PreserveNewest" Link="image.jpg" />
+        <Content Include="../../tests/test-files/example.docm" CopyToOutputDirectory="PreserveNewest" Link="example.docm" />
     </ItemGroup>
 
 </Project>

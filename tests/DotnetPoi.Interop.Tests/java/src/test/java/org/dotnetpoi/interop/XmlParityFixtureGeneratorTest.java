@@ -11,7 +11,6 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -48,8 +47,17 @@ public class XmlParityFixtureGeneratorTest {
     }
 
     private static Path getFixturesRoot() {
-        Path projectRoot = Paths.get("").toAbsolutePath();
-        return projectRoot.getParent().resolve("fixtures").resolve("xml-parity");
+        Path directory = Paths.get("").toAbsolutePath();
+        while (directory != null) {
+            if (Files.exists(directory.resolve("DotnetPOI.sln"))) {
+                return directory.resolve("tests")
+                        .resolve("DotnetPoi.Interop.Tests")
+                        .resolve("fixtures")
+                        .resolve("xml-parity");
+            }
+            directory = directory.getParent();
+        }
+        throw new IllegalStateException("Could not locate the dotnet-poi repository root.");
     }
 
     private static void generateCellZeroCases(Path fixturesRoot, Path workbooksRoot) throws IOException {
@@ -167,18 +175,11 @@ public class XmlParityFixtureGeneratorTest {
         String caseName = "inline-strings";
         cleanupCaseFiles(fixturesRoot, caseName);
 
-        SXSSFWorkbook workbook = new SXSSFWorkbook(null, 100, false, false);
-        try {
-            Sheet sheet = workbook.createSheet("Inline");
-            Row row = sheet.createRow(0);
-            row.createCell(0).setCellValue("Inline String");
-            row.createCell(1).setCellValue("More Inline");
-
-            writeAndExtract(caseName, workbook, fixturesRoot, workbooksRoot);
-        } finally {
-            workbook.dispose();
-            workbook.close();
+        Path workbookPath = workbooksRoot.resolve(caseName + ".xlsx");
+        if (!Files.exists(workbookPath)) {
+            throw new IOException("Missing inline string workbook fixture: " + workbookPath);
         }
+        extractXmlEntries(workbookPath, caseName, fixturesRoot);
     }
 
     private static void cleanupCaseFiles(Path fixturesRoot, String caseName) throws IOException {

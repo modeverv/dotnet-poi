@@ -702,6 +702,13 @@ Agile 暗号化、`EncryptionInfo` XML 出力、`EncryptedPackage` の chunk/HMA
 
 目標: `v1.0`。`FormulaEvaluator`。単独で数ヶ月かかる想定。
 
+#### 優先順位
+残ったものは落穂拾いにて対応する
+
+step1. 数式の保存・読み込み
+step2. Excel に再計算させる設定
+step3. 代表的な関数だけ評価
+
 ### Phase 6 — Word / PowerPoint 形式
 
 目標: `v1.x`。HWPF / XWPF / HSLF / XSLF。優先度低。

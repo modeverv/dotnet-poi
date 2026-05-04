@@ -36,6 +36,20 @@ public sealed class XSSFWorkbook : IWorkbook
     private XSSFDataFormat? _dataFormat;
     private int _nextDrawingIndex = 1;
 
+    // xlsm support: opaque VBA binary preserved byte-for-byte.
+    // Non-null iff the loaded/constructed workbook is macro-enabled.
+    private byte[]? _vbaProjectBin;
+
+    private const string ContentTypeXlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
+    private const string ContentTypeXlsm = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
+    private const string ContentTypeVbaProject = "application/vnd.ms-office.vbaProject";
+    private const string RelTypeVbaProject = "http://schemas.microsoft.com/office/2006/relationships/vbaProject";
+
+    /// <summary>True if this workbook was loaded from xlsm (has a vbaProject.bin).</summary>
+    public bool HasMacros => _vbaProjectBin != null;
+
+    public bool isMacroEnabled() => HasMacros;
+
     public XSSFWorkbook()
     {
         InitializeDefaultStyles();
@@ -190,6 +204,9 @@ public sealed class XSSFWorkbook : IWorkbook
         {
             WriteBinaryEntry(archive, $"xl/media/image{picture.Index}.{picture.Extension}", picture.Data);
         }
+
+        if (_vbaProjectBin != null)
+            WriteBinaryEntry(archive, "xl/vbaProject.bin", _vbaProjectBin);
     }
 
     public void writeEncrypted(Stream stream, string password)
@@ -205,6 +222,20 @@ public sealed class XSSFWorkbook : IWorkbook
 
     public void close()
     {
+    }
+
+    public void setVBAProject(byte[] vbaProjectData)
+    {
+        ArgumentNullException.ThrowIfNull(vbaProjectData);
+        _vbaProjectBin = vbaProjectData.ToArray();
+    }
+
+    public void setVBAProject(Stream vbaProjectStream)
+    {
+        ArgumentNullException.ThrowIfNull(vbaProjectStream);
+        using var ms = new MemoryStream();
+        vbaProjectStream.CopyTo(ms);
+        _vbaProjectBin = ms.ToArray();
     }
 
     public void Dispose()
@@ -343,12 +374,14 @@ public sealed class XSSFWorkbook : IWorkbook
     private void Load(Stream stream)
     {
         _sheets.Clear();
+        _vbaProjectBin = null;
         InitializeDefaultStyles();
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
         var sharedStrings = ReadSharedStrings(archive);
         ReadStyles(archive);
         ReadPictures(archive);
+        ReadVbaProject(archive);
 
         foreach (var sheetInfo in ReadWorkbookSheets(archive))
         {
@@ -356,6 +389,16 @@ public sealed class XSSFWorkbook : IWorkbook
             ReadWorksheet(archive, sheetInfo.PartName, sheet, sharedStrings);
             ReadSheetDrawing(archive, sheetInfo.PartName, sheet);
         }
+    }
+
+    private void ReadVbaProject(ZipArchive archive)
+    {
+        var entry = archive.GetEntry("xl/vbaProject.bin");
+        if (entry is null) return;
+        using var s = entry.Open();
+        using var ms = new MemoryStream();
+        s.CopyTo(ms);
+        _vbaProjectBin = ms.ToArray();
     }
 
     private void ReadPictures(ZipArchive archive)
@@ -1040,7 +1083,10 @@ public sealed class XSSFWorkbook : IWorkbook
         WriteDefault(writer, "xml", "application/xml");
         WriteOverride(writer, "/docProps/app.xml", "application/vnd.openxmlformats-officedocument.extended-properties+xml");
         WriteOverride(writer, "/docProps/core.xml", "application/vnd.openxmlformats-package.core-properties+xml");
-        WriteOverride(writer, "/xl/workbook.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml");
+        // xlsm uses macroEnabled content type; xlsx uses the standard one.
+        WriteOverride(writer, "/xl/workbook.xml", _vbaProjectBin != null ? ContentTypeXlsm : ContentTypeXlsx);
+        if (_vbaProjectBin != null)
+            WriteOverride(writer, "/xl/vbaProject.bin", ContentTypeVbaProject);
         WriteOverride(writer, "/xl/sharedStrings.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml");
         WriteOverride(writer, "/xl/styles.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml");
         foreach (var sheet in _sheets)
@@ -1344,6 +1390,12 @@ public sealed class XSSFWorkbook : IWorkbook
         foreach (var sheet in _sheets)
         {
             WriteRelationship(writer, "rId" + (sheet.SheetIndex + 2).ToString(CultureInfo.InvariantCulture), $"worksheets/sheet{sheet.SheetIndex}.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
+        }
+        // xlsm: append vbaProject relationship after all worksheet rels
+        if (_vbaProjectBin != null)
+        {
+            var vbaRelId = "rId" + (_sheets.Count + 3).ToString(CultureInfo.InvariantCulture);
+            WriteRelationship(writer, vbaRelId, "vbaProject.bin", RelTypeVbaProject);
         }
         writer.WriteEndElement();
     }

@@ -31,6 +31,13 @@ public sealed class XMLSlideShow : IDisposable
     private const string RelTypeTableStyles= "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles";
 
     private const string ContentTypePresentation = "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+    private const string ContentTypePptm        = "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml";
+    private const string ContentTypeVbaProject  = "application/vnd.ms-office.vbaProject";
+    private const string RelTypeVbaProject      = "http://schemas.microsoft.com/office/2006/relationships/vbaProject";
+
+    /// <summary>True if this presentation was loaded from pptm (has a vbaProject.bin).</summary>
+    public bool HasMacros => _vbaProjectBin != null;
+    public bool isMacroEnabled() => HasMacros;
     private const string ContentTypeSlide        = "application/vnd.openxmlformats-officedocument.presentationml.slide+xml";
     private const string ContentTypeSlideMaster  = "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml";
     private const string ContentTypeSlideLayout  = "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml";
@@ -109,6 +116,9 @@ public sealed class XMLSlideShow : IDisposable
     private readonly List<XSLFSlide>       _slides   = new();
     private readonly List<XSLFPictureData> _pictures = new();
 
+    // pptm support: opaque VBA binary preserved byte-for-byte.
+    private byte[]? _vbaProjectBin;
+
     public XMLSlideShow() { }
 
     public XMLSlideShow(Stream stream)
@@ -182,10 +192,27 @@ public sealed class XMLSlideShow : IDisposable
 
         foreach (var pic in _pictures)
             WriteBinaryEntry(archive, $"ppt/media/{pic.getFileName()}", pic.Data);
+
+        if (_vbaProjectBin != null)
+            WriteBinaryEntry(archive, "ppt/vbaProject.bin", _vbaProjectBin);
     }
 
     public void close() { }
     public void Dispose() => close();
+
+    public void setVBAProject(byte[] vbaProjectData)
+    {
+        ArgumentNullException.ThrowIfNull(vbaProjectData);
+        _vbaProjectBin = vbaProjectData.ToArray();
+    }
+
+    public void setVBAProject(Stream vbaProjectStream)
+    {
+        ArgumentNullException.ThrowIfNull(vbaProjectStream);
+        using var ms = new MemoryStream();
+        vbaProjectStream.CopyTo(ms);
+        _vbaProjectBin = ms.ToArray();
+    }
 
     // ----- write helpers -----
 
@@ -204,7 +231,10 @@ public sealed class XMLSlideShow : IDisposable
             WriteDefault(w, ext, _pictures.First(p => p.Extension == ext).ContentType);
         }
 
-        WriteOverride(w, "/ppt/presentation.xml",                ContentTypePresentation);
+        // pptm uses macroEnabled content type; pptx uses the standard one.
+        WriteOverride(w, "/ppt/presentation.xml", _vbaProjectBin != null ? ContentTypePptm : ContentTypePresentation);
+        if (_vbaProjectBin != null)
+            WriteOverride(w, "/ppt/vbaProject.bin", ContentTypeVbaProject);
         WriteOverride(w, "/ppt/presProps.xml",                   ContentTypePresProps);
         WriteOverride(w, "/ppt/tableStyles.xml",                 ContentTypeTableStyles);
         WriteOverride(w, "/ppt/theme/theme1.xml",                ContentTypeTheme);
@@ -277,6 +307,9 @@ public sealed class XMLSlideShow : IDisposable
         // rId5 is reserved (matches SlideRelIdOffset - 1 = 5) — unused for now; slides start at rId6
         for (int i = 0; i < _slides.Count; i++)
             WriteRelationship(w, $"rId{SlideRelIdOffset + i}", $"slides/slide{i + 1}.xml", RelTypeSlide);
+        // pptm: vbaProject relationship appended after slides
+        if (_vbaProjectBin != null)
+            WriteRelationship(w, $"rId{SlideRelIdOffset + _slides.Count}", "vbaProject.bin", RelTypeVbaProject);
         w.WriteEndElement();
     }
 
@@ -565,6 +598,7 @@ public sealed class XMLSlideShow : IDisposable
     {
         _slides.Clear();
         _pictures.Clear();
+        _vbaProjectBin = null;
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
 
@@ -581,6 +615,16 @@ public sealed class XMLSlideShow : IDisposable
             var slide         = new XSLFSlide();
             ParseSlideXml(archive, fullSlidePath, slide, mediaByRid);
             _slides.Add(slide);
+        }
+
+        // pptm: preserve vbaProject.bin verbatim
+        var vba = archive.GetEntry("ppt/vbaProject.bin");
+        if (vba != null)
+        {
+            using var s = vba.Open();
+            using var ms = new MemoryStream();
+            s.CopyTo(ms);
+            if (ms.Length > 0) _vbaProjectBin = ms.ToArray();
         }
     }
 

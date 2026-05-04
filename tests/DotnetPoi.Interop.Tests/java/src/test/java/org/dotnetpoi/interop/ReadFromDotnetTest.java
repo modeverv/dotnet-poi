@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 
 public class ReadFromDotnetTest {
     private static byte[] loadTestImage() throws IOException {
-        return Files.readAllBytes(findRepoRoot().resolve("tests/image.jpg"));
+        return Files.readAllBytes(findRepoRoot().resolve("tests/test-files/image.jpg"));
     }
 
     @Test
