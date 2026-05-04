@@ -36,6 +36,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Phase33PptxExample", "examp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Phase34AgileEncryptionExample", "examples\Phase34AgileEncryptionExample\Phase34AgileEncryptionExample.csproj", "{D8FB62CC-3D1C-4848-987D-38E7331B5B40}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.XWPF.Tests", "tests\DotnetPoi.XWPF.Tests\DotnetPoi.XWPF.Tests.csproj", "{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -226,6 +228,18 @@ Global
 		{D8FB62CC-3D1C-4848-987D-38E7331B5B40}.Release|x64.Build.0 = Release|Any CPU
 		{D8FB62CC-3D1C-4848-987D-38E7331B5B40}.Release|x86.ActiveCfg = Release|Any CPU
 		{D8FB62CC-3D1C-4848-987D-38E7331B5B40}.Release|x86.Build.0 = Release|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Debug|x64.Build.0 = Debug|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Debug|x86.Build.0 = Debug|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Release|x64.ActiveCfg = Release|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Release|x64.Build.0 = Release|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Release|x86.ActiveCfg = Release|Any CPU
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -235,5 +249,6 @@ Global
 		{3F895B06-F6A4-4195-9F4B-DE5AC0C26F83} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{05124563-5DF7-4048-A9ED-42133A937736} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{D8FB62CC-3D1C-4848-987D-38E7331B5B40} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{C4ABC88F-6549-49BB-88EB-5A091D41A6EC} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
