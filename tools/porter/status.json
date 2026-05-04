@@ -47,6 +47,12 @@
       "name": "Agile Encryption",
       "status": "done",
       "notes": "Initial Agile write/decrypt slice is complete: AES-128/SHA-1 agile password verifier, chunked EncryptedPackage encryption, HMAC metadata, in-repo CFB writer/reader with mini FAT support for the Agile two-stream OLE2 wrapper, XSSFWorkbook.writeEncrypted, POI interop read test for a password-protected xlsx, Excel manual open verification, and a Phase34 runnable example. Excel-compatible integrity HMAC details and CFB writer notes are documented in PHASE_3_4_AGILE_ENCRYPTION_NOTES.md."
+    },
+    {
+      "phase": "6",
+      "name": "HSSF xls Bootstrap",
+      "status": "in_progress",
+      "notes": "Initial HSSF xls read/write slice is present: HSSFWorkbook/HSSFSheet/HSSFRow/HSSFCell plus basic BIFF8 Workbook stream parsing/writing for BoundSheet8, SST/LabelSST, Number, RK, BoolErr, Blank, Dimensions, Window2, and Selection. Unit tests cover self round-trip and reading a POI xls test-data sample; interop covers both directions for a basic .xls with string, numeric, and boolean cells."
     }
   ],
   "classes": [

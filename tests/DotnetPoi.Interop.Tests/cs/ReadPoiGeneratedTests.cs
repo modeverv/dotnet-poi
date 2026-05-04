@@ -1,4 +1,5 @@
 using DotnetPoi.SS.UserModel;
+using DotnetPoi.HSSF.UserModel;
 using DotnetPoi.XSSF.UserModel;
 using Xunit;
 
@@ -6,6 +7,25 @@ namespace DotnetPoi.Interop.Tests;
 
 public class ReadPoiGeneratedTests
 {
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    public void Read_HssfWorkbook_GeneratedByPoi()
+    {
+        var fixturePath = GetFixturePath("phase6-basic.xls");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var workbook = new HSSFWorkbook(stream);
+
+        var sheet = workbook.getSheet("From POI HSSF");
+        Assert.NotNull(sheet);
+        var row = sheet!.getRow(0);
+        Assert.NotNull(row);
+        Assert.Equal("from apache poi hssf", row!.getCell(0)!.getStringCellValue());
+        Assert.Equal(123.75, row.getCell(1)!.getNumericCellValue());
+        Assert.False(row.getCell(2)!.getBooleanCellValue());
+    }
+
     [Fact]
     [Trait("Category", "ReadFromPoi")]
     public void Read_StringAndNumberWorkbook_GeneratedByPoi()

@@ -173,6 +173,29 @@ The example demonstrates:
 - `EncryptionInfo(Stream)` and `Decryptor.verifyPassword(...)`
 - Decrypted package read back via `XSSFWorkbook(Stream)`
 
+## Phase4HssfXlsExample
+
+Creates a BIFF8 `.xls` workbook using the Phase 4 HSSF bootstrap API, then reads it back:
+
+```bash
+dotnet run --project examples/Phase4HssfXlsExample/Phase4HssfXlsExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase4-hssf-xls-example.xls
+```
+
+The example demonstrates:
+
+- `HSSFWorkbook.createSheet(...)`
+- `HSSFSheet.createRow(...)`
+- `HSSFRow.createCell(...)`
+- string, numeric, and boolean cell write/read
+- OLE2 `.xls` output through the in-repo POIFS CFB writer
+- round-trip read back via `HSSFWorkbook(Stream)`
+
 ## Phase5FormulaEvaluatorExample
 
 Creates an `.xlsx` file with formula cells, evaluates a representative Phase 5 function subset, writes cached formula results, then reads the workbook back:

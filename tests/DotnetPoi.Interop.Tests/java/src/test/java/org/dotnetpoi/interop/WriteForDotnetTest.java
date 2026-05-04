@@ -12,10 +12,32 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 public class WriteForDotnetTest {
+    @Test
+    void writePhase6BasicHssfWorkbook() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase6-basic.xls");
+        Files.createDirectories(fixture.getParent());
+
+        try (HSSFWorkbook workbook = new HSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("From POI HSSF");
+            Row row = sheet.createRow(0);
+            row.createCell(0).setCellValue("from apache poi hssf");
+            row.createCell(1).setCellValue(123.75);
+            row.createCell(2).setCellValue(false);
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
     @Test
     void writePhase1BasicWorkbook() throws IOException {
         Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase1-basic.xlsx");

@@ -7,7 +7,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 [![XML Parity](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-WIP-yellow)
-![Phase](https://img.shields.io/badge/phase-5%20step%203%20%E2%80%94%20representative%20FormulaEvaluator%20slice-green)
+![Phase](https://img.shields.io/badge/phase-4%20HSSF%20xls%20bootstrap%20%E2%80%94%20in%20progress-yellow)
 
 ## Philosophy
 
@@ -21,7 +21,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 
 ## Status
 
-### Current Phase: Phase 5 step 3 — representative FormulaEvaluator slice done
+### Current Phase: Phase 4 — HSSF xls bootstrap in progress
 
 | Phase | Description | Target | Status |
 |---|---|---|---|
@@ -39,7 +39,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | **5.1** | **Formula save/read (`<f>` round-trip)** | **—** | ✅ Done |
 | **5.2** | **Force formula recalculation (`calcPr fullCalcOnLoad`)** | **—** | ✅ Done |
 | **5.3** | **Representative formula evaluation functions** | **—** | ✅ Done |
-| 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
+| 4 | POIFS + HSSF (xls read/write) | v0.5 | 🚧 HSSF bootstrap |
 | 5 | Full FormulaEvaluator parity | v1.0 | 🚧 Partial |
 | **6** | **HWPF (.doc text read) + HSLF (.ppt slide/text read)** | **v1.x** | ✅ Done (read-only MVP) |
 
@@ -68,6 +68,17 @@ Minimum bar if POIFS is considered “full” (to unblock HWPF/HSLF work):
 | `XSSFCreationHelper` | ✅ | ✅ | Data format, anchors, formula evaluator |
 
 Legend: ✅ Done / 🚧 In Progress / ⬜ Not started
+
+### Byte-Level Parity Scope
+
+Current byte-level XML parity is guaranteed at the `PoiXmlWriter` fixture layer, using Apache POI/XMLBeans-generated XSSF `.xlsx` XML parts under `tests/DotnetPoi.Interop.Tests/fixtures/xml-parity/`.
+
+This does **not** currently mean whole-file byte parity for `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, `.pptx`, `.docm`, `.xlsm`, or `.pptm`:
+
+- `.xls`, `.doc`, and `.ppt` are OLE2/binary formats, not XML package formats.
+- `.xlsx` XML writer behavior is fixture-gated; full ZIP byte parity is not claimed because ZIP metadata and timestamps vary.
+- `.docx`, `.pptx`, `.docm`, `.xlsm`, and `.pptm` currently have semantic round-trip and Apache POI interop coverage where implemented, but do not yet have format-specific XML fixture byte-parity suites comparable to the XSSF `xml-parity/` fixtures.
+- Agile encryption keeps the normal OOXML parts on the same XML writer foundation before encryption, but encrypted OLE2 output is intentionally not byte-for-byte comparable with Apache POI because salts, keys, encrypted payload bytes, sector layout, and package metadata vary. The Agile `EncryptionInfo` XML is generated in a known Excel/POI-compatible shape, not asserted as POI byte-identical.
 
 ### Phase -1 Foundation
 
@@ -298,6 +309,44 @@ f
 **Byte-level XML parity note**: Phase 3.4 keeps the existing POI/XMLBeans byte-level XML fixture guarantee for normal OOXML parts. The Agile `EncryptionInfo` XML is intentionally generated in the known Excel-compatible shape documented in `PHASE_3_4_AGILE_ENCRYPTION_NOTES.md`; full encrypted OLE2 file byte-for-byte parity with Apache POI is not claimed because salts, keys, encrypted bytes, sector layout, and package metadata vary. The current guarantee is semantic compatibility with Apache POI and Excel for the implemented AES-128/SHA1 Agile path.
 
 Scope note: Phase 3.4 currently covers the default AES-128/SHA1 Agile encryption path for OOXML `.xlsx`. AES-192/AES-256, SHA-256+, broader POIFS/HSSF, and general-purpose OLE2 document authoring remain later work.
+
+### Phase 4 Verification
+
+Phase 4 is in progress. The first HSSF `.xls` bootstrap slice is present: create/read/write simple BIFF8 workbooks through `HSSFWorkbook`, `HSSFSheet`, `HSSFRow`, and `HSSFCell`.
+
+Implemented HSSF bootstrap surface:
+
+- OLE2 `.xls` container read/write through the in-repo POIFS CFB reader/writer
+- BIFF8 Workbook stream read/write for `BoundSheet8`, `SST`/`LabelSST`, `Number`, `RK`, `BoolErr`, `Blank`, `Dimensions`, `Window2`, and `Selection`
+- string, numeric, boolean, blank, and error cells
+- sheet creation and basic row/cell access
+
+Verification currently covers:
+
+- C# HSSF write → C# HSSF read round-trip
+- dotnet-poi reads a POI `.xls` sample from `poi/test-data/spreadsheet`
+- Direction A: Apache POI Java writes `.xls` → dotnet-poi reads string/numeric/boolean values
+- Direction B: dotnet-poi writes `.xls` → Apache POI Java reads string/numeric/boolean values
+- a runnable example under `examples/Phase4HssfXlsExample`
+
+Commands:
+
+```bash
+dotnet test tests/DotnetPoi.HSSF.Tests/DotnetPoi.HSSF.Tests.csproj
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest#writePhase6BasicHssfWorkbook
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Read_HssfWorkbook"
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Write_HssfWorkbook"
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest#readPhase6BasicHssfWorkbook
+dotnet run --project examples/Phase4HssfXlsExample/Phase4HssfXlsExample.csproj
+```
+
+The example writes:
+
+```text
+examples/output/phase4-hssf-xls-example.xls
+```
+
+Scope note: Phase 4 is not complete. Formula tokenization/evaluation, styles, pictures, charts, full POIFS directory preservation, broader BIFF records, and full `.xls` parity remain backlog work.
 
 ### Phase 7 Verification
 
@@ -539,7 +588,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 
 ## 対応状況
 
-### 現在のフェーズ: Phase 5 step 3 — 代表的な FormulaEvaluator subset 完了
+### 現在のフェーズ: Phase 4 — HSSF xls bootstrap 対応中
 
 | Phase | 内容 | バージョン目標 | 状態 |
 |---|---|---|---|
@@ -557,7 +606,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | **5.1** | **数式の保存・読み込み（`<f>` round-trip）** | **—** | ✅ 完了 |
 | **5.2** | **Excel に再計算させる設定（`calcPr fullCalcOnLoad`）** | **—** | ✅ 完了 |
 | **5.3** | **代表的な関数の評価** | **—** | ✅ 完了 |
-| 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
+| 4 | POIFS + HSSF（xls 読み書き） | v0.5 | 🚧 HSSF bootstrap |
 | 5 | FormulaEvaluator 完全互換 | v1.0 | 🚧 一部対応 |
 | **6** | **HWPF (.doc テキスト読み込み) + HSLF (.ppt スライド/テキスト読み込み)** | **v1.x** | ✅ 完了（読み込み専用 MVP）|
 
@@ -586,6 +635,17 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 | `XSSFCreationHelper` | ✅ | ✅ | data format、anchor、formula evaluator |
 
 凡例: ✅ 完了 / 🚧 進行中 / ⬜ 未着手
+
+### Byte-level parity の対象範囲
+
+現在の XML byte-level parity は、`tests/DotnetPoi.Interop.Tests/fixtures/xml-parity/` 以下の Apache POI/XMLBeans 生成 XSSF `.xlsx` XML part に対する `PoiXmlWriter` fixture 層で保証しています。
+
+これは `.doc`、`.docx`、`.xls`、`.xlsx`、`.ppt`、`.pptx`、`.docm`、`.xlsm`、`.pptm` のファイル全体が POI と byte-for-byte 一致するという意味ではありません。
+
+- `.xls`、`.doc`、`.ppt` は OLE2/binary format であり、XML package format ではありません。
+- `.xlsx` は XML writer 挙動を fixture で固定していますが、ZIP metadata や timestamp が変わるため、ファイル全体の byte parity は主張していません。
+- `.docx`、`.pptx`、`.docm`、`.xlsm`、`.pptm` は実装済み範囲で semantic round-trip と Apache POI interop を確認していますが、XSSF の `xml-parity/` と同等の format 固有 XML fixture byte-parity suite はまだありません。
+- Agile 暗号化は、暗号化前の通常 OOXML part について同じ XML writer 基盤を使います。ただし暗号化済み OLE2 output は salt、key、encrypted payload、sector layout、package metadata が変わるため Apache POI との byte-for-byte 一致は主張しません。Agile `EncryptionInfo` XML は Excel/POI 互換の既知 shape で生成しており、POI と byte-identical として assert しているものではありません。
 
 ### Phase -1 基盤
 
@@ -816,6 +876,44 @@ f
 **byte-level XML parity に関する注意**: 通常の OOXML part については、既存の Apache POI/XMLBeans byte-level XML fixture guarantee を維持しています。Agile の `EncryptionInfo` XML は `PHASE_3_4_AGILE_ENCRYPTION_NOTES.md` に記録した Excel-compatible shape で意図的に生成しています。暗号化済み OLE2 file 全体の Apache POI との byte-for-byte parity は、salt / key / encrypted bytes / sector layout / package metadata が変わるため主張していません。現時点の保証は、実装済み AES-128/SHA1 Agile path の Apache POI と Excel との意味的な互換性です。
 
 範囲の注意: Phase 3.4 が対象にしているのは OOXML `.xlsx` の default AES-128/SHA1 Agile encryption path です。AES-192/AES-256、SHA-256+、より広い POIFS/HSSF、汎用 OLE2 document authoring は後続フェーズの対象です。
+
+### Phase 4 検証
+
+Phase 4 は対応中です。最初の HSSF `.xls` bootstrap slice として、`HSSFWorkbook`、`HSSFSheet`、`HSSFRow`、`HSSFCell` によるシンプルな BIFF8 workbook の作成・読み込み・書き出しに対応しています。
+
+実装済み HSSF bootstrap surface:
+
+- in-repo POIFS CFB reader/writer による OLE2 `.xls` container read/write
+- `BoundSheet8`、`SST`/`LabelSST`、`Number`、`RK`、`BoolErr`、`Blank`、`Dimensions`、`Window2`、`Selection` の BIFF8 Workbook stream read/write
+- string / numeric / boolean / blank / error cell
+- sheet creation と基本的な row/cell access
+
+現在の検証内容:
+
+- C# HSSF write → C# HSSF read round-trip
+- `poi/test-data/spreadsheet` の POI `.xls` sample 読み込み
+- A 方向: Apache POI Java が `.xls` を書き出し → dotnet-poi が string/numeric/boolean value を読み込み
+- B 方向: dotnet-poi が `.xls` を書き出し → Apache POI Java が string/numeric/boolean value を読み込み
+- `examples/Phase4HssfXlsExample` の実行サンプル
+
+確認コマンド:
+
+```bash
+dotnet test tests/DotnetPoi.HSSF.Tests/DotnetPoi.HSSF.Tests.csproj
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest#writePhase6BasicHssfWorkbook
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Read_HssfWorkbook"
+dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Write_HssfWorkbook"
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest#readPhase6BasicHssfWorkbook
+dotnet run --project examples/Phase4HssfXlsExample/Phase4HssfXlsExample.csproj
+```
+
+サンプルの出力:
+
+```text
+examples/output/phase4-hssf-xls-example.xls
+```
+
+範囲の注意: Phase 4 は完了ではありません。Formula tokenization/evaluation、style、picture、chart、full POIFS directory preservation、より広い BIFF record、完全な `.xls` parity は backlog です。
 
 ### Phase 7 検証
 

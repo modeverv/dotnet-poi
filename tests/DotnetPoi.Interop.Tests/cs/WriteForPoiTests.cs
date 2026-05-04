@@ -1,4 +1,5 @@
 using DotnetPoi.SS.UserModel;
+using DotnetPoi.HSSF.UserModel;
 using DotnetPoi.XSLF.UserModel;
 using DotnetPoi.XSSF.UserModel;
 using DotnetPoi.XWPF.UserModel;
@@ -9,6 +10,28 @@ namespace DotnetPoi.Interop.Tests;
 public class WriteForPoiTests
 {
     private static byte[] LoadTestImage() => File.ReadAllBytes("image.jpg");
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_HssfWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase6-basic.xls");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new HSSFWorkbook();
+        var sheet = workbook.createSheet("Phase6");
+        var row = sheet.createRow(0);
+        row.createCell(0).setCellValue("from dotnet-poi hssf");
+        row.createCell(1).setCellValue(66.25);
+        row.createCell(2).setCellValue(true);
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+        stream.Flush();
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
 
     [Fact]
     [Trait("Category", "WriteForPoi")]

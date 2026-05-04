@@ -16,6 +16,7 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.PictureData;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.poifs.crypt.Decryptor;
 import org.apache.poi.poifs.crypt.EncryptionInfo;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
@@ -34,6 +35,22 @@ import org.junit.jupiter.api.Test;
 public class ReadFromDotnetTest {
     private static byte[] loadTestImage() throws IOException {
         return Files.readAllBytes(findRepoRoot().resolve("tests/test-files/image.jpg"));
+    }
+
+    @Test
+    void readPhase6BasicHssfWorkbook() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase6-basic.xls");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSSFWorkbook workbook = new HSSFWorkbook(input)) {
+            Sheet sheet = workbook.getSheet("Phase6");
+            Row row = sheet.getRow(0);
+
+            assertEquals("from dotnet-poi hssf", row.getCell(0).getStringCellValue());
+            assertEquals(66.25, row.getCell(1).getNumericCellValue());
+            assertTrue(row.getCell(2).getBooleanCellValue());
+        }
     }
 
     @Test
