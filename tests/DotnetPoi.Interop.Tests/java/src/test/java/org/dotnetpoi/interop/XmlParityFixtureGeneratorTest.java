@@ -23,7 +23,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Base64;
-import java.util.Date;
 import java.util.Enumeration;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -101,7 +100,12 @@ public class XmlParityFixtureGeneratorTest {
             row.createCell(2).setCellValue(true);
 
             Cell dateCell = row.createCell(3);
-            dateCell.setCellValue(new Date(0));
+            // Set the date as an Excel serial number (double) to avoid timezone-dependent
+            // Date→serial conversion. 25569.0 = 1970-01-01 midnight in Excel date format.
+            // Using new Date(0) would produce 25569.375 in JST (UTC+9) because POI converts
+            // via the JVM's default timezone, making the fixture non-reproducible across
+            // timezones.
+            dateCell.setCellValue(25569.0);
             CellStyle dateStyle = workbook.createCellStyle();
             dateStyle.setDataFormat(helper.createDataFormat().getFormat("yyyy-mm-dd"));
             dateCell.setCellStyle(dateStyle);

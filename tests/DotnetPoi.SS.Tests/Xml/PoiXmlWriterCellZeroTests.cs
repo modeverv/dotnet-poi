@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DotnetPoi.SS.Xml;
 using Xunit;
 
@@ -65,9 +66,14 @@ public class PoiXmlWriterCellZeroTests
             writer.WriteAttributeString("xmlns:dcterms", "http://purl.org/dc/terms/");
             writer.WriteAttributeString("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
 
+            // Extract the timestamp from the fixture so the test stays valid after
+            // the Java fixture generator regenerates core.xml with a new timestamp.
+            var fixturePath = XmlFixturePaths.GetFixturePath("cell-zero__docProps__core.xml");
+            var timestamp = ExtractTimestampFromCoreXmlFixture(fixturePath);
+
             writer.WriteStartElement("dcterms", "created");
             writer.WriteAttributeString("xsi", "type", "dcterms:W3CDTF");
-            writer.WriteString("2026-05-03T15:01:29Z");
+            writer.WriteString(timestamp);
             writer.WriteEndElement();
 
             writer.WriteStartElement("dc", "creator");
@@ -327,6 +333,20 @@ public class PoiXmlWriterCellZeroTests
         writer.WriteStartElement(name);
         writer.WriteAttributeString("val", val);
         writer.WriteEndElement();
+    }
+
+    /// <summary>
+    /// Reads the ISO-8601 timestamp from a committed docProps/core.xml fixture.
+    /// This prevents the test from hardcoding a value that goes stale when the
+    /// Java fixture generator regenerates core.xml with a new wall-clock time.
+    /// </summary>
+    internal static string ExtractTimestampFromCoreXmlFixture(string fixturePath)
+    {
+        var content = File.ReadAllText(fixturePath);
+        var match = Regex.Match(content, @"<dcterms:created[^>]*>(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)</dcterms:created>");
+        if (!match.Success)
+            throw new InvalidDataException($"Could not find dcterms:created timestamp in {fixturePath}");
+        return match.Groups[1].Value;
     }
 }
 

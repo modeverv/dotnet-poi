@@ -33,7 +33,15 @@ jobs:
           -B --no-transfer-progress
 
       - name: Assert fixtures are up to date
-        run: git diff --exit-code -- tests/DotnetPoi.Interop.Tests/fixtures/xml-parity
+        # Exclude files that are always volatile:
+        #   *__docProps__core.xml  — contains dcterms:created timestamp (changes every run)
+        #   _workbooks/*.xlsx      — binary zip; embeds the volatile core.xml
+        # All other extracted XML fixtures (worksheet, rels, styles, etc.) must be stable.
+        run: |
+          git diff --exit-code \
+            -- tests/DotnetPoi.Interop.Tests/fixtures/xml-parity \
+            ':(exclude)tests/DotnetPoi.Interop.Tests/fixtures/xml-parity/*__docProps__core.xml' \
+            ':(exclude)tests/DotnetPoi.Interop.Tests/fixtures/xml-parity/_workbooks'
 
       - name: Upload regenerated fixtures (on drift)
         if: failure()

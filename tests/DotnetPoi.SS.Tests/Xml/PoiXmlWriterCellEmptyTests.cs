@@ -65,9 +65,12 @@ public class PoiXmlWriterCellEmptyTests
             writer.WriteAttributeString("xmlns:dcterms", "http://purl.org/dc/terms/");
             writer.WriteAttributeString("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
 
+            var fixturePath = XmlFixturePaths.GetFixturePath("cell-empty__docProps__core.xml");
+            var timestamp = PoiXmlWriterCellZeroTests.ExtractTimestampFromCoreXmlFixture(fixturePath);
+
             writer.WriteStartElement("dcterms", "created");
             writer.WriteAttributeString("xsi", "type", "dcterms:W3CDTF");
-            writer.WriteString("2026-05-03T15:01:30Z");
+            writer.WriteString(timestamp);
             writer.WriteEndElement();
 
             writer.WriteStartElement("dc", "creator");
