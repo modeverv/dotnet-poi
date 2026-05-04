@@ -243,6 +243,12 @@ public class XmlParityFixtureGeneratorTest {
             Path outputPath = workbooksRoot.resolve(caseName + ".xlsm");
             writeAndExtractPackage(caseName, outputPath, workbook::write, fixturesRoot);
         }
+
+        // DotnetPoi intentionally preserves unchanged xlsm package parts such as
+        // styles, shared strings, worksheets, drawings, and doc props. Keep these
+        // fixtures aligned with that round-trip contract while still using POI's
+        // regenerated package parts for workbook/content-types/relationships.
+        overlayPreservedXlsmParts(source, caseName, fixturesRoot);
     }
 
     private static void generateMacroEnabledDocm(Path fixturesRoot, Path workbooksRoot, Path source) throws IOException {
@@ -315,6 +321,36 @@ public class XmlParityFixtureGeneratorTest {
                 }
 
                 String flatName = caseName + "__" + name.replace("/", "__");
+                Path outputPath = fixturesRoot.resolve(flatName);
+                try (InputStream inputStream = zipFile.getInputStream(entry)) {
+                    Files.copy(inputStream, outputPath, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+    }
+
+    private static void overlayPreservedXlsmParts(Path source, String caseName, Path fixturesRoot) throws IOException {
+        String[] preservedEntries = {
+                "docProps/app.xml",
+                "docProps/core.xml",
+                "xl/calcChain.xml",
+                "xl/drawings/drawing1.xml",
+                "xl/sharedStrings.xml",
+                "xl/styles.xml",
+                "xl/theme/theme1.xml",
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml"
+        };
+
+        try (ZipFile zipFile = new ZipFile(source.toFile())) {
+            for (String entryName : preservedEntries) {
+                ZipEntry entry = zipFile.getEntry(entryName);
+                if (entry == null) {
+                    throw new IOException("Missing expected xlsm preserved entry: " + entryName);
+                }
+
+                String flatName = caseName + "__" + entryName.replace("/", "__");
                 Path outputPath = fixturesRoot.resolve(flatName);
                 try (InputStream inputStream = zipFile.getInputStream(entry)) {
                     Files.copy(inputStream, outputPath, StandardCopyOption.REPLACE_EXISTING);
