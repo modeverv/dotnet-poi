@@ -43,6 +43,8 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | 5 | Full FormulaEvaluator parity | v1.0 | 🚧 Partial |
 | **6** | **HWPF (.doc text read) + HSLF (.ppt slide/text read)** | **v1.x** | ✅ Done (read-only MVP) |
 
+Note: Formula evaluation and setting formula result values are intentionally omitted in the library for now; formulas are preserved as text and cached results are only handled when present.
+
 Minimum bar if POIFS is considered “full” (to unblock HWPF/HSLF work):
 
 - Read/write OLE2 header, FAT, mini FAT, and DIFAT chains for multi-stream files
@@ -610,6 +612,8 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | 5 | FormulaEvaluator 完全互換 | v1.0 | 🚧 一部対応 |
 | **6** | **HWPF (.doc テキスト読み込み) + HSLF (.ppt スライド/テキスト読み込み)** | **v1.x** | ✅ 完了（読み込み専用 MVP）|
 
+注意: ライブラリ内での数式の評価と数式結果値の設定は当面オミットします。数式はテキストとして保持し、キャッシュ値がある場合のみ取り扱います。
+
 POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSLF の土台用）:
 
 - OLE2 ヘッダ、FAT、mini FAT、DIFAT の読み書き（複数ストリーム対応）
@@ -690,7 +694,7 @@ dotnet run --project examples/Phase0WriteExample/Phase0WriteExample.csproj
 examples/output/phase0-write-example.xlsx
 ```
 
-注意: `.xlsx` 全体の zip ファイルは、zip metadata や document timestamp により Apache POI 出力と完全なバイト列一致にはなりません。バイト列一致は XML writer fixture 層で確認し、Phase 0 の相互運用性は Apache POI が dotnet-poi 出力を読めることで確認しています。
+注意: 完全な `.xlsx` zip ファイルは、zip metadata や document timestamp により Apache POI 出力と完全なバイト列一致にはなりません。バイト列一致は XML writer fixture 層で確認し、Phase 0 の相互運用性は Apache POI が dotnet-poi 出力を読めることで確認しています。
 
 ### Phase 1 検証
 
@@ -988,7 +992,7 @@ mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
 dotnet run --project examples/Phase5FormulaEvaluatorExample/Phase5FormulaEvaluatorExample.csproj
 ```
 
-範囲の注意: external workbook reference、shared/array formula、date/lookup/financial functions、parser edge case、Excel error semantics 全体は後続の Phase 5 作業です。
+範囲の注意: full Apache POI FormulaEvaluator parity はまだ部分的です。external workbook references、shared/array formulas、date functions、lookup functions、financial functions、parser edge cases、全 Excel error semantics は後続の Phase 5 作業です。
 
 
 ---

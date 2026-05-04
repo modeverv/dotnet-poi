@@ -49,6 +49,8 @@ dotnet-poi/
 
 **Ship something working as early as possible.** Formula engine, styles, and charts come later.
 
+Note: For now, formula evaluation and setting formula result values are intentionally omitted in the library; formulas may be preserved as text and cached results are only handled when present.
+
 ### Phase -1 (Foundation) — XML Output Parity
 
 **This phase must be completed before Phase 0.** All subsequent phases depend on it.
@@ -102,7 +104,7 @@ public class PoiXmlWriter : XmlWriter
     {
         // Force Java-compatible closing behavior
         _inner.WriteFullEndElement(); // always writes </tag>, never <tag/>
-        // OR intercept the raw stream to strip the space from <tag />
+        // OR intercept the raw stream to strip the space from <tag /> 
     }
 
     // Key override: always write zero-value attributes explicitly
@@ -580,6 +582,8 @@ dotnet-poi/
 
 **早期に動くものを出すことを最優先とする。** 数式エンジン・スタイル・グラフは後回し。
 
+注意: ライブラリ内での数式の評価と数式結果値の設定は当面オミットする。数式はテキストとして保持し、キャッシュ値がある場合のみ取り扱う。
+
 ### Phase -1（基盤）— XML 出力挙動の統一
 
 **Phase 0 を始める前に必ず完了させること。** 以降の全フェーズがここに依存する。
@@ -1027,7 +1031,7 @@ throw new NotImplementedException("XSSFCell.SetFormula is not yet ported. See Is
       "csPath": null,
       "status": "in_progress",
       "testStatus": "todo",
-      "notes": "数式部分は skip、Phase 5 送り"
+      "notes": "数式部分 skipped — Phase 5"
     }
   ]
 }
