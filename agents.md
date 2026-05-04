@@ -694,7 +694,7 @@ Phase 3 の前には、共通インターフェースの形に影響する Phase
 Agile 暗号化、`EncryptionInfo` XML 出力、`EncryptedPackage` の chunk/HMAC 処理、
 一時的な `OpenMcdf` 依存の削除に触る前に必ず読むこと。
 
-### Phase 4 — POIFS + HSSF（xls 対応）
+~~### Phase 4 — POIFS + HSSF（xls 対応）
 
 目標: `v0.5`。OLE2コンテナ → BIFF読み書き。最も重いフェーズ。
 
@@ -705,6 +705,8 @@ Agile 暗号化、`EncryptionInfo` XML 出力、`EncryptedPackage` の chunk/HMA
 ### Phase 6 — Word / PowerPoint 形式
 
 目標: `v1.x`。HWPF / XWPF / HSLF / XSLF。優先度低。
+
+### Phase 7 落穂拾い。透過的なPOIの移植として足りていないところを実装する。~~
 
 ---
 

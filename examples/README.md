@@ -172,3 +172,31 @@ The example demonstrates:
 - OLE2 `EncryptionInfo` / `EncryptedPackage` wrapper generation through the in-repo POIFS CFB writer
 - `EncryptionInfo(Stream)` and `Decryptor.verifyPassword(...)`
 - Decrypted package read back via `XSSFWorkbook(Stream)`
+
+## Phase7CellTypesExample
+
+Demonstrates reading all OOXML cell types — numeric, string, boolean, formula (with numeric/string/boolean/error cached results) — from a POI-generated fixture, and verifies Boolean cell write/read round-trip:
+
+```bash
+# Generate the Java fixture first:
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest
+
+# Then run the example:
+dotnet run --project examples/Phase7CellTypesExample/Phase7CellTypesExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase7-cell-types-example.xlsx
+```
+
+Cells demonstrated:
+
+| Row | POI type | dotnet-poi reads as |
+|---|---|---|
+| 0 | Numeric `10.0` | `CellType.Numeric = 10` |
+| 1 | Formula `A1+B1` cached `30.0` | `CellType.Formula → Numeric = 30` |
+| 2 | Formula `"hello "&"world"` cached string | `CellType.Formula → String = "hello world"` |
+| 3 | Boolean `true` | `CellType.Boolean = True` |
+| 4 | Formula `1/0` cached `#DIV/0!` | `CellType.Formula → Error = #DIV/0!` |

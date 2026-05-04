@@ -205,6 +205,28 @@ public class WriteForPoiTests
         Assert.True(new FileInfo(fixturePath).Length > 0);
     }
 
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_BooleanAndNumericCells_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase7-cell-types.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("CellTypes");
+        var row = sheet.createRow(0);
+        row.createCell(0).setCellValue(true);           // BOOLEAN true
+        row.createCell(1).setCellValue(false);          // BOOLEAN false
+        row.createCell(2).setCellValue(42.5);           // NUMERIC
+        row.createCell(3).setCellValue("hello");        // STRING
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;

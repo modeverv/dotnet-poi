@@ -3,13 +3,25 @@ using DotnetPoi.SS.UserModel;
 
 namespace DotnetPoi.XSSF.UserModel;
 
+/// <summary>
+/// Ported from org.apache.poi.xssf.usermodel.XSSFCell.
+/// </summary>
 public sealed class XSSFCell : ICell
 {
     private readonly XSSFRow _row;
     private readonly int _cellNum;
     private CellType _cellType = CellType.Blank;
+
+    // For FORMULA cells: the cached result type and whether this is a formula
+    private bool _isFormula;
+    private CellType _cachedFormulaResultType = CellType.Numeric;
+
+    // Typed value storage (matches POI's CTCell fields)
     private string? _stringValue;
     private double _numericValue;
+    private bool _booleanValue;
+    private string? _errorString; // raw OOXML error string e.g. "#DIV/0!"
+
     private XSSFCellStyle? _cellStyle;
 
     internal XSSFCell(XSSFRow row, int cellNum)
@@ -18,35 +30,35 @@ public sealed class XSSFCell : ICell
         _cellNum = cellNum;
     }
 
-    public XSSFSheet getSheet()
+    public XSSFSheet getSheet() => _row.getSheet();
+    public XSSFRow getRow() => _row;
+    public int getRowIndex() => _row.getRowNum();
+    public int getColumnIndex() => _cellNum;
+
+    /// <summary>
+    /// Returns FORMULA if the cell has a formula, otherwise the base type.
+    /// Ported from XSSFCell.getCellType().
+    /// </summary>
+    public CellType getCellType() => _cellType;
+
+    /// <summary>
+    /// Only valid for formula cells.
+    /// Ported from XSSFCell.getCachedFormulaResultType() / getBaseCellType().
+    /// </summary>
+    public CellType getCachedFormulaResultType()
     {
-        return getRow().getSheet();
+        if (_cellType != CellType.Formula)
+            throw new InvalidOperationException("Only formula cells have cached results.");
+        return _cachedFormulaResultType;
     }
 
-    public XSSFRow getRow()
-    {
-        return _row;
-    }
-
-    public int getRowIndex()
-    {
-        return _row.getRowNum();
-    }
-
-    public int getColumnIndex()
-    {
-        return _cellNum;
-    }
-
-    public CellType getCellType()
-    {
-        return _cellType;
-    }
+    // ----- setCellValue overloads -----
 
     public void setCellValue(string? value)
     {
         _stringValue = value ?? string.Empty;
         _cellType = CellType.String;
+        _isFormula = false;
     }
 
     public void setCellValue(double value)
@@ -54,61 +66,137 @@ public sealed class XSSFCell : ICell
         _numericValue = value;
         _stringValue = null;
         _cellType = CellType.Numeric;
+        _isFormula = false;
     }
 
+    public void setCellValue(bool value)
+    {
+        _booleanValue = value;
+        _cellType = CellType.Boolean;
+        _isFormula = false;
+    }
+
+    // ----- getters -----
+
+    /// <summary>
+    /// Returns the string value. Valid for STRING and FORMULA cells with STRING cached type.
+    /// Ported from XSSFCell.getStringCellValue().
+    /// </summary>
     public string getStringCellValue()
     {
-        if (_cellType != CellType.String)
-        {
-            throw new InvalidOperationException("Cannot get a string value from a non-string cell.");
-        }
-
+        var effectiveType = _isFormula ? _cachedFormulaResultType : _cellType;
+        if (effectiveType != CellType.String)
+            throw new InvalidOperationException($"Cannot get a string value from a {_cellType} cell.");
         return _stringValue ?? string.Empty;
     }
 
+    /// <summary>
+    /// Returns the numeric value. Valid for NUMERIC and FORMULA cells with NUMERIC cached type.
+    /// Ported from XSSFCell.getNumericCellValue().
+    /// </summary>
     public double getNumericCellValue()
     {
-        if (_cellType != CellType.Numeric)
-        {
-            throw new InvalidOperationException("Cannot get a numeric value from a non-numeric cell.");
-        }
-
+        var effectiveType = _isFormula ? _cachedFormulaResultType : _cellType;
+        if (effectiveType != CellType.Numeric)
+            throw new InvalidOperationException($"Cannot get a numeric value from a {_cellType} cell.");
         return _numericValue;
     }
 
-    public XSSFCellStyle getCellStyle()
+    /// <summary>
+    /// Returns the boolean value. Valid for BOOLEAN and FORMULA cells with BOOLEAN cached type.
+    /// Ported from XSSFCell.getBooleanCellValue(): checks _cell.isSetV() &amp;&amp; "1".equals(_cell.getV()).
+    /// </summary>
+    public bool getBooleanCellValue()
     {
-        return _cellStyle ?? getSheet().getWorkbook().getCellStyleAt(0);
+        var effectiveType = _isFormula ? _cachedFormulaResultType : _cellType;
+        if (effectiveType != CellType.Boolean)
+            throw new InvalidOperationException($"Cannot get a boolean value from a {_cellType} cell.");
+        return _booleanValue;
     }
+
+    /// <summary>
+    /// Returns the raw OOXML error string (e.g. "#DIV/0!") for ERROR cells.
+    /// Ported from XSSFCell.getErrorCellString().
+    /// </summary>
+    public string getErrorCellString()
+    {
+        var effectiveType = _isFormula ? _cachedFormulaResultType : _cellType;
+        if (effectiveType != CellType.Error)
+            throw new InvalidOperationException($"Cannot get an error value from a {_cellType} cell.");
+        return _errorString ?? string.Empty;
+    }
+
+    public XSSFCellStyle getCellStyle() =>
+        _cellStyle ?? getSheet().getWorkbook().getCellStyleAt(0);
 
     public void setCellStyle(XSSFCellStyle? style)
     {
         if (style is not null && !ReferenceEquals(style.Workbook, getSheet().getWorkbook()))
-        {
-            throw new ArgumentException("This Style does not belong to the supplied Workbook Styles Source. Are you trying to assign a style from one workbook to the cell of a different workbook?", nameof(style));
-        }
-
+            throw new ArgumentException(
+                "This Style does not belong to the supplied Workbook Styles Source.",
+                nameof(style));
         _cellStyle = style;
     }
 
-    public void setCellStyle(ICellStyle? style)
+    public void setCellStyle(ICellStyle? style) => setCellStyle(style as XSSFCellStyle);
+
+    // ----- internal helpers used by the reader -----
+
+    /// <summary>
+    /// Called by the reader when a formula cell is encountered.
+    /// Sets FORMULA type and stores the cached value according to the t attribute.
+    /// Ported from the reader side of XSSFCell.
+    /// </summary>
+    internal void SetFormulaWithCachedValue(CellType cachedType, string? rawValue)
     {
-        setCellStyle(style as XSSFCellStyle);
+        _isFormula = true;
+        _cellType = CellType.Formula;
+        _cachedFormulaResultType = cachedType;
+        ApplyCachedValue(cachedType, rawValue);
     }
 
-    internal string GetNumericText()
+    /// <summary>
+    /// Called by the reader for non-formula cells.
+    /// Matches POI's getBaseCellType() logic with the t attribute.
+    /// </summary>
+    internal void SetValueFromXml(CellType baseCellType, string? rawValue)
     {
-        return _numericValue.ToString("G15", CultureInfo.InvariantCulture);
+        _isFormula = false;
+        _cellType = baseCellType;
+        ApplyCachedValue(baseCellType, rawValue);
     }
 
-    internal void SetCellStyleIndex(int styleIndex)
+    private void ApplyCachedValue(CellType type, string? rawValue)
     {
+        switch (type)
+        {
+            case CellType.Numeric:
+                _numericValue = rawValue is not null
+                    ? double.Parse(rawValue, CultureInfo.InvariantCulture)
+                    : 0.0;
+                break;
+            case CellType.String:
+                _stringValue = rawValue ?? string.Empty;
+                break;
+            case CellType.Boolean:
+                // POI: "1" = true, "0" = false
+                _booleanValue = rawValue == "1";
+                break;
+            case CellType.Error:
+                _errorString = rawValue;
+                break;
+            case CellType.Blank:
+                break;
+        }
+    }
+
+    internal string GetNumericText() =>
+        _numericValue.ToString("G15", CultureInfo.InvariantCulture);
+
+    internal void SetCellStyleIndex(int styleIndex) =>
         _cellStyle = getSheet().getWorkbook().getCellStyleAt(styleIndex);
-    }
 
     ICellStyle ICell.getCellStyle() => getCellStyle();
-
     ISheet ICell.getSheet() => getSheet();
-
     IRow ICell.getRow() => getRow();
 }

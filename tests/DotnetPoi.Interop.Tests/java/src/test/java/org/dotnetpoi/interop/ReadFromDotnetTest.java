@@ -1,6 +1,7 @@
 package org.dotnetpoi.interop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -209,6 +210,34 @@ public class ReadFromDotnetTest {
                 assertEquals("encrypted from dotnet-poi", sheet.getRow(0).getCell(0).getStringCellValue());
                 assertEquals(34.0, sheet.getRow(0).getCell(1).getNumericCellValue());
             }
+        }
+    }
+
+    @Test
+    void readPhase7CellTypes() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase7-cell-types.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(input)) {
+            Sheet sheet = workbook.getSheet("CellTypes");
+            Row row = sheet.getRow(0);
+
+            // Boolean true
+            assertEquals(org.apache.poi.ss.usermodel.CellType.BOOLEAN, row.getCell(0).getCellType());
+            assertTrue(row.getCell(0).getBooleanCellValue());
+
+            // Boolean false
+            assertEquals(org.apache.poi.ss.usermodel.CellType.BOOLEAN, row.getCell(1).getCellType());
+            assertFalse(row.getCell(1).getBooleanCellValue());
+
+            // Numeric
+            assertEquals(org.apache.poi.ss.usermodel.CellType.NUMERIC, row.getCell(2).getCellType());
+            assertEquals(42.5, row.getCell(2).getNumericCellValue());
+
+            // String
+            assertEquals(org.apache.poi.ss.usermodel.CellType.STRING, row.getCell(3).getCellType());
+            assertEquals("hello", row.getCell(3).getStringCellValue());
         }
     }
 

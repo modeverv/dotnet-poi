@@ -32,6 +32,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 | **3.2** | **docx support (XWPF — text, images, rotation)** | **—** | ✅ Done |
 | **3.3** | **pptx support (XSLF — slides, images, rotation, flip)** | **—** | ✅ Done |
 | **3.4** | **AGILE encryption (XSSF write/read decrypt path)** | **—** | ✅ Done |
+| **7** | **Gleaning — cell type coverage (Boolean, Formula cached, Error read/write)** | **—** | ✅ Done |
 | 4 | POIFS + HSSF (xls read/write) | v0.5 | ⬜ Not started |
 | 5 | Formula engine (FormulaEvaluator) | v1.0 | ⬜ Not started |
 | 6 | Word / PowerPoint formats | v1.x | ⬜ Not started |
@@ -278,6 +279,48 @@ f
 
 Scope note: Phase 3.4 currently covers the default AES-128/SHA1 Agile encryption path for OOXML `.xlsx`. AES-192/AES-256, SHA-256+, broader POIFS/HSSF, and general-purpose OLE2 document authoring remain later work.
 
+### Phase 7 Verification
+
+Phase 7 (gleaning) adds full cell type coverage to the xlsx read/write path — filling the gap that caused crashes when reading Excel files with formula cached values, boolean cells, or error cells.
+
+Ported from:
+- `XSSFCell.getBaseCellType()` — `STCellType` → `CellType` mapping
+- `XSSFCell.getCachedFormulaResultType()` — cached formula result type
+- `XSSFCell.getBooleanCellValue()` — `"1"` = true, `"0"` = false
+- `XSSFCell.getErrorCellString()` — raw OOXML error string
+- `CryptoFunctions.generateKey()` — attribute write order fix (`r t s`, matching XMLBeans output)
+
+Cell types now supported:
+
+| OOXML `t` | Read as | Write as |
+|---|---|---|
+| absent / `"n"` with `<v>` | `Numeric` | no `t` attr ✅ |
+| absent / `"n"` without `<v>` | `Blank` | skipped ✅ |
+| `"s"` | `String` (shared) | `t="s"` ✅ |
+| `"str"` | `Formula → String` | formula written as cached String ✅ |
+| `"b"` | `Boolean` | `t="b"`, `<v>1</v>` or `<v>0</v>` ✅ |
+| `"e"` | `Error` | `t="e"`, `<v>#DIV/0!</v>` ✅ |
+| + `<f>` | `Formula` (read cached `<v>`) | cached value only, no `<f>` (Phase 5) ✅ |
+
+Verification currently covers:
+
+- Direction A: Apache POI Java writes formula/boolean/error xlsx → dotnet-poi reads all types correctly
+- Direction B: dotnet-poi writes boolean cells → Apache POI Java reads and verifies type and value
+- C# write → C# read round-trip for all cell types
+- a runnable example under `examples/Phase7CellTypesExample`
+
+Commands:
+
+```bash
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest
+dotnet test tests/DotnetPoi.Interop.Tests/cs/ --filter Category=ReadFromPoi
+dotnet test tests/DotnetPoi.Interop.Tests/cs/ --filter Category=WriteForPoi
+mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
+dotnet run --project examples/Phase7CellTypesExample/Phase7CellTypesExample.csproj
+```
+
+**Byte-level XML parity**: Attribute write order is now `r t s` (matching POI/XMLBeans). The `t="n"` default and `s="0"` default are omitted (OOXML allows this), which is a remaining minor difference from POI. The `PoiXmlWriter` gate tests remain green.
+
 ---
 
 ## Quick Start
@@ -443,6 +486,7 @@ This project is not affiliated with the Apache Software Foundation or the Apache
 | **3.2** | **docx 対応（XWPF — テキスト・画像・回転）** | **—** | ✅ 完了 |
 | **3.3** | **pptx 対応（XSLF — スライド・画像・回転・フリップ）** | **—** | ✅ 完了 |
 | **3.4** | **AGILE 暗号化（XSSF write / read decrypt path）** | **—** | ✅ 完了 |
+| **7** | **落穂拾い — セルタイプ全対応（Boolean・Formula cached・Error 読み書き）** | **—** | ✅ 完了 |
 | 4 | POIFS + HSSF（xls 読み書き） | v0.5 | ⬜ 未着手 |
 | 5 | 数式エンジン（FormulaEvaluator） | v1.0 | ⬜ 未着手 |
 | 6 | Word / PowerPoint 形式 | v1.x | ⬜ 未着手 |

@@ -303,16 +303,14 @@ public sealed class XSSFWorkbook : IWorkbook
             {
                 foreach (var cell in row.Cells)
                 {
-                    if (cell.getCellType() != CellType.String)
-                    {
-                        continue;
-                    }
+                    // Include formula cells whose cached type is String
+                    var effectiveType = cell.getCellType() == CellType.Formula
+                        ? cell.getCachedFormulaResultType()
+                        : cell.getCellType();
+                    if (effectiveType != CellType.String) continue;
 
                     var value = cell.getStringCellValue();
-                    if (_sharedStringIndexes.ContainsKey(value))
-                    {
-                        continue;
-                    }
+                    if (_sharedStringIndexes.ContainsKey(value)) continue;
 
                     _sharedStringIndexes[value] = _sharedStrings.Count;
                     _sharedStrings.Add(value);
@@ -482,7 +480,9 @@ public sealed class XSSFWorkbook : IWorkbook
         using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
         XSSFRow? currentRow = null;
         XSSFCell? currentCell = null;
-        string? currentCellType = null;
+        string? currentCellTypeAttr = null; // raw "t" attribute
+        bool currentCellIsFormula = false;  // true when <f> element seen inside current <c>
+        bool inFormulaElement = false;      // true while inside <f>...</f> subtree
         var inlineText = new StringBuilder();
         var nextRowIndex = 0;
         var nextColumnIndex = 0;
@@ -509,7 +509,8 @@ public sealed class XSSFWorkbook : IWorkbook
                 var reference = reader.GetAttribute("r");
                 var columnIndex = reference is null ? nextColumnIndex : ParseColumnIndex(reference);
                 currentCell = currentRow.createCell(columnIndex);
-                currentCellType = reader.GetAttribute("t");
+                currentCellTypeAttr = reader.GetAttribute("t");
+                currentCellIsFormula = false;
                 var styleIndexText = reader.GetAttribute("s");
                 if (styleIndexText is not null)
                 {
@@ -520,19 +521,42 @@ public sealed class XSSFWorkbook : IWorkbook
 
                 if (reader.IsEmptyElement)
                 {
+                    // Empty element <c/> → blank cell, leave as Blank
                     currentCell = null;
-                    currentCellType = null;
+                    currentCellTypeAttr = null;
+                    currentCellIsFormula = false;
                 }
+                continue;
+            }
+
+            // Skip everything inside <f>...</f> (formula text — evaluation is Phase 5).
+            // We use a state flag rather than ReadElementContentAsString() to avoid
+            // accidentally advancing the reader past the sibling <v> element.
+            if (inFormulaElement)
+            {
+                if (reader.NodeType == XmlNodeType.EndElement && reader.LocalName == "f")
+                    inFormulaElement = false;
+                continue;
+            }
+
+            if (currentCell is not null && reader.NodeType == XmlNodeType.Element && reader.LocalName == "f")
+            {
+                currentCellIsFormula = true;
+                if (!reader.IsEmptyElement)
+                    inFormulaElement = true; // enter skip-mode until </f>
                 continue;
             }
 
             if (currentCell is not null && reader.NodeType == XmlNodeType.Element && reader.LocalName == "v")
             {
-                ApplyCellValue(currentCell, currentCellType, reader.ReadElementContentAsString(), sharedStrings);
+                var rawValue = reader.ReadElementContentAsString();
+                ApplyCellValue(currentCell, currentCellTypeAttr, currentCellIsFormula, rawValue, sharedStrings);
                 continue;
             }
 
-            if (currentCell is not null && currentCellType == "inlineStr" && reader.NodeType == XmlNodeType.Element && reader.LocalName == "t")
+            // Inline string segment
+            if (currentCell is not null && currentCellTypeAttr == "inlineStr"
+                && reader.NodeType == XmlNodeType.Element && reader.LocalName == "t")
             {
                 inlineText.Append(reader.ReadElementContentAsString());
                 continue;
@@ -540,15 +564,61 @@ public sealed class XSSFWorkbook : IWorkbook
 
             if (currentCell is not null && reader.NodeType == XmlNodeType.EndElement && reader.LocalName == "c")
             {
-                if (currentCellType == "inlineStr")
+                if (currentCellTypeAttr == "inlineStr")
                 {
-                    currentCell.setCellValue(inlineText.ToString());
+                    if (currentCellIsFormula)
+                        currentCell.SetFormulaWithCachedValue(CellType.String, inlineText.ToString());
+                    else
+                        currentCell.SetValueFromXml(CellType.String, inlineText.ToString());
                 }
 
                 currentCell = null;
-                currentCellType = null;
+                currentCellTypeAttr = null;
+                currentCellIsFormula = false;
+                inFormulaElement = false;
             }
         }
+    }
+
+    /// <summary>
+    /// Maps the raw OOXML t attribute to a CellType.
+    /// Ported from XSSFCell.getBaseCellType() / STCellType constants.
+    /// </summary>
+    private static CellType ParseCellTypeAttr(string? t, string? rawValue)
+    {
+        return t switch
+        {
+            "b"         => CellType.Boolean,
+            "e"         => CellType.Error,
+            "s"         => CellType.String,   // shared string
+            "str"       => CellType.String,   // formula cached string
+            "inlineStr" => CellType.String,   // inline string (handled separately)
+            null or "n" => rawValue is null ? CellType.Blank : CellType.Numeric,
+            _ => CellType.Numeric             // unknown t → treat as numeric
+        };
+    }
+
+    private static void ApplyCellValue(
+        XSSFCell cell, string? cellTypeAttr, bool isFormula,
+        string rawValue, IReadOnlyList<string> sharedStrings)
+    {
+        // Resolve the base cell type from the t attribute
+        // For numeric types: if rawValue is empty/null → Blank (no <v> set)
+        var baseType = ParseCellTypeAttr(cellTypeAttr, rawValue.Length > 0 ? rawValue : null);
+
+        if (baseType == CellType.String && cellTypeAttr == "s")
+        {
+            // Shared string: rawValue is the SST index
+            var idx = int.Parse(rawValue, CultureInfo.InvariantCulture);
+            if ((uint)idx >= (uint)sharedStrings.Count)
+                throw new InvalidDataException($"Shared string index {idx} is outside the table.");
+            rawValue = sharedStrings[idx];
+        }
+
+        if (isFormula)
+            cell.SetFormulaWithCachedValue(baseType, rawValue);
+        else
+            cell.SetValueFromXml(baseType, rawValue);
     }
 
     private void ReadSheetDrawing(ZipArchive archive, string sheetPartName, XSSFSheet sheet)
@@ -894,23 +964,7 @@ public sealed class XSSFWorkbook : IWorkbook
         }
     }
 
-    private static void ApplyCellValue(XSSFCell cell, string? cellType, string valueText, IReadOnlyList<string> sharedStrings)
-    {
-        if (cellType == "s")
-        {
-            var sharedStringIndex = int.Parse(valueText, CultureInfo.InvariantCulture);
-            if ((uint)sharedStringIndex >= (uint)sharedStrings.Count)
-            {
-                throw new InvalidDataException($"Shared string index {sharedStringIndex} is outside the shared string table.");
-            }
-
-            cell.setCellValue(sharedStrings[sharedStringIndex]);
-        }
-        else
-        {
-            cell.setCellValue(double.Parse(valueText, CultureInfo.InvariantCulture));
-        }
-    }
+    // Removed: replaced by the new ApplyCellValue(cell, cellTypeAttr, isFormula, rawValue, sharedStrings) above.
 
     private static int ParseOneBasedAttribute(string? value, int defaultOneBasedValue)
     {
@@ -1387,7 +1441,12 @@ public sealed class XSSFWorkbook : IWorkbook
         {
             foreach (var row in sheet.Rows)
             {
-                count += row.Cells.Count(cell => cell.getCellType() == CellType.String);
+                count += row.Cells.Count(cell =>
+                {
+                    var et = cell.getCellType() == CellType.Formula
+                        ? cell.getCachedFormulaResultType() : cell.getCellType();
+                    return et == CellType.String;
+                });
             }
         }
 
@@ -1441,34 +1500,62 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteAttributeString("r", (row.getRowNum() + 1).ToString(CultureInfo.InvariantCulture));
         foreach (var cell in row.Cells)
         {
-            if (cell.getCellType() == CellType.Blank)
-            {
-                continue;
-            }
+            var effectiveType = cell.getCellType() == CellType.Formula
+                ? cell.getCachedFormulaResultType()
+                : cell.getCellType();
 
+            if (effectiveType == CellType.Blank) continue;
+
+            // POI attribute order: r, t (if not numeric default), s (if non-zero)
+            // Ported from XSSFCell.write() via XMLBeans schema order.
             writer.WriteStartElement("c");
             writer.WriteAttributeString("r", FormatCellReference(cell.getRowIndex(), cell.getColumnIndex()));
+
+            // Write t before s — matches POI/XMLBeans output order
+            var tAttr = effectiveType switch
+            {
+                CellType.String  => "s",
+                CellType.Boolean => "b",
+                CellType.Error   => "e",
+                _                => null   // Numeric: t="n" is the OOXML default, omit it
+            };
+            if (tAttr is not null)
+                writer.WriteAttributeString("t", tAttr);
+
             var styleIndex = cell.getCellStyle().getIndex();
             if (styleIndex != 0)
-            {
                 writer.WriteAttributeString("s", styleIndex.ToString(CultureInfo.InvariantCulture));
-            }
-            if (cell.getCellType() == CellType.String)
+
+            // Write <v> content.
+            // Formula cells are written as their cached value only (no <f>) — Phase 5 adds formula write.
+            switch (effectiveType)
             {
-                writer.WriteAttributeString("t", "s");
+                case CellType.String:
+                    writer.WriteStartElement("v");
+                    writer.WriteString(GetSharedStringIndex(cell.getStringCellValue()).ToString(CultureInfo.InvariantCulture));
+                    writer.WriteEndElement();
+                    break;
+
+                case CellType.Boolean:
+                    writer.WriteStartElement("v");
+                    writer.WriteString(cell.getBooleanCellValue() ? "1" : "0");
+                    writer.WriteEndElement();
+                    break;
+
+                case CellType.Error:
+                    writer.WriteStartElement("v");
+                    writer.WriteString(cell.getErrorCellString());
+                    writer.WriteEndElement();
+                    break;
+
+                default: // Numeric
+                    writer.WriteStartElement("v");
+                    writer.WriteString(cell.GetNumericText());
+                    writer.WriteEndElement();
+                    break;
             }
 
-            writer.WriteStartElement("v");
-            if (cell.getCellType() == CellType.String)
-            {
-                writer.WriteString(GetSharedStringIndex(cell.getStringCellValue()).ToString(CultureInfo.InvariantCulture));
-            }
-            else
-            {
-                writer.WriteString(cell.GetNumericText());
-            }
-            writer.WriteEndElement();
-            writer.WriteEndElement();
+            writer.WriteEndElement(); // </c>
         }
         writer.WriteEndElement();
     }
@@ -1491,10 +1578,9 @@ public sealed class XSSFWorkbook : IWorkbook
             maxRow = Math.Max(maxRow, row.getRowNum());
             foreach (var cell in row.Cells)
             {
-                if (cell.getCellType() == CellType.Blank)
-                {
-                    continue;
-                }
+                var dimType = cell.getCellType() == CellType.Formula
+                    ? cell.getCachedFormulaResultType() : cell.getCellType();
+                if (dimType == CellType.Blank) continue;
 
                 minColumn = Math.Min(minColumn, cell.getColumnIndex());
                 maxColumn = Math.Max(maxColumn, cell.getColumnIndex());
