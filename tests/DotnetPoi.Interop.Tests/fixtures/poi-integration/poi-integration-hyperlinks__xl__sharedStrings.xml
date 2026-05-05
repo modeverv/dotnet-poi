@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sst count="5" uniqueCount="5" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>http://apache.org</t></si><si><t>www.apache.org</t></si><si><t>/temp</t></si><si><t>c:/temp</t></si><si><t>http://apache.org/default.php?s=isTramsformed&amp;submit=Search&amp;la=*&amp;li=*</t></si></sst>
