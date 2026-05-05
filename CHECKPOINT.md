@@ -1,5 +1,86 @@
 # CHECKPOINT
 
+## 2026-05-05 11:xx JST - Phase 7 xlsx fill/border/alignment read
+
+- Current task: xlsx fill/border/alignment 読み取り実装。
+- Scope: コミットしない。
+
+### やったこと
+
+`ICellStyle` にアライメントメソッド10個を追加し、`XSSFCellStyle` / `XSSFWorkbook` / `HSSFCellStyle` に実装。
+
+**ReadStyles の拡張（XSSFWorkbook.cs）:**
+
+- `ReadFills()` — `<fills>` セクションをパース。patternType と fgColor indexed を読み取り、`_fills` リストに `XSSFCellStyle` として格納（index 0/1 は組込 default、それ以降がユーザー定義）。
+- `ReadBorders()` — `<borders>` セクションをパース。left/right/top/bottom 各辺の style 属性を読み取り、`_borders` リストに格納。
+- `ReadCellXfs()` — `fillId` / `borderId` に対応する `_fills[fillId]` / `_borders[borderId]` からプロパティをコピー。`applyFill` / `applyBorder` / `applyAlignment` をパース。`<alignment>` 子要素（horizontal, vertical, wrapText, indent, textRotation）をパース。
+- ヘルパーメソッド追加: `ParseHorizontalAlignment()` / `ParseVerticalAlignment()` / `GetHorizontalAlignmentName()` / `GetVerticalAlignmentName()` / `ParseBorderStyleName()`。
+
+**WriteCellXf の拡張:**
+
+- `applyAlignment` 属性と `<alignment>` 子要素を書き出すようになった（horizontal, vertical, wrapText, indent, textRotation）。
+
+**XSSFCellStyle.cs:**
+
+- `_fillRegistered` / `_borderRegistered` フラグで同じ style が `_fills` / `_borders` に重複登録されるのを防止。
+
+**ICellStyle.cs:**
+
+- アライメントメソッド10個を追加: `getAlignment` / `setAlignment` / `getVerticalAlignment` / `setVerticalAlignment` / `getWrapText` / `setWrapText` / `getIndention` / `setIndention` / `getRotation` / `setRotation`。
+
+**VerticalAlignment enum 新規作成:**
+
+- `DotnetPoi.SS.UserModel.VerticalAlignment` を追加。
+
+**HSSFCellStyle.cs:**
+
+- 新しい ICellStyle メソッド10個のスタブ実装を追加（既存のスタブパターンに従う）。
+
+### 追加テスト（XSSFWorkbookTests.cs）
+
+- `RoundTrip_StyledCell_FillRestored` — SolidForeground + Yellow fill の round-trip。
+- `RoundTrip_StyledCell_BorderRestored` — 4辺に Medium/Dotted/Thick/Dashed を設定。
+- `RoundTrip_StyledCell_AlignmentRestored` — Center/Top/wrapText/indent 1/rotation 45。
+
+### Verification
+
+- `dotnet test tests/DotnetPoi.XSSF.Tests/...` passed (32 tests, 新規3件含む)。
+- 全 `dotnet build` source projects 正常。
+- agents.md の進捗表を `[~]` → `[x]` に更新（fill/border/alignment read）。
+
+## 2026-05-05 10:xx JST - xlsx style round-trip
+
+- Current task: xlsx round-trip スタイル確認テスト追加。
+- Scope: コミットしない。
+
+### 対応状況の整理
+
+`ReadStyles` / `ReadFonts` / `ReadCellXfs` で読み取り済み：
+- Font: 名前・bold・italic・strikeout・underline・size・color（indexed）
+- DataFormat: numFmtId、カスタム format code
+
+読み取り未実装（fill/border/alignment は `ReadCellXfs` が `fillId`/`borderId`/alignment を読まない）：
+→ テストスコープを実装済み範囲に限定し、未対応属性はコメントで明記。
+
+### 追加テスト（XSSFWorkbookTests.cs）
+
+`RoundTrip_StyledCell_FontAndDataFormatRestored`
+- Arial 14pt bold italic red + format "0.00" の style を書いて読み返す
+- フォント名・高さ・bold・italic・indexed color・format code が全て復元される
+
+`RoundTrip_MultipleStyles_EachCellRestoresItsOwnStyle`
+- A1（bold 12pt）と B1（italic + "#,##0.0"）の 2 種スタイルを書いて読み返す
+- 各セルが独立して正しいスタイルを保持する
+
+`RoundTrip_BuiltinDateFormat_DataFormatIndexRestored`
+- 組み込み日付フォーマット（index 14）を書いて読み返す
+- format index が正確に復元される
+
+### Verification
+
+- `dotnet test tests/DotnetPoi.XSSF.Tests/...` passed (29テスト、スタイル round-trip 3件追加)。
+- 全スイート異常なし。
+
 ## 2026-05-05 09:xx JST - docm/pptm interop + XWPF round-trip
 
 - Current task: docm/pptm Java interop, XWPF round-trip テスト追加。

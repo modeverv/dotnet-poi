@@ -68,4 +68,34 @@ public sealed class HSSFCellStyle : ICellStyle
     public void setBorderLeft(BorderStyle border)
     {
     }
+
+    public HorizontalAlignment getAlignment() => HorizontalAlignment.General;
+
+    public void setAlignment(HorizontalAlignment align)
+    {
+    }
+
+    public VerticalAlignment getVerticalAlignment() => VerticalAlignment.Bottom;
+
+    public void setVerticalAlignment(VerticalAlignment align)
+    {
+    }
+
+    public bool getWrapText() => false;
+
+    public void setWrapText(bool wrapped)
+    {
+    }
+
+    public short getIndention() => 0;
+
+    public void setIndention(short indent)
+    {
+    }
+
+    public short getRotation() => 0;
+
+    public void setRotation(short rotation)
+    {
+    }
 }

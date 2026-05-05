@@ -977,6 +977,18 @@ public sealed class XSSFWorkbook : IWorkbook
                 continue;
             }
 
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "fills")
+            {
+                ReadFills(reader);
+                continue;
+            }
+
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "borders")
+            {
+                ReadBorders(reader);
+                continue;
+            }
+
             if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "cellXfs")
             {
                 ReadCellXfs(reader);
@@ -1047,6 +1059,226 @@ public sealed class XSSFWorkbook : IWorkbook
         }
     }
 
+    private void ReadFills(XmlReader reader)
+    {
+        _fills.Clear();
+        // Always add default fills at index 0 and 1 (none and darkGray)
+        _fills.Add(null);
+        _fills.Add(null);
+
+        if (reader.IsEmptyElement)
+        {
+            return;
+        }
+
+        using var subtree = reader.ReadSubtree();
+        var fillIndex = 0;
+        while (subtree.Read())
+        {
+            if (subtree.NodeType != XmlNodeType.Element || subtree.LocalName != "fill")
+            {
+                continue;
+            }
+
+            if (fillIndex < 2)
+            {
+                // Skip built-in default fills
+                fillIndex++;
+                continue;
+            }
+
+            // Read patternFill child
+            FillPatternType pattern = FillPatternType.NoFill;
+            short? fgColor = null;
+
+            if (!subtree.IsEmptyElement)
+            {
+                using var fillSubtree = subtree.ReadSubtree();
+                while (fillSubtree.Read())
+                {
+                    if (fillSubtree.NodeType != XmlNodeType.Element)
+                    {
+                        continue;
+                    }
+
+                    if (fillSubtree.LocalName == "patternFill")
+                    {
+                        var patternAttr = fillSubtree.GetAttribute("patternType");
+                        if (patternAttr is not null)
+                        {
+                            int patternIdx = patternAttr switch
+                            {
+                                "none" => 1,
+                                "solid" => 2,
+                                "mediumGray" => 3,
+                                "darkGray" => 4,
+                                "lightGray" => 5,
+                                "darkHorizontal" => 6,
+                                "darkVertical" => 7,
+                                "darkDown" => 8,
+                                "darkUp" => 9,
+                                "darkGrid" => 10,
+                                "darkTrellis" => 11,
+                                "lightHorizontal" => 12,
+                                "lightVertical" => 13,
+                                "lightDown" => 14,
+                                "lightUp" => 15,
+                                "lightGrid" => 16,
+                                "lightTrellis" => 17,
+                                "gray125" => 18,
+                                "gray0625" => 19,
+                                _ => 1
+                            };
+                            pattern = (FillPatternType)(patternIdx - 1);
+                        }
+
+                        // Read fgColor child
+                        using var patternSubtree = fillSubtree.ReadSubtree();
+                        while (patternSubtree.Read())
+                        {
+                            if (patternSubtree.NodeType == XmlNodeType.Element
+                                && patternSubtree.LocalName == "fgColor")
+                            {
+                                var indexed = patternSubtree.GetAttribute("indexed");
+                                if (indexed is not null
+                                    && short.TryParse(indexed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var c))
+                                {
+                                    fgColor = c;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Store this fill as a reusable style object
+            var fillStyle = new XSSFCellStyle(this, fillIndex);
+            fillStyle.FillPattern = pattern;
+            fillStyle.FillForegroundColor = fgColor;
+            _fills.Add(fillStyle);
+
+            fillIndex++;
+        }
+    }
+
+    private void ReadBorders(XmlReader reader)
+    {
+        _borders.Clear();
+        _borders.Add(null); // index 0: default border (none)
+
+        if (reader.IsEmptyElement)
+        {
+            return;
+        }
+
+        using var subtree = reader.ReadSubtree();
+        var borderIndex = 0;
+        while (subtree.Read())
+        {
+            if (subtree.NodeType != XmlNodeType.Element || subtree.LocalName != "border")
+            {
+                continue;
+            }
+
+            if (borderIndex == 0)
+            {
+                // Skip the first default border (index 0 in XML)
+                borderIndex++;
+                continue;
+            }
+
+            BorderStyle left = BorderStyle.None;
+            BorderStyle right = BorderStyle.None;
+            BorderStyle top = BorderStyle.None;
+            BorderStyle bottom = BorderStyle.None;
+
+            if (!subtree.IsEmptyElement)
+            {
+                using var borderSubtree = subtree.ReadSubtree();
+                while (borderSubtree.Read())
+                {
+                    if (borderSubtree.NodeType != XmlNodeType.Element)
+                    {
+                        continue;
+                    }
+
+                    var styleName = borderSubtree.GetAttribute("style");
+                    var borderStyle = styleName is null
+                        ? BorderStyle.None
+                        : ParseBorderStyleName(styleName);
+
+                    switch (borderSubtree.LocalName)
+                    {
+                        case "left":   left   = borderStyle; break;
+                        case "right":  right  = borderStyle; break;
+                        case "top":    top    = borderStyle; break;
+                        case "bottom": bottom = borderStyle; break;
+                    }
+                }
+            }
+
+            // Store this border as a reusable style object
+            var borderObj = new XSSFCellStyle(this, borderIndex);
+            borderObj.BorderLeft = left;
+            borderObj.BorderRight = right;
+            borderObj.BorderTop = top;
+            borderObj.BorderBottom = bottom;
+            _borders.Add(borderObj);
+
+            borderIndex++;
+        }
+    }
+
+    private static BorderStyle ParseBorderStyleName(string name)
+    {
+        return name switch
+        {
+            "thin"              => BorderStyle.Thin,
+            "medium"            => BorderStyle.Medium,
+            "dashed"            => BorderStyle.Dashed,
+            "dotted"            => BorderStyle.Dotted,
+            "thick"             => BorderStyle.Thick,
+            "double"            => BorderStyle.Double,
+            "hair"              => BorderStyle.Hair,
+            "mediumDashed"      => BorderStyle.MediumDashed,
+            "dashDot"           => BorderStyle.DashDot,
+            "mediumDashDot"     => BorderStyle.MediumDashDot,
+            "dashDotDot"        => BorderStyle.DashDotDot,
+            "mediumDashDotDot"  => BorderStyle.MediumDashDotDot,
+            "slantDashDot"      => BorderStyle.SlantedDashDot,
+            _                   => BorderStyle.None
+        };
+    }
+
+    private static HorizontalAlignment ParseHorizontalAlignment(string name)
+    {
+        return name switch
+        {
+            "general"            => HorizontalAlignment.General,
+            "left"               => HorizontalAlignment.Left,
+            "center"             => HorizontalAlignment.Center,
+            "right"              => HorizontalAlignment.Right,
+            "fill"               => HorizontalAlignment.Fill,
+            "justify"            => HorizontalAlignment.Justify,
+            "centerContinuous"   => HorizontalAlignment.CenterSelection,
+            "distributed"        => HorizontalAlignment.Distributed,
+            _                    => HorizontalAlignment.General
+        };
+    }
+
+    private static VerticalAlignment ParseVerticalAlignment(string name)
+    {
+        return name switch
+        {
+            "bottom"       => VerticalAlignment.Bottom,
+            "center"       => VerticalAlignment.Center,
+            "top"          => VerticalAlignment.Top,
+            "justify"      => VerticalAlignment.Justify,
+            "distributed"  => VerticalAlignment.Distributed,
+            _              => VerticalAlignment.Bottom
+        };
+    }
+
     private void ReadCellXfs(XmlReader reader)
     {
         _cellStyles.Clear();
@@ -1065,14 +1297,100 @@ public sealed class XSSFWorkbook : IWorkbook
             }
 
             var style = new XSSFCellStyle(this, _cellStyles.Count);
+
+            // numFmtId
             if (int.TryParse(subtree.GetAttribute("numFmtId"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var numFmtId))
             {
                 style.setDataFormat(numFmtId);
             }
 
+            // fontId
             if (int.TryParse(subtree.GetAttribute("fontId"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var fontId) && fontId != 0)
             {
                 style.setFont(getFontAt(fontId));
+            }
+
+            // fillId — copy fill properties from the fills table
+            if (int.TryParse(subtree.GetAttribute("fillId"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var fillId))
+            {
+                style.FillId = fillId;
+                if (fillId >= 0 && fillId < _fills.Count && _fills[fillId] is XSSFCellStyle srcFill)
+                {
+                    style.FillPattern = srcFill.FillPattern;
+                    style.FillForegroundColor = srcFill.FillForegroundColor;
+                }
+            }
+            style.ApplyFill = ParseBooleanAttribute(subtree.GetAttribute("applyFill"), defaultValue: true);
+
+            // borderId — copy border properties from the borders table
+            if (int.TryParse(subtree.GetAttribute("borderId"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var borderId))
+            {
+                style.BorderId = borderId;
+                if (borderId >= 0 && borderId < _borders.Count && _borders[borderId] is XSSFCellStyle srcBorder)
+                {
+                    style.BorderLeft = srcBorder.BorderLeft;
+                    style.BorderRight = srcBorder.BorderRight;
+                    style.BorderTop = srcBorder.BorderTop;
+                    style.BorderBottom = srcBorder.BorderBottom;
+                    style.ApplyBorder = true;
+                }
+            }
+            if (!style.ApplyBorder)
+            {
+                // Also check the explicit attribute
+                style.ApplyBorder = ParseBooleanAttribute(subtree.GetAttribute("applyBorder"), defaultValue: true);
+            }
+
+            // applyAlignment flag
+            style.ApplyAlignment = ParseBooleanAttribute(subtree.GetAttribute("applyAlignment"), defaultValue: false);
+
+            // Read alignment element from inside the xf
+            if (!subtree.IsEmptyElement)
+            {
+                using var xfSubtree = subtree.ReadSubtree();
+                while (xfSubtree.Read())
+                {
+                    if (xfSubtree.NodeType != XmlNodeType.Element || xfSubtree.LocalName != "alignment")
+                    {
+                        continue;
+                    }
+
+                    var hAttr = xfSubtree.GetAttribute("horizontal");
+                    if (hAttr is not null)
+                    {
+                        style.AlignmentValue = ParseHorizontalAlignment(hAttr);
+                        style.ApplyAlignment = true;
+                    }
+
+                    var vAttr = xfSubtree.GetAttribute("vertical");
+                    if (vAttr is not null)
+                    {
+                        style.VerticalAlignmentValue = ParseVerticalAlignment(vAttr);
+                        style.ApplyAlignment = true;
+                    }
+
+                    style.WrapTextEnabled = ParseBooleanAttribute(xfSubtree.GetAttribute("wrapText"), defaultValue: false);
+                    if (style.WrapTextEnabled)
+                    {
+                        style.ApplyAlignment = true;
+                    }
+
+                    var indentAttr = xfSubtree.GetAttribute("indent");
+                    if (indentAttr is not null
+                        && short.TryParse(indentAttr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var indent))
+                    {
+                        style.IndentLevel = indent;
+                        style.ApplyAlignment = true;
+                    }
+
+                    var rotationAttr = xfSubtree.GetAttribute("textRotation");
+                    if (rotationAttr is not null
+                        && short.TryParse(rotationAttr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rotation))
+                    {
+                        style.TextRotation = rotation;
+                        style.ApplyAlignment = true;
+                    }
+                }
             }
 
             _cellStyles.Add(style);
@@ -1083,8 +1401,6 @@ public sealed class XSSFWorkbook : IWorkbook
             _cellStyles.Add(new XSSFCellStyle(this, 0));
         }
     }
-
-    // Removed: replaced by the new ApplyCellValue(cell, cellTypeAttr, isFormula, rawValue, sharedStrings) above.
 
     private static int ParseOneBasedAttribute(string? value, int defaultOneBasedValue)
     {
@@ -1399,6 +1715,35 @@ public sealed class XSSFWorkbook : IWorkbook
         if (style.ApplyBorder)
         {
             writer.WriteAttributeString("applyBorder", "true");
+        }
+        if (style.ApplyAlignment)
+        {
+            writer.WriteAttributeString("applyAlignment", "true");
+        }
+        if (style.ApplyAlignment)
+        {
+            writer.WriteStartElement("alignment");
+            if (style.AlignmentValue != HorizontalAlignment.General)
+            {
+                writer.WriteAttributeString("horizontal", GetHorizontalAlignmentName(style.AlignmentValue));
+            }
+            if (style.VerticalAlignmentValue != VerticalAlignment.Bottom)
+            {
+                writer.WriteAttributeString("vertical", GetVerticalAlignmentName(style.VerticalAlignmentValue));
+            }
+            if (style.WrapTextEnabled)
+            {
+                writer.WriteAttributeString("wrapText", "true");
+            }
+            if (style.IndentLevel != 0)
+            {
+                writer.WriteAttributeString("indent", style.IndentLevel.ToString(CultureInfo.InvariantCulture));
+            }
+            if (style.TextRotation != 0)
+            {
+                writer.WriteAttributeString("textRotation", style.TextRotation.ToString(CultureInfo.InvariantCulture));
+            }
+            writer.WriteEndElement();
         }
         writer.WriteEndElement();
     }
@@ -1800,6 +2145,35 @@ public sealed class XSSFWorkbook : IWorkbook
             FillPatternType.LessDots => "gray125",
             FillPatternType.LeastDots => "gray0625",
             _ => "none"
+        };
+    }
+
+    private static string GetHorizontalAlignmentName(HorizontalAlignment alignment)
+    {
+        return alignment switch
+        {
+            HorizontalAlignment.General        => "general",
+            HorizontalAlignment.Left           => "left",
+            HorizontalAlignment.Center         => "center",
+            HorizontalAlignment.Right          => "right",
+            HorizontalAlignment.Fill           => "fill",
+            HorizontalAlignment.Justify        => "justify",
+            HorizontalAlignment.CenterSelection => "centerContinuous",
+            HorizontalAlignment.Distributed    => "distributed",
+            _                                  => "general"
+        };
+    }
+
+    private static string GetVerticalAlignmentName(VerticalAlignment alignment)
+    {
+        return alignment switch
+        {
+            VerticalAlignment.Bottom       => "bottom",
+            VerticalAlignment.Center       => "center",
+            VerticalAlignment.Top          => "top",
+            VerticalAlignment.Justify      => "justify",
+            VerticalAlignment.Distributed  => "distributed",
+            _                              => "bottom"
         };
     }
 

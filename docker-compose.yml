@@ -5,7 +5,6 @@ services:
       dockerfile: Dockerfile.devbox
     container_name: deepseek-devbox
     working_dir: /workspace
-    command: ["bash", "-lc", "sleep infinity"]
     user: "1000:1000"
     stdin_open: true
     tty: true
@@ -45,6 +44,24 @@ services:
       - sandbox_net
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    command:
+      - bash
+      - -lc
+      - |
+        mkdir -p /home/dev/.deepcode
+        if [ ! -f /home/dev/.deepcode/settings.json ]; then
+          cat > /home/dev/.deepcode/settings.json <<EOF
+        {
+          "env": {
+            "MODEL": "${DEEPSEEK_MODEL:-deepseek-reasoner}",
+            "BASE_URL": "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}",
+            "API_KEY": "${DEEPSEEK_API_KEY}"
+          },
+          "thinkingEnabled": true
+        }
+        EOF
+        fi
+        sleep infinity       
 
 networks:
   sandbox_net:

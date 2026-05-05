@@ -5,6 +5,8 @@ namespace DotnetPoi.XSSF.UserModel;
 public sealed class XSSFCellStyle : ICellStyle
 {
     private readonly XSSFWorkbook _workbook;
+    private bool _fillRegistered;
+    private bool _borderRegistered;
 
     internal XSSFCellStyle(XSSFWorkbook workbook, int index)
     {
@@ -14,33 +16,45 @@ public sealed class XSSFCellStyle : ICellStyle
 
     internal int Index { get; }
 
-    internal int FontId { get; private set; }
+    internal int FontId { get; set; }
 
-    internal int NumFmtId { get; private set; }
+    internal int NumFmtId { get; set; }
 
-    internal int FillId { get; private set; }
+    internal int FillId { get; set; }
 
-    internal int BorderId { get; private set; }
+    internal int BorderId { get; set; }
 
-    internal bool ApplyFont { get; private set; }
+    internal bool ApplyFont { get; set; }
 
-    internal bool ApplyNumberFormat { get; private set; }
+    internal bool ApplyNumberFormat { get; set; }
 
-    internal bool ApplyFill { get; private set; }
+    internal bool ApplyFill { get; set; }
 
-    internal bool ApplyBorder { get; private set; }
+    internal bool ApplyBorder { get; set; }
 
-    internal short? FillForegroundColor { get; private set; }
+    internal bool ApplyAlignment { get; set; }
 
-    internal FillPatternType FillPattern { get; private set; } = FillPatternType.NoFill;
+    internal short? FillForegroundColor { get; set; }
 
-    internal BorderStyle BorderTop { get; private set; }
+    internal FillPatternType FillPattern { get; set; } = FillPatternType.NoFill;
 
-    internal BorderStyle BorderRight { get; private set; }
+    internal BorderStyle BorderTop { get; set; }
 
-    internal BorderStyle BorderBottom { get; private set; }
+    internal BorderStyle BorderRight { get; set; }
 
-    internal BorderStyle BorderLeft { get; private set; }
+    internal BorderStyle BorderBottom { get; set; }
+
+    internal BorderStyle BorderLeft { get; set; }
+
+    internal HorizontalAlignment AlignmentValue { get; set; } = HorizontalAlignment.General;
+
+    internal VerticalAlignment VerticalAlignmentValue { get; set; } = VerticalAlignment.Bottom;
+
+    internal bool WrapTextEnabled { get; set; }
+
+    internal short IndentLevel { get; set; }
+
+    internal short TextRotation { get; set; }
 
     internal XSSFWorkbook Workbook => _workbook;
 
@@ -102,7 +116,8 @@ public sealed class XSSFCellStyle : ICellStyle
     public void setFillForegroundColor(short fg)
     {
         FillForegroundColor = fg;
-        RegisterFill();
+        ApplyFill = true;
+        if (!_fillRegistered) { FillId = _workbook.GetOrAddFill(this); _fillRegistered = true; }
     }
 
     public short getFillForegroundColor()
@@ -113,7 +128,8 @@ public sealed class XSSFCellStyle : ICellStyle
     public void setFillPattern(FillPatternType pattern)
     {
         FillPattern = pattern;
-        RegisterFill();
+        ApplyFill = true;
+        if (!_fillRegistered) { FillId = _workbook.GetOrAddFill(this); _fillRegistered = true; }
     }
 
     public FillPatternType getFillPattern()
@@ -124,64 +140,105 @@ public sealed class XSSFCellStyle : ICellStyle
     public void setBorderTop(BorderStyle border)
     {
         BorderTop = border;
-        RegisterBorder();
+        ApplyBorder = true;
+        if (!_borderRegistered) { BorderId = _workbook.GetOrAddBorder(this); _borderRegistered = true; }
     }
 
     public BorderStyle getBorderTop()
     {
-        return BorderTop;
+        return ApplyBorder ? BorderTop : BorderStyle.None;
     }
 
     public void setBorderRight(BorderStyle border)
     {
         BorderRight = border;
-        RegisterBorder();
+        ApplyBorder = true;
+        if (!_borderRegistered) { BorderId = _workbook.GetOrAddBorder(this); _borderRegistered = true; }
     }
 
     public BorderStyle getBorderRight()
     {
-        return BorderRight;
+        return ApplyBorder ? BorderRight : BorderStyle.None;
     }
 
     public void setBorderBottom(BorderStyle border)
     {
         BorderBottom = border;
-        RegisterBorder();
+        ApplyBorder = true;
+        if (!_borderRegistered) { BorderId = _workbook.GetOrAddBorder(this); _borderRegistered = true; }
     }
 
     public BorderStyle getBorderBottom()
     {
-        return BorderBottom;
+        return ApplyBorder ? BorderBottom : BorderStyle.None;
     }
 
     public void setBorderLeft(BorderStyle border)
     {
         BorderLeft = border;
-        RegisterBorder();
+        ApplyBorder = true;
+        if (!_borderRegistered) { BorderId = _workbook.GetOrAddBorder(this); _borderRegistered = true; }
     }
 
     public BorderStyle getBorderLeft()
     {
-        return BorderLeft;
+        return ApplyBorder ? BorderLeft : BorderStyle.None;
+    }
+
+    public HorizontalAlignment getAlignment()
+    {
+        return ApplyAlignment ? AlignmentValue : HorizontalAlignment.General;
+    }
+
+    public void setAlignment(HorizontalAlignment align)
+    {
+        AlignmentValue = align;
+        ApplyAlignment = true;
+    }
+
+    public VerticalAlignment getVerticalAlignment()
+    {
+        return ApplyAlignment ? VerticalAlignmentValue : VerticalAlignment.Bottom;
+    }
+
+    public void setVerticalAlignment(VerticalAlignment align)
+    {
+        VerticalAlignmentValue = align;
+        ApplyAlignment = true;
+    }
+
+    public bool getWrapText()
+    {
+        return ApplyAlignment && WrapTextEnabled;
+    }
+
+    public void setWrapText(bool wrapped)
+    {
+        WrapTextEnabled = wrapped;
+        ApplyAlignment = true;
+    }
+
+    public short getIndention()
+    {
+        return IndentLevel;
+    }
+
+    public void setIndention(short indent)
+    {
+        IndentLevel = indent;
+        ApplyAlignment = true;
+    }
+
+    public short getRotation()
+    {
+        return TextRotation;
+    }
+
+    public void setRotation(short rotation)
+    {
+        TextRotation = rotation;
+        ApplyAlignment = true;
     }
 
     IFont ICellStyle.getFont() => getFont();
-
-    private void RegisterFill()
-    {
-        if (FillId == 0)
-        {
-            FillId = _workbook.GetOrAddFill(this);
-        }
-        ApplyFill = true;
-    }
-
-    private void RegisterBorder()
-    {
-        if (BorderId == 0)
-        {
-            BorderId = _workbook.GetOrAddBorder(this);
-        }
-        ApplyBorder = true;
-    }
 }

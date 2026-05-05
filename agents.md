@@ -292,7 +292,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 
 | step | format | progress | notes |
 |---|---|---|---|
-| 1 | xlsx/XSSF | ~30% | basic value/formula round-trip ✅; styles/layout/drawing partial; no formula evaluation |
+| 1 | xlsx/XSSF | ~40% | basic value/formula round-trip ✅; styles partial (font/dataFormat/fill/border/alignment read/write ✅); layout/drawing partial; no formula evaluation |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
 | 3 | docx/XWPF | ~15% | paragraph/run/image write ✅; round-trip not tested |
 | 4 | pptx/XSLF | ~15% | slide/image/rotation write ✅; round-trip not tested |
@@ -306,7 +306,7 @@ Do not add these as fixture-specific constants — only fix when a concrete inte
 
 #### step 1 xlsx / XSSF
 
-- [~] Round-trip: write xlsx → read back → assert cell values, types, and styles are identical. *(values/formulas done; styles not round-tripped)*
+- [x] Round-trip: write xlsx → read back → assert cell values, types, and styles are identical. *(values/formulas/font/dataFormat/fill/border/alignment read/write done)*
 - [x] Interop A: Java POI writes xlsx → dotnet-poi reads → assert values match.
 - [x] Interop B: dotnet-poi writes xlsx → Java POI reads → assert values match.
 - [ ] Style parity: fonts, fills, borders, number formats, alignment, protection, row/column styles.
@@ -827,7 +827,7 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 
 #### step 1 xlsx / XSSF
 
-- [~] ラウンドトリップ: xlsx を書いて読み返し、セルの値・型・スタイルが同一であることを確認する。*(値・数式は完了、スタイルは未)*
+- [x] ラウンドトリップ: xlsx を書いて読み返し、セルの値・型・スタイルが同一であることを確認する。*(値・数式・フォント・数値書式・fill/border/alignment の読み書き完了)*
 - [x] Interop A: Java POI が xlsx を書く → dotnet-poi が読む → 値の一致を確認する。
 - [x] Interop B: dotnet-poi が xlsx を書く → Java POI が読む → 値の一致を確認する。
 - [ ] スタイルパリティ: font、fill、border、number format、alignment、protection、row/column style。

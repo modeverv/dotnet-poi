@@ -304,6 +304,197 @@ public class XSSFWorkbookTests
         Assert.Contains("<xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"true\"/>", stylesXml);
     }
 
+    // ── Style round-trip ─────────────────────────────────────────────────
+
+    /// Font attributes (name, bold, italic, height, indexed color) and data format
+    /// survive write → read.
+    [Fact]
+    public void RoundTrip_StyledCell_FontAndDataFormatRestored()
+    {
+        using var original = new XSSFWorkbook();
+        var font = original.createFont();
+        font.setFontName("Arial");
+        font.setFontHeightInPoints(14);
+        font.setBold(true);
+        font.setItalic(true);
+        font.setColor((short)IndexedColors.Red);
+
+        var style = original.createCellStyle();
+        style.setFont(font);
+        style.setDataFormat(original.createDataFormat().getFormat("0.00"));
+
+        var cell = original.createSheet("Styles").createRow(0).createCell(0);
+        cell.setCellValue(123.456);
+        cell.setCellStyle(style);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+
+        var loadedCell = loaded.getSheet("Styles")!.getRow(0)!.getCell(0)!;
+        Assert.Equal(123.456, loadedCell.getNumericCellValue());
+
+        var loadedStyle = loadedCell.getCellStyle();
+        Assert.Equal("0.00", loadedStyle.getDataFormatString());
+
+        var loadedFont = loadedStyle.getFont();
+        Assert.Equal("Arial", loadedFont.getFontName());
+        Assert.Equal(14, loadedFont.getFontHeightInPoints());
+        Assert.True(loadedFont.getBold());
+        Assert.True(loadedFont.getItalic());
+        Assert.Equal((short)IndexedColors.Red, loadedFont.getColor());
+    }
+
+    [Fact]
+    public void RoundTrip_MultipleStyles_EachCellRestoresItsOwnStyle()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("MultiStyle");
+
+        // Cell A1: bold, font size 12
+        var fontBold = original.createFont();
+        fontBold.setBold(true);
+        fontBold.setFontHeightInPoints(12);
+        var styleBold = original.createCellStyle();
+        styleBold.setFont(fontBold);
+        var cellA1 = sheet.createRow(0).createCell(0);
+        cellA1.setCellValue("bold");
+        cellA1.setCellStyle(styleBold);
+
+        // Cell B1: italic, custom number format
+        var fontItalic = original.createFont();
+        fontItalic.setItalic(true);
+        var styleItalic = original.createCellStyle();
+        styleItalic.setFont(fontItalic);
+        styleItalic.setDataFormat(original.createDataFormat().getFormat("#,##0.0"));
+        var cellB1 = sheet.getRow(0)!.createCell(1);
+        cellB1.setCellValue(9999.5);
+        cellB1.setCellStyle(styleItalic);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("MultiStyle")!;
+
+        var la1 = loadedSheet.getRow(0)!.getCell(0)!;
+        Assert.Equal("bold", la1.getStringCellValue());
+        Assert.True(la1.getCellStyle().getFont().getBold());
+        Assert.Equal(12, la1.getCellStyle().getFont().getFontHeightInPoints());
+        Assert.False(la1.getCellStyle().getFont().getItalic());
+
+        var lb1 = loadedSheet.getRow(0)!.getCell(1)!;
+        Assert.Equal(9999.5, lb1.getNumericCellValue());
+        Assert.False(lb1.getCellStyle().getFont().getBold());
+        Assert.True(lb1.getCellStyle().getFont().getItalic());
+        Assert.Equal("#,##0.0", lb1.getCellStyle().getDataFormatString());
+    }
+
+    [Fact]
+    public void RoundTrip_BuiltinDateFormat_DataFormatIndexRestored()
+    {
+        // Format index 14 is the built-in "m/d/yy" date format in OOXML.
+        const short dateFormatIndex = 14;
+
+        using var original = new XSSFWorkbook();
+        var style = original.createCellStyle();
+        style.setDataFormat(dateFormatIndex);
+        var cell = original.createSheet("Date").createRow(0).createCell(0);
+        cell.setCellValue(45678.0); // an Excel date serial number
+        cell.setCellStyle(style);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedCell = loaded.getSheet("Date")!.getRow(0)!.getCell(0)!;
+
+        Assert.Equal(dateFormatIndex, loadedCell.getCellStyle().getDataFormat());
+    }
+
+    [Fact]
+    public void RoundTrip_StyledCell_FillRestored()
+    {
+        using var original = new XSSFWorkbook();
+        var style = original.createCellStyle();
+        style.setFillForegroundColor((short)IndexedColors.Yellow);
+        style.setFillPattern(FillPatternType.SolidForeground);
+
+        var cell = original.createSheet("Fill").createRow(0).createCell(0);
+        cell.setCellValue(42.0);
+        cell.setCellStyle(style);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedCell = loaded.getSheet("Fill")!.getRow(0)!.getCell(0)!;
+        var loadedStyle = loadedCell.getCellStyle();
+        Assert.Equal((short)IndexedColors.Yellow, loadedStyle.getFillForegroundColor());
+        Assert.Equal(FillPatternType.SolidForeground, loadedStyle.getFillPattern());
+    }
+
+    [Fact]
+    public void RoundTrip_StyledCell_BorderRestored()
+    {
+        using var original = new XSSFWorkbook();
+        var style = original.createCellStyle();
+        style.setBorderTop(BorderStyle.Medium);
+        style.setBorderRight(BorderStyle.Dotted);
+        style.setBorderBottom(BorderStyle.Thick);
+        style.setBorderLeft(BorderStyle.Dashed);
+
+        var cell = original.createSheet("Border").createRow(0).createCell(0);
+        cell.setCellValue(42.0);
+        cell.setCellStyle(style);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedCell = loaded.getSheet("Border")!.getRow(0)!.getCell(0)!;
+        var loadedStyle = loadedCell.getCellStyle();
+        Assert.Equal(BorderStyle.Medium, loadedStyle.getBorderTop());
+        Assert.Equal(BorderStyle.Dotted, loadedStyle.getBorderRight());
+        Assert.Equal(BorderStyle.Thick, loadedStyle.getBorderBottom());
+        Assert.Equal(BorderStyle.Dashed, loadedStyle.getBorderLeft());
+    }
+
+    [Fact]
+    public void RoundTrip_StyledCell_AlignmentRestored()
+    {
+        using var original = new XSSFWorkbook();
+        var style = original.createCellStyle();
+        style.setAlignment(HorizontalAlignment.Center);
+        style.setVerticalAlignment(VerticalAlignment.Top);
+        style.setWrapText(true);
+        style.setIndention(1);
+        style.setRotation(45);
+
+        var cell = original.createSheet("Align").createRow(0).createCell(0);
+        cell.setCellValue("aligned");
+        cell.setCellStyle(style);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedCell = loaded.getSheet("Align")!.getRow(0)!.getCell(0)!;
+        var loadedStyle = loadedCell.getCellStyle();
+        Assert.Equal(HorizontalAlignment.Center, loadedStyle.getAlignment());
+        Assert.Equal(VerticalAlignment.Top, loadedStyle.getVerticalAlignment());
+        Assert.True(loadedStyle.getWrapText());
+        Assert.Equal((short)1, loadedStyle.getIndention());
+        Assert.Equal((short)45, loadedStyle.getRotation());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

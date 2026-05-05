@@ -20,4 +20,14 @@ public interface ICellStyle
     void setBorderBottom(BorderStyle border);
     BorderStyle getBorderLeft();
     void setBorderLeft(BorderStyle border);
+    HorizontalAlignment getAlignment();
+    void setAlignment(HorizontalAlignment align);
+    VerticalAlignment getVerticalAlignment();
+    void setVerticalAlignment(VerticalAlignment align);
+    bool getWrapText();
+    void setWrapText(bool wrapped);
+    short getIndention();
+    void setIndention(short indent);
+    short getRotation();
+    void setRotation(short rotation);
 }
