@@ -122,6 +122,9 @@ public sealed class XMLSlideShow : IDisposable
     // pptm support: opaque VBA binary preserved byte-for-byte.
     private byte[]? _vbaProjectBin;
 
+    // Unknown-part preservation: non-model ZIP entries stored verbatim during Load and re-emitted during write.
+    private Dictionary<string, byte[]> _preservedEntries = new(StringComparer.OrdinalIgnoreCase);
+
     public XMLSlideShow() { }
 
     public XMLSlideShow(Stream stream)
@@ -181,6 +184,10 @@ public sealed class XMLSlideShow : IDisposable
     {
         ArgumentNullException.ThrowIfNull(stream);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+
+        // Emit preserved (non-model) entries first, so model entries overwrite them
+        foreach (var kv in _preservedEntries)
+            WriteBinaryEntry(archive, kv.Key, kv.Value);
 
         WriteEntry(archive, "[Content_Types].xml",                           WriteContentTypes);
         WriteEntry(archive, "_rels/.rels",                                   WriteRootRelationships);
@@ -443,6 +450,9 @@ public sealed class XMLSlideShow : IDisposable
         foreach (var autoShape in slide.getAutoShapes())
             WriteAutoShape(w, autoShape);
 
+        foreach (var table in slide.getTables())
+            WriteTableGraphicFrame(w, table);
+
         w.WriteEndElement(); // p:spTree
         w.WriteEndElement(); // p:cSld
 
@@ -580,6 +590,116 @@ public sealed class XMLSlideShow : IDisposable
         w.WriteEndElement(); // txBody
 
         w.WriteEndElement(); // p:sp
+    }
+
+    private static void WriteTableGraphicFrame(PoiXmlWriter w, XSLFTable table)
+    {
+        var id = table.ShapeId.ToString(CultureInfo.InvariantCulture);
+
+        w.WriteStartElement("p", "graphicFrame");
+
+        w.WriteStartElement("p", "nvGraphicFramePr");
+        w.WriteStartElement("p", "cNvPr");
+        w.WriteAttributeString("id", id);
+        w.WriteAttributeString("name", $"Table {id}");
+        w.WriteEndElement();
+        w.WriteStartElement("p", "cNvGraphicFramePr");
+        w.WriteAttributeString("bwMode", "auto");
+        w.WriteEndElement();
+        w.WriteStartElement("p", "nvPr");
+        w.WriteEndElement();
+        w.WriteEndElement(); // nvGraphicFramePr
+
+        w.WriteStartElement("p", "xfrm");
+        WriteAOff(w, table.AnchorX, table.AnchorY);
+        WriteAExt(w, table.AnchorCx, table.AnchorCy);
+        w.WriteEndElement(); // xfrm
+
+        w.WriteStartElement("a", "graphic");
+        w.WriteAttributeString("xmlns:a", NsA);
+        w.WriteStartElement("a", "graphicData");
+        w.WriteAttributeString("uri", "http://schemas.openxmlformats.org/drawingml/2006/table");
+
+        w.WriteStartElement("a", "tbl");
+        w.WriteStartElement("a", "tblPr");
+        w.WriteEndElement(); // tblPr
+
+        w.WriteStartElement("a", "tblGrid");
+        foreach (var gridCol in table.GridColWidths)
+        {
+            w.WriteStartElement("a", "gridCol");
+            w.WriteAttributeString("w", gridCol!.ToString(CultureInfo.InvariantCulture));
+            w.WriteEndElement();
+        }
+        w.WriteEndElement(); // tblGrid
+
+        foreach (var row in table.Rows)
+        {
+            w.WriteStartElement("a", "tr");
+            foreach (var cell in row.Cells)
+            {
+                w.WriteStartElement("a", "tc");
+                w.WriteStartElement("a", "txBody");
+                w.WriteStartElement("a", "bodyPr");
+                w.WriteAttributeString("wrap", "square");
+                w.WriteEndElement();
+                w.WriteStartElement("a", "lstStyle");
+                w.WriteEndElement();
+                foreach (var para in cell.Paragraphs)
+                {
+                    w.WriteStartElement("a", "p");
+                    foreach (var run in para.Runs)
+                    {
+                        w.WriteStartElement("a", "r");
+                        bool hasFormatting = run.Bold || run.Italic || run.Underline || run.Strikethrough
+                            || run.FontSize > 0 || run.FontName is not null || run.Color is not null;
+                        if (hasFormatting)
+                        {
+                            w.WriteStartElement("a", "rPr");
+                            if (run.Bold)        { w.WriteStartElement("a", "b"); w.WriteEndElement(); }
+                            if (run.Italic)      { w.WriteStartElement("a", "i"); w.WriteEndElement(); }
+                            if (run.Underline)   { w.WriteStartElement("a", "u"); w.WriteEndElement(); }
+                            if (run.Strikethrough) { w.WriteStartElement("a", "strike"); w.WriteEndElement(); }
+                            if (run.FontSize > 0)
+                            {
+                                w.WriteStartElement("a", "sz");
+                                w.WriteAttributeString("val", ((int)(run.FontSize * 100)).ToString(CultureInfo.InvariantCulture));
+                                w.WriteEndElement();
+                            }
+                            if (run.FontName is not null)
+                            {
+                                w.WriteStartElement("a", "latin");
+                                w.WriteAttributeString("typeface", run.FontName);
+                                w.WriteEndElement();
+                            }
+                            if (run.Color is not null)
+                            {
+                                w.WriteStartElement("a", "solidFill");
+                                w.WriteStartElement("a", "srgbClr");
+                                w.WriteAttributeString("val", run.Color);
+                                w.WriteEndElement();
+                                w.WriteEndElement();
+                            }
+                            w.WriteEndElement(); // rPr
+                        }
+                        w.WriteStartElement("a", "t");
+                        if (run.Text is not null)
+                            w.WriteString(run.Text);
+                        w.WriteEndElement(); // t
+                        w.WriteEndElement(); // r
+                    }
+                    w.WriteEndElement(); // p
+                }
+                w.WriteEndElement(); // txBody
+                w.WriteEndElement(); // tc
+            }
+            w.WriteEndElement(); // tr
+        }
+
+        w.WriteEndElement(); // tbl
+        w.WriteEndElement(); // graphicData
+        w.WriteEndElement(); // graphic
+        w.WriteEndElement(); // p:graphicFrame
     }
 
     private static void WriteSlideRels(PoiXmlWriter w, XSLFSlide slide)
@@ -730,6 +850,53 @@ public sealed class XMLSlideShow : IDisposable
             s.CopyTo(ms);
             if (ms.Length > 0) _vbaProjectBin = ms.ToArray();
         }
+
+        // Collect non-model ZIP entries for unknown-part preservation
+        // Must be after _slides is populated so GetModelEntryNames() is accurate
+        CollectPreservedEntries(archive);
+    }
+
+    private void CollectPreservedEntries(ZipArchive archive)
+    {
+        _preservedEntries.Clear();
+        var known = GetModelEntryNames();
+        foreach (var entry in archive.Entries)
+        {
+            var name = entry.FullName.Replace('\\', '/');
+            // Known model entries are NOT preserved (they get re-written)
+            if (known.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
+            // Media entries are re-written from _pictures list
+            if (name.StartsWith("ppt/media/", StringComparison.OrdinalIgnoreCase)) continue;
+            using var s = entry.Open();
+            using var ms = new MemoryStream();
+            s.CopyTo(ms);
+            _preservedEntries[name] = ms.ToArray();
+        }
+    }
+
+    private HashSet<string> GetModelEntryNames()
+    {
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "[Content_Types].xml",
+            "_rels/.rels",
+            "ppt/presentation.xml",
+            "ppt/_rels/presentation.xml.rels",
+            "ppt/presProps.xml",
+            "ppt/tableStyles.xml",
+            "ppt/theme/theme1.xml",
+            "ppt/slideMasters/slideMaster1.xml",
+            "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+            "ppt/slideLayouts/slideLayout1.xml",
+            "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+        };
+        // Model-written slides
+        for (int i = 1; i <= _slides.Count; i++)
+        {
+            known.Add($"ppt/slides/slide{i}.xml");
+            known.Add($"ppt/slides/_rels/slide{i}.xml.rels");
+        }
+        return known;
     }
 
     private static Dictionary<string, byte[]> LoadMedia(ZipArchive archive)
@@ -855,6 +1022,19 @@ public sealed class XMLSlideShow : IDisposable
         XSLFAutoShape? currentAutoShape = null;
         XSLFTextParagraph? currentParagraph = null;
         XSLFTextRun? currentRun = null;
+
+        // Table (p:graphicFrame) state
+        bool inGraphicFrame = false;
+        bool inTbl = false;
+        bool tableInAP = false;
+        bool tableInAR = false;
+        bool tableInARPr = false;
+        XSLFTable? currentTable = null;
+        XSLFTableRow? currentRow = null;
+        XSLFTableCell? currentCell = null;
+        XSLFTextParagraph? tableCurrentParagraph = null;
+        XSLFTextRun? tableCurrentRun = null;
+        long tableX = 0, tableY = 0, tableCx = 0, tableCy = 0;
 
         while (reader.Read())
         {
@@ -984,6 +1164,125 @@ public sealed class XMLSlideShow : IDisposable
                         continue;
                     }
                 }
+
+                // --- table (p:graphicFrame) elements ---
+                if (reader.NamespaceURI == NsP && reader.LocalName == "graphicFrame")
+                {
+                    inGraphicFrame = true;
+                    inTbl = false; tableInAP = false; tableInAR = false; tableInARPr = false;
+                    currentTable = new XSLFTable(0);
+                    currentRow = null; currentCell = null;
+                    tableCurrentParagraph = null; tableCurrentRun = null;
+                    tableX = tableY = tableCx = tableCy = 0;
+                    continue;
+                }
+                if (inGraphicFrame)
+                {
+                    if (reader.NamespaceURI == NsP && reader.LocalName == "cNvPr" && !inTbl)
+                    {
+                        if (int.TryParse(reader.GetAttribute("id"), out var sid))
+                            currentTable = new XSLFTable(sid);
+                        continue;
+                    }
+                    if (reader.NamespaceURI == NsA && reader.LocalName == "off")
+                    {
+                        if (long.TryParse(reader.GetAttribute("x"), out var ox)) tableX = ox;
+                        if (long.TryParse(reader.GetAttribute("y"), out var oy)) tableY = oy;
+                        continue;
+                    }
+                    if (reader.NamespaceURI == NsA && reader.LocalName == "ext" && !inTbl)
+                    {
+                        if (long.TryParse(reader.GetAttribute("cx"), out var ecx)) tableCx = ecx;
+                        if (long.TryParse(reader.GetAttribute("cy"), out var ecy)) tableCy = ecy;
+                        continue;
+                    }
+                    if (reader.NamespaceURI == NsA && reader.LocalName == "tbl")
+                    {
+                        inTbl = true;
+                        continue;
+                    }
+                    if (inTbl)
+                    {
+                        if (reader.NamespaceURI == NsA && reader.LocalName == "gridCol")
+                        {
+                            var wAttr = reader.GetAttribute("w");
+                            if (wAttr is not null && long.TryParse(wAttr, out var w))
+                                currentTable?.addGridCol(w);
+                            continue;
+                        }
+                        if (reader.NamespaceURI == NsA && reader.LocalName == "tr")
+                        {
+                            currentRow = new XSLFTableRow();
+                            continue;
+                        }
+                        if (reader.NamespaceURI == NsA && reader.LocalName == "tc")
+                        {
+                            currentCell = new XSLFTableCell();
+                            tableInAP = false; tableInAR = false; tableInARPr = false;
+                            tableCurrentParagraph = null; tableCurrentRun = null;
+                            continue;
+                        }
+                        if (reader.NamespaceURI == NsA && reader.LocalName == "txBody")
+                        {
+                            // enter cell text body (same structure as auto shape txBody)
+                            continue;
+                        }
+                        // Cell text paragraphs / runs (same as auto shape but with table context)
+                        if (reader.NamespaceURI == NsA && reader.LocalName == "p" && currentCell is not null)
+                        {
+                            tableInAP = true;
+                            tableCurrentParagraph = new XSLFTextParagraph();
+                            continue;
+                        }
+                        if (tableInAP && reader.NamespaceURI == NsA && reader.LocalName == "r")
+                        {
+                            tableInAR = true;
+                            tableCurrentRun = new XSLFTextRun();
+                            continue;
+                        }
+                        if (tableInAR && reader.NamespaceURI == NsA && reader.LocalName == "t")
+                        {
+                            var text = reader.ReadString();
+                            if (tableCurrentRun is not null) tableCurrentRun.Text = text;
+                            continue;
+                        }
+                        // rPr element inside a:r (in table cell)
+                        if (tableInAR && reader.NamespaceURI == NsA && reader.LocalName == "rPr")
+                        {
+                            tableInARPr = true;
+                            continue;
+                        }
+                        // rPr child elements (table cell)
+                        if (tableInARPr)
+                        {
+                            if (reader.NamespaceURI == NsA && reader.LocalName == "b")
+                                tableCurrentRun!.Bold = true;
+                            else if (reader.NamespaceURI == NsA && reader.LocalName == "i")
+                                tableCurrentRun!.Italic = true;
+                            else if (reader.NamespaceURI == NsA && reader.LocalName == "u")
+                                tableCurrentRun!.Underline = true;
+                            else if (reader.NamespaceURI == NsA && reader.LocalName == "strike")
+                                tableCurrentRun!.Strikethrough = true;
+                            else if (reader.NamespaceURI == NsA && reader.LocalName == "sz")
+                            {
+                                var val = reader.GetAttribute("val");
+                                if (val is not null && double.TryParse(val, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sz))
+                                    tableCurrentRun!.FontSize = sz / 100.0;
+                            }
+                            else if (reader.NamespaceURI == NsA && reader.LocalName == "latin")
+                            {
+                                var tf = reader.GetAttribute("typeface");
+                                if (tf is not null) tableCurrentRun!.FontName = tf;
+                            }
+                            else if (reader.NamespaceURI == NsA && reader.LocalName == "srgbClr")
+                            {
+                                var cv = reader.GetAttribute("val");
+                                if (cv is not null) tableCurrentRun!.Color = cv;
+                            }
+                            continue;
+                        }
+                    }
+                }
             }
             else if (reader.NodeType == XmlNodeType.EndElement)
             {
@@ -1043,6 +1342,63 @@ public sealed class XMLSlideShow : IDisposable
                 if (inARPr && reader.NamespaceURI == NsA && reader.LocalName == "rPr")
                 {
                     inARPr = false;
+                    continue;
+                }
+
+                // --- table end elements ---
+                if (inGraphicFrame && reader.NamespaceURI == NsP && reader.LocalName == "graphicFrame")
+                {
+                    inGraphicFrame = false;
+                    inTbl = false;
+                    if (currentTable is not null)
+                    {
+                        currentTable.setAnchor(tableX, tableY, tableCx, tableCy);
+                        slide.AttachTable(currentTable);
+                    }
+                    currentTable = null; currentRow = null; currentCell = null;
+                    continue;
+                }
+                if (inTbl && reader.NamespaceURI == NsA && reader.LocalName == "tr")
+                {
+                    if (currentRow is not null && currentTable is not null)
+                        currentTable.AddRow(currentRow);
+                    currentRow = null;
+                    continue;
+                }
+                if (inTbl && reader.NamespaceURI == NsA && reader.LocalName == "tc")
+                {
+                    if (currentCell is not null && currentRow is not null)
+                        currentRow.AddCell(currentCell);
+                    currentCell = null;
+                    continue;
+                }
+                if (inTbl && reader.NamespaceURI == NsA && reader.LocalName == "txBody")
+                {
+                    // exiting cell text body
+                    tableInAP = false; tableInAR = false; tableInARPr = false;
+                    tableCurrentParagraph = null; tableCurrentRun = null;
+                    continue;
+                }
+                if (inTbl && tableInAP && reader.NamespaceURI == NsA && reader.LocalName == "p")
+                {
+                    tableInAP = false;
+                    if (tableCurrentParagraph is not null && currentCell is not null)
+                        currentCell.AddParagraph(tableCurrentParagraph);
+                    tableCurrentParagraph = null; tableCurrentRun = null;
+                    continue;
+                }
+                if (inTbl && tableInAR && reader.NamespaceURI == NsA && reader.LocalName == "r")
+                {
+                    tableInAR = false;
+                    tableInARPr = false;
+                    if (tableCurrentRun is not null && tableCurrentParagraph is not null)
+                        tableCurrentParagraph.AddRun(tableCurrentRun);
+                    tableCurrentRun = null;
+                    continue;
+                }
+                if (inTbl && tableInARPr && reader.NamespaceURI == NsA && reader.LocalName == "rPr")
+                {
+                    tableInARPr = false;
                     continue;
                 }
             }

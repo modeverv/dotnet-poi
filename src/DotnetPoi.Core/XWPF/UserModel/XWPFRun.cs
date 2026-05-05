@@ -12,6 +12,9 @@ public sealed class XWPFRun
     private bool _underline;
     private bool _strike;
     private readonly List<XWPFPicture> _pictures = new();
+    private string? _hyperlinkUrl;
+    internal string? HyperlinkUrl => _hyperlinkUrl;
+    internal string? HyperlinkRelId { get; set; }
 
     internal XWPFRun(XWPFParagraph paragraph)
     {
@@ -61,6 +64,12 @@ public sealed class XWPFRun
     public void setStrike(bool strike) => _strike = strike;
 
     public bool isStrike() => _strike;
+
+    /// <summary>Sets a hyperlink URL on this run. The run's text becomes the clickable link.</summary>
+    public void setHyperlink(string url) => _hyperlinkUrl = url;
+
+    /// <summary>Returns the hyperlink URL, or null if this run is not a hyperlink.</summary>
+    public string? getHyperlink() => _hyperlinkUrl;
 
     /// <summary>
     /// Adds an inline image to this run.

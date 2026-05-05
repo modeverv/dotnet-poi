@@ -414,6 +414,125 @@ public class XMLSlideShowTests
         return prs.createPicture(slide, idx);
     }
 
+    [Fact]
+    public void RoundTrip_UnknownParts_Preserved()
+    {
+        // Prepare a pptx bytes with extra entries not in the model's known list
+        using var original = new XMLSlideShow();
+        var slide = original.createSlide();
+        slide.createTextBox();
+        slide.getAutoShapes()[0].setAnchor(0, 0, 100000, 100000);
+        slide.getAutoShapes()[0].addParagraph().addRun("test");
+
+        byte[] raw;
+        using (var ms = new MemoryStream())
+        {
+            original.write(ms);
+            raw = ms.ToArray();
+        }
+
+        // Re-pack the zip with additional non-model entries
+        using var injectedStream = new MemoryStream();
+        using (var writerArchive = new ZipArchive(injectedStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            // Copy all existing entries
+            using (var readerArchive = new ZipArchive(new MemoryStream(raw), ZipArchiveMode.Read))
+            {
+                foreach (var entry in readerArchive.Entries)
+                {
+                    using var s = entry.Open();
+                    using var ms = new MemoryStream();
+                    s.CopyTo(ms);
+                    var newEntry = writerArchive.CreateEntry(entry.FullName);
+                    using var ws = newEntry.Open();
+                    ws.Write(ms.ToArray(), 0, (int)ms.Length);
+                }
+            }
+            // Add extra non-model entries
+            var extraEntry = writerArchive.CreateEntry("ppt/slideLayouts/layout2.xml");
+            using (var ws = extraEntry.Open())
+            {
+                ws.Write(System.Text.Encoding.UTF8.GetBytes("<p:sldLayout/>"));
+            }
+            extraEntry = writerArchive.CreateEntry("ppt/slideLayouts/_rels/layout2.xml.rels");
+            using (var ws = extraEntry.Open())
+            {
+                ws.Write(System.Text.Encoding.UTF8.GetBytes("<?xml version=\"1.0\"?><Relationships/>"));
+            }
+        }
+        injectedStream.Position = 0;
+
+        // Load the injected pptx — CollectPreservedEntries should capture the extra layout
+        using var loaded = new XMLSlideShow(injectedStream);
+        Assert.Single(loaded.getSlides());
+
+        // Write again — preserved entries should be emitted
+        using var reloadedStream = new MemoryStream();
+        loaded.write(reloadedStream);
+        reloadedStream.Position = 0;
+
+        // Verify extra entries survive the round-trip
+        using var finalArchive = new ZipArchive(reloadedStream, ZipArchiveMode.Read);
+        var layoutEntry = finalArchive.GetEntry("ppt/slideLayouts/layout2.xml");
+        Assert.NotNull(layoutEntry);
+        using var layoutReader = new StreamReader(layoutEntry.Open());
+        Assert.Equal("<p:sldLayout/>", layoutReader.ReadToEnd());
+
+        var relsEntry = finalArchive.GetEntry("ppt/slideLayouts/_rels/layout2.xml.rels");
+        Assert.NotNull(relsEntry);
+    }
+
+    [Fact]
+    public void RoundTrip_Table_Restored()
+    {
+        using var original = new XMLSlideShow();
+        var slide = original.createSlide();
+
+        // Create a table with 2 columns, 2 rows
+        var table = slide.createTable();
+        table.setAnchor(100000, 200000, 3000000, 1000000);
+        table.addGridCol(1500000);
+        table.addGridCol(1500000);
+
+        var row1 = table.createRow();
+        var cellA1 = row1.createCell();
+        cellA1.addParagraph().addRun("A1");
+        var cellB1 = row1.createCell();
+        cellB1.addParagraph().addRun("B1");
+
+        var row2 = table.createRow();
+        var cellA2 = row2.createCell();
+        cellA2.addParagraph().addRun("A2");
+        var cellB2 = row2.createCell();
+        cellB2.addParagraph().addRun("B2");
+
+        using var stream = WriteToStream(original);
+        using var loaded = new XMLSlideShow(stream);
+
+        var loadedSlide = loaded.getSlides()[0];
+        var tables = loadedSlide.getTables();
+        Assert.Single(tables);
+
+        var loadedTable = tables[0];
+        Assert.Equal(2, loadedTable.GridColWidths.Count);
+        Assert.Equal(1500000, loadedTable.GridColWidths[0]);
+        Assert.Equal(1500000, loadedTable.GridColWidths[1]);
+        Assert.Equal(2, loadedTable.Rows.Count);
+        Assert.Equal(2, loadedTable.Rows[0].Cells.Count);
+        Assert.Equal(2, loadedTable.Rows[1].Cells.Count);
+
+        Assert.Equal("A1", loadedTable.Rows[0].Cells[0].Paragraphs[0].getPlainText());
+        Assert.Equal("B1", loadedTable.Rows[0].Cells[1].Paragraphs[0].getPlainText());
+        Assert.Equal("A2", loadedTable.Rows[1].Cells[0].Paragraphs[0].getPlainText());
+        Assert.Equal("B2", loadedTable.Rows[1].Cells[1].Paragraphs[0].getPlainText());
+
+        // Verify anchor preserved
+        Assert.Equal(100000, loadedTable.getAnchorX());
+        Assert.Equal(200000, loadedTable.getAnchorY());
+        Assert.Equal(3000000, loadedTable.getAnchorCx());
+        Assert.Equal(1000000, loadedTable.getAnchorCy());
+    }
+
     private static MemoryStream WriteToStream(XMLSlideShow prs)
     {
         var stream = new MemoryStream();

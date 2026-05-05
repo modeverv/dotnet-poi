@@ -24,6 +24,11 @@ public sealed class XWPFDocument : IDisposable
 
     private const string RelTypeNumbering = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
     private const string ContentTypeNumbering = "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml";
+    private const string RelTypeHyperlink = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+    private const string RelTypeHeader = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
+    private const string ContentTypeHeader = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml";
+    private const string RelTypeFooter = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer";
+    private const string ContentTypeFooter = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml";
 
     /// <summary>True if this document was loaded from docm (has a vbaProject.bin).</summary>
     public bool HasMacros => _vbaProjectBin != null;
@@ -36,6 +41,7 @@ public sealed class XWPFDocument : IDisposable
     private readonly List<XWPFParagraph> _paragraphs = new();
     private readonly List<XWPFPictureData> _pictures = new();
     private readonly List<XWPFTable> _tables = new();
+    private readonly List<string> _hyperlinkUrls = new();
     private long _nextDrawingId = 1;
 
     // Numbering support
@@ -48,6 +54,23 @@ public sealed class XWPFDocument : IDisposable
     private byte[]? _vbaProjectBin;
     private byte[]? _vbaDataXml;
     private byte[]? _vbaProjectBinRels;
+
+    // Page setup (twips = 1/1440 inch)
+    private long _pageWidth = 12240;  // default: 8.5in
+    private long _pageHeight = 15840; // default: 11in
+    private string? _pageOrientation; // null = portrait, "landscape" = landscape
+    private long _marginTop = 1440;    // 1in
+    private long _marginRight = 1440;
+    private long _marginBottom = 1440;
+    private long _marginLeft = 1440;
+    private long _marginHeader = 720;  // 0.5in
+    private long _marginFooter = 720;
+
+    // Headers / footers (single default for first section)
+    private string? _headerText;
+    private string? _footerText;
+    private int _headerCount;
+    private int _footerCount;
 
     public XWPFDocument() { }
 
@@ -85,10 +108,69 @@ public sealed class XWPFDocument : IDisposable
         return data.Index - 1;
     }
 
+    /// <summary>Set page size in twips (1/1440 inch). Default: 12240 x 15840 (Letter).</summary>
+    public void setPageSize(long widthTwips, long heightTwips)
+    {
+        _pageWidth = widthTwips;
+        _pageHeight = heightTwips;
+    }
+
+    /// <summary>Get page width in twips.</summary>
+    public long getPageWidth() => _pageWidth;
+
+    /// <summary>Get page height in twips.</summary>
+    public long getPageHeight() => _pageHeight;
+
+    /// <summary>Set landscape orientation (default is portrait).</summary>
+    public void setLandscape(bool landscape) => _pageOrientation = landscape ? "landscape" : null;
+
+    /// <summary>True if page orientation is landscape.</summary>
+    public bool isLandscape() => _pageOrientation == "landscape";
+
+    /// <summary>Set margin in twips (1/1440 inch). Pass 0 for none.</summary>
+    public void setMargins(long top, long right, long bottom, long left)
+    {
+        _marginTop = top;
+        _marginRight = right;
+        _marginBottom = bottom;
+        _marginLeft = left;
+    }
+
+    public long getMarginTop() => _marginTop;
+    public long getMarginRight() => _marginRight;
+    public long getMarginBottom() => _marginBottom;
+    public long getMarginLeft() => _marginLeft;
+
+    /// <summary>Set default header text (plain text, first section).</summary>
+    public void setHeaderText(string text)
+    {
+        _headerText = text;
+        _headerCount = text.Length > 0 ? 1 : 0;
+    }
+
+    /// <summary>Get default header text.</summary>
+    public string? getHeaderText() => _headerText;
+
+    /// <summary>Set default footer text (plain text, first section).</summary>
+    public void setFooterText(string text)
+    {
+        _footerText = text;
+        _footerCount = text.Length > 0 ? 1 : 0;
+    }
+
+    /// <summary>Get default footer text.</summary>
+    public string? getFooterText() => _footerText;
+
+    internal bool HasHeader => _headerCount > 0;
+    internal bool HasFooter => _footerCount > 0;
+    internal int HeaderCount => _headerCount;
+    internal int FooterCount => _footerCount;
+
     public void write(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+        CollectHyperlinks();
         WriteEntry(archive, "[Content_Types].xml", WriteContentTypes);
         WriteEntry(archive, "_rels/.rels", WriteRootRelationships);
         WriteEntry(archive, "word/document.xml", WriteDocument);
@@ -96,6 +178,11 @@ public sealed class XWPFDocument : IDisposable
         WriteEntry(archive, "word/settings.xml", WriteSettings);
         if (_numInstances.Count > 0)
             WriteEntry(archive, "word/numbering.xml", WriteNumbering);
+        // headers and footers
+        if (_headerCount > 0)
+            WriteEntry(archive, "word/header1.xml", WriteHeader);
+        if (_footerCount > 0)
+            WriteEntry(archive, "word/footer1.xml", WriteFooter);
         foreach (var pic in _pictures)
         {
             WriteBinaryEntry(archive, $"word/media/{pic.getFileName()}", pic.Data);
@@ -196,6 +283,41 @@ public sealed class XWPFDocument : IDisposable
         ReadPictures(archive);
         ReadDocument(archive);
         ReadVbaFiles(archive);
+        ReadHeadersFooters(archive);
+    }
+
+    private void CollectHyperlinks()
+    {
+        _hyperlinkUrls.Clear();
+        foreach (var para in _paragraphs)
+        {
+            CollectHyperlinksFromPara(para);
+        }
+        foreach (var table in _tables)
+        {
+            foreach (var row in table.Rows)
+            {
+                foreach (var cell in row.Cells)
+                {
+                    foreach (var para in cell.Paragraphs)
+                    {
+                        CollectHyperlinksFromPara(para);
+                    }
+                }
+            }
+        }
+    }
+
+    private void CollectHyperlinksFromPara(XWPFParagraph para)
+    {
+        foreach (var run in para.Runs)
+        {
+            var url = run.HyperlinkUrl;
+            if (url is not null && !_hyperlinkUrls.Contains(url))
+            {
+                _hyperlinkUrls.Add(url);
+            }
+        }
     }
 
     private void ReadVbaFiles(ZipArchive archive)
@@ -230,10 +352,65 @@ public sealed class XWPFDocument : IDisposable
         }
     }
 
+    private void ReadHeadersFooters(ZipArchive archive)
+    {
+        // Build relId → part path map from document relationships
+        var hfRelMap = new Dictionary<string, string>(StringComparer.Ordinal);
+        var relsEntry = archive.GetEntry("word/_rels/document.xml.rels");
+        if (relsEntry is not null)
+        {
+            using var rs = relsEntry.Open();
+            using var rr = XmlReader.Create(rs, new XmlReaderSettings { IgnoreWhitespace = false });
+            while (rr.Read())
+            {
+                if (rr.NodeType != XmlNodeType.Element || rr.LocalName != "Relationship") continue;
+                var relType = rr.GetAttribute("Type");
+                var isH = relType is not null && relType.EndsWith("/relationships/header", StringComparison.Ordinal);
+                var isF = relType is not null && relType.EndsWith("/relationships/footer", StringComparison.Ordinal);
+                if (isH || isF)
+                {
+                    var id = rr.GetAttribute("Id");
+                    var target = rr.GetAttribute("Target");
+                    if (id is not null && target is not null)
+                    {
+                        var partPath = target.StartsWith("/") ? target.Substring(1) : $"word/{target}";
+                        // Normalize separators
+                        partPath = partPath.Replace('\\', '/');
+                        hfRelMap[id] = partPath;
+                    }
+                }
+            }
+        }
+
+        // Read header1.xml and footer1.xml text
+        foreach (var kv in hfRelMap)
+        {
+            var entry = archive.GetEntry(kv.Value);
+            if (entry is null) continue;
+            using var s = entry.Open();
+            using var hr = XmlReader.Create(s, new XmlReaderSettings { IgnoreWhitespace = false });
+            while (hr.Read())
+            {
+                if (hr.NodeType == XmlNodeType.Element && hr.LocalName == "t")
+                {
+                    var text = hr.ReadElementContentAsString();
+                    if (kv.Value.Contains("header"))
+                        _headerText = (_headerText ?? "") + text;
+                    else
+                        _footerText = (_footerText ?? "") + text;
+                    continue;
+                }
+            }
+            if (kv.Value.Contains("header")) _headerCount = 1;
+            else _footerCount = 1;
+        }
+    }
+
     private void ReadDocument(ZipArchive archive)
     {
         // Build relId → picture-index map from document relationships
         var picIndexByRelId = BuildPictureRelMap(archive);
+        var hyperlinkRelMap = BuildHyperlinkRelMap(archive);
 
         var docEntry = archive.GetEntry("word/document.xml");
         if (docEntry is null) return;
@@ -246,6 +423,7 @@ public sealed class XWPFDocument : IDisposable
         XWPFTable? currentTable = null;
         XWPFTableRow? currentRow = null;
         XWPFTableCell? currentTableCell = null;
+        string? hyperlinkRelId = null;
         bool inPPr = false;
         bool inRPr = false;
 
@@ -273,9 +451,16 @@ public sealed class XWPFDocument : IDisposable
                                 else
                                     currentParagraph = createParagraph();
                                 break;
+                            case "hyperlink":
+                                hyperlinkRelId = GetAttributeByLocalName(reader, "id");
+                                break;
                             case "r" when !inRPr:
                                 if (currentParagraph is not null)
+                                {
                                     currentRun = currentParagraph.createRun();
+                                    if (hyperlinkRelId is not null && hyperlinkRelMap.TryGetValue(hyperlinkRelId, out var url))
+                                        currentRun.setHyperlink(url);
+                                }
                                 break;
                             case "rPr":
                                 inRPr = true;
@@ -369,6 +554,33 @@ public sealed class XWPFDocument : IDisposable
                                 if (ilvlAttr is not null && int.TryParse(ilvlAttr, out var iv))
                                     currentParagraph?.setIlvl(iv);
                                 break;
+                            case "pgSz":
+                                var pgW = reader.GetAttribute("w:w");
+                                var pgH = reader.GetAttribute("w:h");
+                                var orient = reader.GetAttribute("w:orient");
+                                if (pgW is not null && long.TryParse(pgW, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pw))
+                                    _pageWidth = pw;
+                                if (pgH is not null && long.TryParse(pgH, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ph))
+                                    _pageHeight = ph;
+                                if (orient == "landscape")
+                                    _pageOrientation = "landscape";
+                                break;
+                            case "pgMar":
+                            {
+                                var tp = reader.GetAttribute("w:top");
+                                var rp = reader.GetAttribute("w:right");
+                                var bp = reader.GetAttribute("w:bottom");
+                                var lp = reader.GetAttribute("w:left");
+                                var hdp = reader.GetAttribute("w:header");
+                                var ftp = reader.GetAttribute("w:footer");
+                                if (tp is not null && long.TryParse(tp, out var mt)) _marginTop = mt;
+                                if (rp is not null && long.TryParse(rp, out var mr)) _marginRight = mr;
+                                if (bp is not null && long.TryParse(bp, out var mb)) _marginBottom = mb;
+                                if (lp is not null && long.TryParse(lp, out var ml)) _marginLeft = ml;
+                                if (hdp is not null && long.TryParse(hdp, out var mh)) _marginHeader = mh;
+                                if (ftp is not null && long.TryParse(ftp, out var mf)) _marginFooter = mf;
+                                break;
+                            }
                             case "t" when currentRun is not null && !inRPr:
                                 currentRun.setText(reader.ReadElementContentAsString());
                                 continue;
@@ -430,6 +642,9 @@ public sealed class XWPFDocument : IDisposable
                                 currentParagraph = null;
                                 currentRun = null;
                                 inPPr = false;
+                                break;
+                            case "hyperlink":
+                                hyperlinkRelId = null;
                                 break;
                             case "r" when !inRPr:
                                 currentRun = null;
@@ -507,6 +722,28 @@ public sealed class XWPFDocument : IDisposable
         return map;
     }
 
+    private Dictionary<string, string> BuildHyperlinkRelMap(ZipArchive archive)
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        var relsEntry = archive.GetEntry("word/_rels/document.xml.rels");
+        if (relsEntry is null) return map;
+
+        using var relsStream = relsEntry.Open();
+        using var reader = XmlReader.Create(relsStream, new XmlReaderSettings { IgnoreWhitespace = false });
+        while (reader.Read())
+        {
+            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "Relationship") continue;
+            if (!string.Equals(reader.GetAttribute("Type"),
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+                StringComparison.Ordinal)) continue;
+            var relId = reader.GetAttribute("Id");
+            var target = reader.GetAttribute("Target");
+            if (relId is not null && target is not null)
+                map[relId] = target;
+        }
+        return map;
+    }
+
     private static void AttachPictureToRun(XWPFRun run, XWPFPicture picture)
     {
         run.AttachPicture(picture);
@@ -563,6 +800,10 @@ public sealed class XWPFDocument : IDisposable
         WriteOverride(writer, "/word/settings.xml", ContentTypeSettings);
         if (_numInstances.Count > 0)
             WriteOverride(writer, "/word/numbering.xml", ContentTypeNumbering);
+        if (_headerCount > 0)
+            WriteOverride(writer, "/word/header1.xml", ContentTypeHeader);
+        if (_footerCount > 0)
+            WriteOverride(writer, "/word/footer1.xml", ContentTypeFooter);
         if (_vbaProjectBin != null)
         {
             WriteOverride(writer, "/word/vbaProject.bin", ContentTypeVbaProject);
@@ -585,26 +826,46 @@ public sealed class XWPFDocument : IDisposable
     {
         writer.WriteStartElement("Relationships");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
-        // rId1 is always settings; images use rId{Index + ImageRelIdOffset}
+        // rId1: settings
         WriteRelationship(writer, "rId1", "settings.xml", RelTypeSettings);
+        // images: rId{pic.Index + 1}
         foreach (var pic in _pictures)
         {
             WriteRelationship(writer, $"rId{pic.Index + ImageRelIdOffset}", $"media/{pic.getFileName()}",
                 "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image");
         }
-        // docm: vbaProject relationship after images
-        if (_vbaProjectBin != null)
+        // hyperlinks: after images, before numbering/vba
+        for (int i = 0; i < _hyperlinkUrls.Count; i++)
         {
-            var vbaRelId = $"rId{_pictures.Count + 2}";
-            WriteRelationship(writer, vbaRelId, "vbaProject.bin", RelTypeVbaProject);
+            var relId = $"rId{_pictures.Count + 2 + i}";
+            WriteRelationship(writer, relId, _hyperlinkUrls[i], RelTypeHyperlink, "External");
         }
-        // numbering relationship after images
+        int offset = _hyperlinkUrls.Count;
+        // numbering
         if (_numInstances.Count > 0)
         {
-            var numRelId = _vbaProjectBin != null
-                ? $"rId{_pictures.Count + 3}"
-                : $"rId{_pictures.Count + 2}";
+            var numRelId = $"rId{_pictures.Count + 2 + offset}";
             WriteRelationship(writer, numRelId, "numbering.xml", RelTypeNumbering);
+            offset++;
+        }
+        // vbaProject
+        if (_vbaProjectBin != null)
+        {
+            var vbaRelId = $"rId{_pictures.Count + 2 + offset}";
+            WriteRelationship(writer, vbaRelId, "vbaProject.bin", RelTypeVbaProject);
+        }
+        // headers and footers
+        if (_headerCount > 0)
+        {
+            offset++;
+            var hRelId = $"rId{_pictures.Count + 2 + offset - 1}";
+            WriteRelationship(writer, hRelId, "header1.xml", RelTypeHeader);
+        }
+        if (_footerCount > 0)
+        {
+            offset++;
+            var fRelId = $"rId{_pictures.Count + 2 + offset - 1}";
+            WriteRelationship(writer, fRelId, "footer1.xml", RelTypeFooter);
         }
         writer.WriteEndElement();
     }
@@ -613,6 +874,36 @@ public sealed class XWPFDocument : IDisposable
     {
         writer.WriteStartElement("w", "settings");
         writer.WriteAttributeString("xmlns:w", NsW);
+        writer.WriteEndElement();
+    }
+
+    private void WriteHeader(PoiXmlWriter writer)
+    {
+        writer.WriteStartElement("w", "hdr");
+        writer.WriteAttributeString("xmlns:w", NsW);
+        writer.WriteStartElement("w", "p");
+        writer.WriteStartElement("w", "r");
+        writer.WriteStartElement("w", "t");
+        if (_headerText is not null)
+            writer.WriteString(_headerText);
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+    }
+
+    private void WriteFooter(PoiXmlWriter writer)
+    {
+        writer.WriteStartElement("w", "ftr");
+        writer.WriteAttributeString("xmlns:w", NsW);
+        writer.WriteStartElement("w", "p");
+        writer.WriteStartElement("w", "r");
+        writer.WriteStartElement("w", "t");
+        if (_footerText is not null)
+            writer.WriteString(_footerText);
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+        writer.WriteEndElement();
         writer.WriteEndElement();
     }
 
@@ -637,12 +928,49 @@ public sealed class XWPFDocument : IDisposable
             WriteTable(writer, table);
         }
         writer.WriteStartElement("w", "sectPr");
+        // pgSz: page size + orientation
+        writer.WriteStartElement("w", "pgSz");
+        writer.WriteAttributeString("w", "w", _pageWidth.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("w", "h", _pageHeight.ToString(CultureInfo.InvariantCulture));
+        if (_pageOrientation is not null)
+            writer.WriteAttributeString("w", "orient", _pageOrientation);
         writer.WriteEndElement();
+        // pgMar: margins
+        writer.WriteStartElement("w", "pgMar");
+        writer.WriteAttributeString("w", "top", _marginTop.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("w", "right", _marginRight.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("w", "bottom", _marginBottom.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("w", "left", _marginLeft.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("w", "header", _marginHeader.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("w", "footer", _marginFooter.ToString(CultureInfo.InvariantCulture));
+        writer.WriteEndElement();
+        // headerReference / footerReference
+        if (_headerCount > 0 || _footerCount > 0)
+        {
+            int relOffset = 2 + _pictures.Count + _hyperlinkUrls.Count;
+            if (_numInstances.Count > 0) relOffset++;
+            if (_vbaProjectBin != null) relOffset++;
+            if (_headerCount > 0)
+            {
+                writer.WriteStartElement("w", "headerReference");
+                writer.WriteAttributeString("w", "type", "default");
+                writer.WriteAttributeString("r", "id", $"rId{relOffset++}");
+                writer.WriteEndElement();
+            }
+            if (_footerCount > 0)
+            {
+                writer.WriteStartElement("w", "footerReference");
+                writer.WriteAttributeString("w", "type", "default");
+                writer.WriteAttributeString("r", "id", $"rId{relOffset++}");
+                writer.WriteEndElement();
+            }
+        }
+        writer.WriteEndElement(); // sectPr
         writer.WriteEndElement(); // body
         writer.WriteEndElement(); // document
     }
 
-    private static void WriteParagraph(PoiXmlWriter writer, XWPFParagraph para)
+    private void WriteParagraph(PoiXmlWriter writer, XWPFParagraph para)
     {
         writer.WriteStartElement("w", "p");
 
@@ -720,7 +1048,7 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteEndElement();
     }
 
-    private static void WriteTable(PoiXmlWriter writer, XWPFTable table)
+    private void WriteTable(PoiXmlWriter writer, XWPFTable table)
     {
         writer.WriteStartElement("w", "tbl");
         writer.WriteStartElement("w", "tblPr");
@@ -757,10 +1085,26 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteEndElement(); // tbl
     }
 
-    private static void WriteRun(PoiXmlWriter writer, XWPFRun run)
+    private void WriteRun(PoiXmlWriter writer, XWPFRun run)
     {
         if (run.TextValue is not null)
         {
+            bool isHyperlink = run.HyperlinkUrl is not null;
+            if (isHyperlink)
+            {
+                // Ensure relId is assigned
+                if (run.HyperlinkRelId is null)
+                {
+                    int hyperlinkIndex = _hyperlinkUrls.IndexOf(run.HyperlinkUrl!);
+                    run.HyperlinkRelId = hyperlinkIndex >= 0
+                        ? $"rId{_pictures.Count + 2 + hyperlinkIndex}"
+                        : throw new InvalidOperationException("Hyperlink URL not registered.");
+                }
+                writer.WriteStartElement("w", "hyperlink");
+                writer.WriteAttributeString("r", "id", run.HyperlinkRelId);
+                writer.WriteAttributeString("w", "history", "1");
+            }
+
             writer.WriteStartElement("w", "r");
             if (run.Bold || run.Italic || run.Underline || run.Strike
                 || run.FontName is not null || run.FontSize > 0 || run.Color is not null)
@@ -816,6 +1160,11 @@ public sealed class XWPFDocument : IDisposable
             writer.WriteString(run.TextValue);
             writer.WriteEndElement(); // t
             writer.WriteEndElement(); // r
+
+            if (isHyperlink)
+            {
+                writer.WriteEndElement(); // hyperlink
+            }
         }
         foreach (var picture in run.Pictures)
         {
@@ -963,6 +1312,16 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteAttributeString("Id", id);
         writer.WriteAttributeString("Target", target);
         writer.WriteAttributeString("Type", type);
+        writer.WriteEndElement();
+    }
+
+    private static void WriteRelationship(PoiXmlWriter writer, string id, string target, string type, string targetMode)
+    {
+        writer.WriteStartElement("Relationship");
+        writer.WriteAttributeString("Id", id);
+        writer.WriteAttributeString("Target", target);
+        writer.WriteAttributeString("Type", type);
+        writer.WriteAttributeString("TargetMode", targetMode);
         writer.WriteEndElement();
     }
 

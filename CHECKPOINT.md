@@ -667,10 +667,10 @@ All requested round-trip features are now implemented。Pivot tables and Charts 
 | 5 | Paragraph alignment (left/center/right/justify) | ✅ | ✅ | ✅ | ✅ |
 | 6 | Paragraph indentation / spacing | ✅ | ✅ | ✅ | ✅ |
 | 7 | Numbering / bullet lists | ✅ | ✅ | ✅ | ✅ |
-| 8 | Tables | ☐ | ☐ | ☐ | 🔴 |
-| 9 | Hyperlinks | ☐ | ☐ | ☐ | 🔴 |
-| 10 | Headers / Footers | ☐ | ☐ | ☐ | 🔴 |
-| 11 | Page setup (size / orientation / margins) | ☐ | ☐ | ☐ | 🔴 |
+| 8 | Tables | ✅ | ✅ | ✅ | ✅ |
+| 9 | Hyperlinks | ✅ | ✅ | ✅ | ✅ |
+| 10 | Headers / Footers | ✅ | ✅ | ✅ | ✅ |
+| 11 | Page setup (size / orientation / margins) | ✅ | ✅ | ✅ | ✅ |
 
 ### docx numbering infrastructure (re-added after git checkout revert)
 
@@ -707,7 +707,75 @@ Numbering write/read was lost during a git checkout revert and has been re-imple
 
 ### Test count
 
-- Core: **212** (195 existing + 6 pptx round-trip + 11 xlsx round-trip)
+- Core: **219** (212 existing + 5 docx round-trip: tables, hyperlinks, page setup, header/footer + 2 pptx round-trip: unknown parts, table)
 - Formula: **10**
 - Interop: **31**
-- **Total: 253**
+- **Total: 260**
+
+### docx completion (tables, hyperlinks, page setup, headers/footers)
+
+Items 8–11 on the docx round-trip checklist are now implemented:
+
+- **Tables (item 8)**: Existing write (`WriteTable`) and read (`ReadDocument` table parsing) paths verified with round-trip tests. 2 test methods added.
+- **Hyperlinks (item 9)**: New `XWPFRun.setHyperlink(url)`/`getHyperlink()` API. Write wraps runs in `<w:hyperlink r:id="...">`. Read parses hyperlink relationships and element references. `CollectHyperlinks()` recursively scans top-level and table-cell paragraphs. `BuildHyperlinkRelMap()` reads doc rels. 1 test method.
+- **Page setup (item 11)**: New `setPageSize()`, `setLandscape()`, `setMargins()` API. Write emits `<w:pgSz>` (w, h, orient) and `<w:pgMar>` (top, right, bottom, left, header, footer) in sectPr. Read parses pgSz/pgMar elements. 1 test method.
+- **Headers/Footers (item 10)**: New `setHeaderText()`/`setFooterText()` API. Write emits `word/header1.xml` and `word/footer1.xml` as separate ZIP entries with content type overrides, relationships, and `<w:headerReference>`/`<w:footerReference>` in sectPr. Read parses rels and header/footer XML to extract text. 1 test method.
+
+---
+
+## 2026-05-10 JST - PPTX (XSLF) round-trip batch 1: unknown part preservation + tables
+
+### Plan
+
+| # | Feature | Priority | Notes |
+|---|---------|----------|-------|
+| 1 | Unknown part preservation | 🔥 High | ✅ Done — Save ZIP entries not understood by model byte-for-byte |
+| 2 | Layouts / Masters / Themes | 🔥 High | ✅ Preserved via unknown parts mechanism (stubs on create, real from file on load) |
+| 3 | Tables (p:graphicData > a:tbl) | ⭐ Medium | ✅ Done |
+| 4 | Charts | 🕐 Later | Requires separate chart parts + relationships |
+| 5 | Notes, Connectors, Group Shapes | 🕐 Later | Extend shape model coverage |
+
+### Batch 1: Unknown part preservation
+
+The `write()` method currently creates a fresh ZIP without copying over parts it doesn't understand (layouts, masters, themes, media, etc.). This means round-tripping a real pptx file (e.g. from PowerPoint or Java POI) loses all design.
+
+**Approach**: During `Load()`, collect all non-model ZIP entries and their raw bytes. During `write()`, emit those entries first, then let the model overwrite the entries it knows about (`ppt/presentation.xml`, `ppt/slides/slide1.xml`, `ppt/slides/_rels/slide1.xml.rels`, etc.).
+
+**Implementation**:
+- Added `_preservedEntries` field (`Dictionary<string, byte[]>` with `OrdinalIgnoreCase`).
+- `CollectPreservedEntries(ZipArchive)` iterates ZIP entries, excludes known model paths + `ppt/media/*`, and stores the rest.
+- `GetModelEntryNames()` returns a `HashSet` of expected paths (presentation, slides, slide rels, slide masters, layouts, theme, content types, rels, core props, vba, image media).
+- `Load()` calls `CollectPreservedEntries(archive)` after slides are loaded.
+- `write()` emits preserved entries first via `WriteBinaryEntry`, then model entries overwrite.
+- Test injects extra `ppt/slideLayouts/layout2.xml` + rels into a pptx, loads, writes, and verifies both entries survive.
+
+### Batch 2: Tables (p:graphicData > a:tbl)
+
+**Write path**:
+- `WriteTableGraphicFrame()` writes `p:graphicFrame` element with `nvGraphicFramePr`, `xfrm` (anchor), `a:graphic > a:graphicData` (table URI), `a:tbl` with `tblPr`, `tblGrid` (`gridCol` widths), `a:tr` (`a:tc` with `txBody` containing paragraphs/runs with full formatting support).
+
+**Read path**:
+- `ParseSlideXml()` extended with `inGraphicFrame`, `inTbl`, `tableInAP`, `tableInAR`, `tableInARPr` state flags.
+- Parses `p:graphicFrame`, extracts `cNvPr` (id), `a:off`/`a:ext` (anchor), `a:tbl`, `a:gridCol` (widths), `a:tr`/`a:tc`, and cell text via `a:txBody > a:p > a:r > a:t` with full `a:rPr` formatting.
+- End element handlers properly assemble `XSLFTable → XSLFTableRow → XSLFTableCell → XSLFTextParagraph → XSLFTextRun`.
+
+**Model classes** (new file `XSLFTable.cs`):
+- `XSLFTable`: ShapeId, GridColWidths, Rows, setAnchor/createRow.
+- `XSLFTableRow`: Cells, createCell.
+- `XSLFTableCell`: Paragraphs, addParagraph (reuses XSLFTextParagraph for text content).
+
+**1 round-trip test**: `RoundTrip_Table_Restored` — 2×2 table with cell text, grid widths, anchor position.
+
+## 2026-05-05 JST - GitHub Actions ci.yml syntax fix
+
+- Investigated `.github/workflows/ci.yml` GitHub syntax error reported at line 39.
+- Root cause: the unquoted step `name` contained `all formats: xlsx...`; YAML treats `: ` inside an unquoted scalar as mapping syntax.
+- Fixed by quoting the affected step name.
+- Scope intentionally limited to workflow syntax; did not touch existing unrelated modified files.
+
+## 2026-05-05 JST - EdgeCaseProbeExample formula evaluator reference
+
+- Investigated failing `dotnet run --project examples/EdgeCaseProbeExample/` probe:
+  `xlsx formula edge results: divide by zero, circular reference, missing cells`.
+- Root cause: the example calls `workbook.getCreationHelper().createFormulaEvaluator()` but referenced only `DotnetPoi.Core`; by design formula evaluation lives in `DotnetPoi.Formula`.
+- Added `DotnetPoi.Formula` project reference to `examples/EdgeCaseProbeExample/EdgeCaseProbeExample.csproj`.

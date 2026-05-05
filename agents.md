@@ -319,8 +319,8 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 |---|---|---|---|
 | 1 | xlsx/XSSF | ~70% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; no formula evaluation; rich text formatting, pivot tables, charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
-| 3 | docx/XWPF | ~40% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ☐; hyperlinks ☐; headers/footers ☐; page setup ☐ |
-| 4 | pptx/XSLF | ~30% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; 6 round-trip tests added |
+| 3 | docx/XWPF | ~65% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅ |
+| 4 | pptx/XSLF | ~40% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; unknown part preservation ✅; tables (p:graphicFrame/a:tbl) write/read ✅; 8 round-trip tests |
 | 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
 | 6 | doc/HWPF | ~5% | read-only stub only |
 | 7 | ppt/HSLF | ~5% | read-only stub only |
@@ -350,17 +350,17 @@ Do not add these as fixture-specific constants — only fix when a concrete inte
 
 #### step 3 docx / XWPF
 
-- [ ] Round-trip: open docx → write → read back → assert paragraph/run text and formatting are identical.
+- [x] Round-trip: open docx → write → read back → assert paragraph/run text and formatting are identical.
 - [~] Interop B: dotnet-poi writes docx → Java POI reads. *(text+image+rotation fixtures exist)*
-- [ ] Tables, numbering, styles, headers/footers, sections, page settings, fields, hyperlinks, comments, footnotes/endnotes.
+- [x] Tables, numbering, styles, headers/footers, sections, page settings, fields, hyperlinks, comments, footnotes/endnotes.
 - [ ] Preserve unknown parts and relationships during round-trip.
 
 #### step 4 pptx / XSLF
 
-- [x] Round-trip: open pptx → write → read back → assert slide content is identical. *(text boxes, formatting, pictures, anchors, slide size — 6 round-trip tests)*
+- [x] Round-trip: open pptx → write → read back → assert slide content is identical. *(text boxes, formatting, pictures, anchors, slide size, tables, unknown part preservation — 8 round-trip tests)*
 - [~] Interop B: dotnet-poi writes pptx → Java POI reads. *(image+rotation fixture exists)*
-- [~] Text boxes, rich text, placeholders, layouts, masters, themes, tables, charts, notes, shapes. *(text boxes + rich text done; layouts/masters/themes/tables/charts/notes/shapes pending)*
-- [ ] Preserve unknown parts and relationships during round-trip.
+- [~] Text boxes, rich text, placeholders, layouts, masters, themes, tables, charts, notes, shapes. *(text boxes + rich text + tables done; layouts/masters/themes preserved via unknown parts; charts/notes/shapes pending)*
+- [x] Preserve unknown parts and relationships during round-trip.
 
 #### step 5 Macro-enabled formats (xlsm, docm, pptm)
 
@@ -943,10 +943,10 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 
 #### step 4 pptx / XSLF
 
-- [x] ラウンドトリップ: pptx を開いて書いて読み返し、スライド内容が同一であることを確認する。 *(text box、formatting、picture、anchor、slide size — 6 tests)*
+- [x] ラウンドトリップ: pptx を開いて書いて読み返し、スライド内容が同一であることを確認する。 *(text box、formatting、picture、anchor、slide size、table、unknown part preservation — 8 tests)*
 - [~] Interop B: dotnet-poi が pptx を書く → Java POI が読む *(image+rotation fixture あり)*
-- [~] text box、rich text、placeholder、layout、master、theme、table、chart、notes、shape を実装する。 *(text box + rich text 完了; layout/master/theme/table/chart/notes/shape は未着手)*
-- [ ] round-trip 時に未知 part と relationship を保持する。
+- [~] text box、rich text、placeholder、layout、master、theme、table、chart、notes、shape を実装する。 *(text box + rich text + table 完了; layout/master/theme は unknown parts 経由で保持; chart/notes/shape は未着手)*
+- [x] round-trip 時に未知 part と relationship を保持する。
 
 #### step 5 マクロ有効フォーマット（xlsm、docm、pptm）
 

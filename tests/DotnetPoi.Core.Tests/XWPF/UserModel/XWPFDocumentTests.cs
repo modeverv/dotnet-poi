@@ -452,6 +452,124 @@ public class XWPFDocumentTests
         Assert.Equal("numbered item", loadedPara.getText());
     }
 
+    [Fact]
+    public void RoundTrip_Table_Restored()
+    {
+        using var original = new XWPFDocument();
+        var table = original.createTable();
+        table.addGridCol(9144); // ~1 inch
+        table.addGridCol(9144);
+        var row = table.createRow();
+        var cell1 = row.createCell();
+        cell1.addParagraph().createRun().setText("A1");
+        var cell2 = row.createCell();
+        cell2.addParagraph().createRun().setText("B1");
+        var row2 = table.createRow();
+        row2.createCell().addParagraph().createRun().setText("A2");
+        row2.createCell().addParagraph().createRun().setText("B2");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        var tables = loaded.getTables();
+        Assert.Single(tables);
+        var loadedTable = tables[0];
+        Assert.Equal(2, loadedTable.getRows().Count);
+        Assert.Equal(2, loadedTable.getRows()[0].getCells().Count);
+        Assert.Equal(2, loadedTable.getRows()[1].getCells().Count);
+        Assert.Equal("A1", loadedTable.getRows()[0].getCells()[0].getParagraphs()[0].getText());
+        Assert.Equal("B2", loadedTable.getRows()[1].getCells()[1].getParagraphs()[0].getText());
+    }
+
+    [Fact]
+    public void RoundTrip_TableAndParagraphs_Combined()
+    {
+        using var original = new XWPFDocument();
+        var p1 = original.createParagraph();
+        p1.createRun().setText("before table");
+
+        var table = original.createTable();
+        table.addGridCol(9144);
+        var row = table.createRow();
+        row.createCell().addParagraph().createRun().setText("cell");
+
+        var p2 = original.createParagraph();
+        p2.createRun().setText("after table");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        Assert.Equal(2, loaded.getParagraphs().Count);
+        Assert.Single(loaded.getTables());
+        Assert.Equal("before table", loaded.getParagraphs()[0].getText());
+        Assert.Equal("after table", loaded.getParagraphs()[1].getText());
+        Assert.Equal("cell", loaded.getTables()[0].getRows()[0].getCells()[0].getParagraphs()[0].getText());
+    }
+
+    [Fact]
+    public void RoundTrip_Hyperlink_Restored()
+    {
+        using var original = new XWPFDocument();
+        var para = original.createParagraph();
+        var run = para.createRun();
+        run.setText("Click here");
+        run.setHyperlink("https://example.com");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        var loadedPara = loaded.getParagraphs()[0];
+        var loadedRun = loadedPara.getRuns()[0];
+        Assert.Equal("Click here", loadedRun.getText(0));
+        Assert.Equal("https://example.com", loadedRun.getHyperlink());
+    }
+
+    [Fact]
+    public void RoundTrip_PageSetup_Restored()
+    {
+        using var original = new XWPFDocument();
+        original.setPageSize(15840, 12240); // landscape-ish dimensions
+        original.setLandscape(true);
+        original.setMargins(720, 720, 720, 720); // 0.5in all sides
+        original.createParagraph().createRun().setText("page setup test");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        Assert.Equal(15840, loaded.getPageWidth());
+        Assert.Equal(12240, loaded.getPageHeight());
+        Assert.True(loaded.isLandscape());
+        Assert.Equal(720, loaded.getMarginTop());
+        Assert.Equal(720, loaded.getMarginRight());
+        Assert.Equal(720, loaded.getMarginBottom());
+        Assert.Equal(720, loaded.getMarginLeft());
+    }
+
+    [Fact]
+    public void RoundTrip_HeaderFooter_Restored()
+    {
+        using var original = new XWPFDocument();
+        original.setHeaderText("My Header");
+        original.setFooterText("Page 1");
+        original.createParagraph().createRun().setText("header/footer test");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        Assert.Equal("My Header", loaded.getHeaderText());
+        Assert.Equal("Page 1", loaded.getFooterText());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

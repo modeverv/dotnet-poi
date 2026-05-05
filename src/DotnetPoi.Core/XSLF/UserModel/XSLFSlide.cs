@@ -5,6 +5,7 @@ public sealed class XSLFSlide
 {
     private readonly List<XSLFPictureShape> _shapes = new();
     private readonly List<XSLFAutoShape> _autoShapes = new();
+    private readonly List<XSLFTable> _tables = new();
     private int _nextShapeId = 2; // 1 is reserved for the group shape container
 
     internal XSLFSlide() { }
@@ -14,6 +15,9 @@ public sealed class XSLFSlide
 
     /// <summary>All auto shapes (text boxes) on this slide.</summary>
     public IReadOnlyList<XSLFAutoShape> getAutoShapes() => _autoShapes;
+
+    /// <summary>All tables on this slide.</summary>
+    public IReadOnlyList<XSLFTable> getTables() => _tables;
 
     /// <summary>
     /// Creates a picture shape referencing the picture at the given 0-based index.
@@ -45,4 +49,15 @@ public sealed class XSLFSlide
     }
 
     internal void AttachAutoShape(XSLFAutoShape shape) => _autoShapes.Add(shape);
+
+    /// <summary>Creates a table shape on this slide.</summary>
+    public XSLFTable createTable()
+    {
+        int shapeId = _nextShapeId++;
+        var table = new XSLFTable(shapeId);
+        _tables.Add(table);
+        return table;
+    }
+
+    internal void AttachTable(XSLFTable table) => _tables.Add(table);
 }
