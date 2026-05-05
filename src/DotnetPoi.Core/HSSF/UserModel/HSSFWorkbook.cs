@@ -97,6 +97,9 @@ public sealed class HSSFWorkbook : IWorkbook
 
     public bool getForceFormulaRecalculation() => false;
 
+    public void protectWorkbook(bool protect) { }
+    public bool isWorkbookProtected() => false;
+
     public void write(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);

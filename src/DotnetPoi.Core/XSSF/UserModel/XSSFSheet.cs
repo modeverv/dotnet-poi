@@ -23,6 +23,9 @@ public sealed class XSSFSheet : ISheet
     // Hidden columns
     private readonly HashSet<int> _hiddenColumns = new();
 
+    // Sheet protection
+    private bool _sheetProtected;
+
     // Page margins (inches, default OOXML values)
     public double PageMarginBottom { get; set; } = 0.75;
     public double PageMarginFooter { get; set; } = 0.3;
@@ -163,6 +166,23 @@ public sealed class XSSFSheet : ISheet
     }
 
     internal IReadOnlySet<int> HiddenColumns => _hiddenColumns;
+
+    /// <summary>
+    /// Gets or sets whether this sheet is protected.
+    /// When protected, worksheet's <c>&lt;sheetProtection&gt;</c> element is emitted on write.
+    /// </summary>
+    public bool SheetProtected
+    {
+        get => _sheetProtected;
+        set => _sheetProtected = value;
+    }
+
+    public void protectSheet(bool protect)
+    {
+        _sheetProtected = protect;
+    }
+
+    public bool isSheetProtected() => _sheetProtected;
 
     public IReadOnlyList<XSSFPivotTable> PivotTables => _pivotTables;
 

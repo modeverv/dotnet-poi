@@ -63,6 +63,9 @@ public sealed class HSSFSheet : ISheet
     public void setColumnHidden(int columnIndex, bool hidden) { }
     public bool isColumnHidden(int columnIndex) => false;
 
+    public void protectSheet(bool protect) { }
+    public bool isSheetProtected() => false;
+
     IRow ISheet.createRow(int rownum) => createRow(rownum);
 
     IRow? ISheet.getRow(int rownum) => getRow(rownum);

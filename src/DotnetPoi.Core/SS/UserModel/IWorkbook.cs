@@ -20,4 +20,8 @@ public interface IWorkbook : IDisposable
     bool getForceFormulaRecalculation();
     void write(Stream stream);
     void close();
+
+    // Workbook protection
+    void protectWorkbook(bool protect);
+    bool isWorkbookProtected();
 }

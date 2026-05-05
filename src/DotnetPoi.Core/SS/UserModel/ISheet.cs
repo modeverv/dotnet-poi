@@ -24,4 +24,8 @@ public interface ISheet
     // Hidden columns
     void setColumnHidden(int columnIndex, bool hidden);
     bool isColumnHidden(int columnIndex);
+
+    // Sheet protection
+    void protectSheet(bool protect);
+    bool isSheetProtected();
 }

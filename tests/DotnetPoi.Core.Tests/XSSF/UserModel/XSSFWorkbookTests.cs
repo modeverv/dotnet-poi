@@ -928,6 +928,59 @@ public class XSSFWorkbookTests
         Assert.Equal("FakePivotContent", reader.ReadToEnd());
     }
 
+    [Fact]
+    public void RoundTrip_SheetProtection_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("Protected");
+        sheet.createRow(0).createCell(0).setCellValue("data");
+        sheet.protectSheet(true);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        // Verify the sheetProtection element exists in the worksheet XML
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var sheetEntry = archive.GetEntry("xl/worksheets/sheet1.xml");
+        Assert.NotNull(sheetEntry);
+        using var sheetReader = new StreamReader(sheetEntry.Open());
+        var sheetXml = sheetReader.ReadToEnd();
+        Assert.Contains("<sheetProtection", sheetXml);
+
+        // Reload and verify
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("Protected")!;
+        Assert.True(loadedSheet.isSheetProtected());
+        Assert.Equal("data", loadedSheet.getRow(0)!.getCell(0)!.getStringCellValue());
+    }
+
+    [Fact]
+    public void RoundTrip_WorkbookProtection_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        original.createSheet("Data");
+        original.protectWorkbook(true);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        // Verify the workbookProtection element exists
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var wbEntry = archive.GetEntry("xl/workbook.xml");
+        Assert.NotNull(wbEntry);
+        using var wbReader = new StreamReader(wbEntry.Open());
+        var wbXml = wbReader.ReadToEnd();
+        Assert.Contains("<workbookProtection", wbXml);
+
+        // Reload and verify
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        Assert.True(loaded.isWorkbookProtected());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

@@ -52,6 +52,9 @@ public sealed class XSSFWorkbook : IWorkbook
     // and re-emitted during write() before model parts overwrite.
     private readonly Dictionary<string, byte[]> _preservedEntries = new(StringComparer.OrdinalIgnoreCase);
 
+    // Workbook protection
+    private bool _workbookProtected;
+
     private const string ContentTypeXlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
     private const string ContentTypeXlsm = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
     private const string ContentTypeVbaProject = "application/vnd.ms-office.vbaProject";
@@ -206,6 +209,14 @@ public sealed class XSSFWorkbook : IWorkbook
     void IWorkbook.setForceFormulaRecalculation(bool value) => setForceFormulaRecalculation(value);
 
     bool IWorkbook.getForceFormulaRecalculation() => getForceFormulaRecalculation();
+
+    public void protectWorkbook(bool protect) => _workbookProtected = protect;
+
+    public bool isWorkbookProtected() => _workbookProtected;
+
+    void IWorkbook.protectWorkbook(bool protect) => protectWorkbook(protect);
+
+    bool IWorkbook.isWorkbookProtected() => isWorkbookProtected();
 
     public void write(Stream stream)
     {
@@ -483,12 +494,18 @@ public sealed class XSSFWorkbook : IWorkbook
         using var reader = XmlReader.Create(workbookStream, new XmlReaderSettings { IgnoreWhitespace = false });
         while (reader.Read())
         {
-            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "calcPr")
+            if (reader.NodeType != XmlNodeType.Element)
                 continue;
 
-            _hasCalcPr = true;
-            _forceFormulaRecalculation = ParseBooleanAttribute(reader.GetAttribute("fullCalcOnLoad"));
-            return;
+            if (reader.LocalName == "calcPr")
+            {
+                _hasCalcPr = true;
+                _forceFormulaRecalculation = ParseBooleanAttribute(reader.GetAttribute("fullCalcOnLoad"));
+            }
+            else if (reader.LocalName == "workbookProtection")
+            {
+                _workbookProtected = true;
+            }
         }
     }
 
@@ -838,6 +855,12 @@ public sealed class XSSFWorkbook : IWorkbook
                         sheet.createFreezePane(xS, yS);
                     }
                 }
+                continue;
+            }
+            // Parse sheet protection
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "sheetProtection")
+            {
+                sheet.protectSheet(true);
                 continue;
             }
             if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "cols")
@@ -2306,6 +2329,12 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteStartElement("workbookPr");
         writer.WriteAttributeString("date1904", "false");
         writer.WriteEndElement();
+        if (_workbookProtected)
+        {
+            writer.WriteStartElement("workbookProtection");
+            writer.WriteAttributeString("lockStructure", "1");
+            writer.WriteEndElement();
+        }
         writer.WriteStartElement("bookViews");
         writer.WriteStartElement("workbookView");
         writer.WriteAttributeString("activeTab", "0");
@@ -2565,6 +2594,14 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteStartElement("sheetFormatPr");
         writer.WriteAttributeString("defaultRowHeight", "15.0");
         writer.WriteEndElement();
+        if (sheet.SheetProtected)
+        {
+            writer.WriteStartElement("sheetProtection");
+            writer.WriteAttributeString("sheet", "1");
+            writer.WriteAttributeString("objects", "1");
+            writer.WriteAttributeString("scenarios", "1");
+            writer.WriteEndElement();
+        }
         WriteCols(writer, sheet);
         writer.WriteStartElement("sheetData");
         foreach (var row in sheet.Rows)
