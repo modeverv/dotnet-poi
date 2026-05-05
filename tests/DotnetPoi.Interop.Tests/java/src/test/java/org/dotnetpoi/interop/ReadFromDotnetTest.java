@@ -22,15 +22,25 @@ import org.apache.poi.poifs.crypt.Decryptor;
 import org.apache.poi.poifs.crypt.EncryptionInfo;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
+import org.apache.poi.xslf.usermodel.XSLFAutoShape;
 import org.apache.poi.xslf.usermodel.XSLFPictureShape;
 import org.apache.poi.xslf.usermodel.XSLFShape;
 import org.apache.poi.xslf.usermodel.XSLFSlide;
+import org.apache.poi.xslf.usermodel.XSLFTextParagraph;
+import org.apache.poi.xslf.usermodel.XSLFTextRun;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFHeader;
+import org.apache.poi.xwpf.usermodel.XWPFFooter;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFPicture;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableCell;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.apache.poi.openxml4j.opc.PackageRelationship;
+import org.apache.poi.xwpf.usermodel.XWPFNumbering;
 import org.junit.jupiter.api.Test;
 
 public class ReadFromDotnetTest {
@@ -351,6 +361,171 @@ public class ReadFromDotnetTest {
             java.util.List<org.apache.poi.openxml4j.opc.PackagePart> vbaParts =
                 doc.getPackage().getPartsByContentType("application/vnd.ms-office.vbaProject");
             assertFalse(vbaParts.isEmpty(), "word/vbaProject.bin should be in the package");
+        }
+    }
+
+    @Test
+    void readPhaseDocxComprehensive() throws IOException, org.apache.poi.openxml4j.exceptions.InvalidFormatException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-docx-comprehensive.docx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XWPFDocument doc = new XWPFDocument(input)) {
+
+            // --- Header / Footer ---
+            XWPFHeader header = doc.getHeaderList().get(0);
+            assertNotNull(header, "header should exist");
+            assertTrue(header.getText().contains("Interop Test Header"), "header text mismatch");
+
+            XWPFFooter footer = doc.getFooterList().get(0);
+            assertNotNull(footer, "footer should exist");
+            assertTrue(footer.getText().contains("Page"), "footer text mismatch");
+
+            // --- Page setup (landscape) ---
+            var sectPr = doc.getDocument().getBody().getSectPr();
+            assertNotNull(sectPr, "sectPr should exist");
+            var pgSz = sectPr.getPgSz();
+            assertNotNull(pgSz, "pgSz should exist");
+            assertEquals("landscape", pgSz.getOrient().toString(), "orientation should be landscape");
+
+            java.util.List<XWPFParagraph> paragraphs = doc.getParagraphs();
+
+            // --- 1) Rich text paragraph (paragraph 0) ---
+            XWPFParagraph richPara = paragraphs.get(0);
+            java.util.List<XWPFRun> runs = richPara.getRuns();
+            assertTrue(runs.size() >= 4, "should have at least 4 runs");
+
+            XWPFRun boldRun = runs.get(0);
+            assertEquals("Bold ", boldRun.getText(0));
+            assertTrue(boldRun.isBold());
+            assertEquals(14, boldRun.getFontSize());
+            assertEquals("Arial", boldRun.getFontName());
+            assertEquals("FF0000", boldRun.getColor());
+
+            XWPFRun italicRun = runs.get(1);
+            assertEquals("Italic ", italicRun.getText(0));
+            assertTrue(italicRun.isItalic());
+            assertEquals(12, italicRun.getFontSize());
+            assertEquals("0000FF", italicRun.getColor());
+
+            XWPFRun ulRun = runs.get(2);
+            assertEquals("Underline ", ulRun.getText(0));
+            assertTrue(ulRun.getUnderline() != null && !ulRun.getUnderline().equals("none"),
+                "underline should be set");
+            assertEquals("Times New Roman", ulRun.getFontName());
+
+            XWPFRun strikeRun = runs.get(3);
+            assertEquals("Strikethrough", strikeRun.getText(0));
+            assertTrue(strikeRun.isStrike());
+            assertEquals(16, strikeRun.getFontSize());
+
+            // --- 2) Numbered list (paragraphs 1-2) ---
+            XWPFNumbering numbering = doc.getNumbering();
+            assertNotNull(numbering, "numbering should exist");
+
+            XWPFParagraph numPara1 = paragraphs.get(1);
+            assertEquals("First item", numPara1.getText());
+            assertNotNull(numPara1.getNumID(), "numbered item should have numId");
+
+            XWPFParagraph numPara2 = paragraphs.get(2);
+            assertEquals("Second item", numPara2.getText());
+            assertNotNull(numPara2.getNumID(), "numbered item should have numId");
+
+            // --- 3) Bullet list (paragraphs 3-4) ---
+            XWPFParagraph bullet1 = paragraphs.get(3);
+            assertEquals("Bullet A", bullet1.getText());
+            assertNotNull(bullet1.getNumID(), "bullet item should have numId");
+
+            XWPFParagraph bullet2 = paragraphs.get(4);
+            assertEquals("Bullet B", bullet2.getText());
+            assertNotNull(bullet2.getNumID(), "bullet item should have numId");
+
+            // --- 4) Indentation and spacing (paragraph 5) ---
+            XWPFParagraph indentPara = paragraphs.get(5);
+            assertEquals("Indented centered paragraph with spacing before and after.",
+                indentPara.getText());
+            assertEquals("center", indentPara.getAlignment().toString().toLowerCase());
+            assertTrue(indentPara.getIndentationLeft() > 0, "indent left should be set");
+            assertTrue(indentPara.getIndentationFirstLine() > 0, "first line indent should be set");
+
+            // --- 5) Hyperlink (paragraph 6) ---
+            XWPFParagraph linkPara = paragraphs.get(6);
+            assertEquals("Click here for DotnetPoi", linkPara.getText());
+
+            // Verify via OPC-level hyperlink relationships
+            boolean foundGithub = false;
+            for (PackageRelationship rel : doc.getPackagePart().getRelationshipsByType(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink")) {
+                if (rel.getTargetURI().toString().contains("github.com")) {
+                    foundGithub = true;
+                    break;
+                }
+            }
+            assertTrue(foundGithub, "github hyperlink should exist in document");
+
+            // --- 6) Table ---
+            java.util.List<XWPFTable> tables = doc.getTables();
+            assertEquals(1, tables.size(), "should have 1 table");
+
+            XWPFTable table = tables.get(0);
+            java.util.List<XWPFTableRow> tableRows = table.getRows();
+            assertEquals(3, tableRows.size(), "should have 3 rows");
+
+            // Header row
+            XWPFTableRow headerTableRow = tableRows.get(0);
+            assertEquals("Col A", headerTableRow.getCell(0).getText());
+            assertEquals("Col B", headerTableRow.getCell(1).getText());
+            assertEquals("Col C", headerTableRow.getCell(2).getText());
+
+            // Data row 1
+            XWPFTableRow dataRow1 = tableRows.get(1);
+            assertEquals("A1", dataRow1.getCell(0).getText());
+            assertEquals("B1", dataRow1.getCell(1).getText());
+            assertEquals("C1", dataRow1.getCell(2).getText());
+
+            // Link row (table row with hyperlink in middle cell)
+            XWPFTableRow linkRow = tableRows.get(2);
+            assertEquals("Link cell", linkRow.getCell(0).getText());
+            assertEquals("End", linkRow.getCell(2).getText());
+            // Middle cell should contain a hyperlink
+            XWPFTableCell linkCell = linkRow.getCell(1);
+            String linkCellText = linkCell.getText();
+            assertTrue("Example".equals(linkCellText) || linkCellText.contains("Example"),
+                "link cell should contain 'Example'");
+        }
+    }
+
+    @Test
+    void readPhasePptxComprehensive() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-pptx-comprehensive.pptx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XMLSlideShow prs = new XMLSlideShow(input)) {
+
+            assertEquals(1, prs.getSlides().size());
+            XSLFSlide slide = prs.getSlides().get(0);
+
+            // --- Text box with formatted text ---
+            // The text box (XSLFAutoShape) is the first shape
+            XSLFShape shape0 = slide.getShapes().get(0);
+            assertTrue(shape0 instanceof XSLFAutoShape, "first shape should be auto shape (text box)");
+            XSLFAutoShape autoShape = (XSLFAutoShape) shape0;
+
+            var paragraphs = autoShape.getTextParagraphs();
+            assertEquals(2, paragraphs.size());
+
+            // Paragraph 1: "Bold text" (bold, 18pt)
+            assertEquals("Bold text", paragraphs.get(0).getText());
+            var run0 = paragraphs.get(0).getRuns().get(0);
+            assertTrue(run0.isBold(), "first run should be bold");
+            assertEquals(18.0, run0.getFontSize(), 0.01);
+
+            // Paragraph 2: "Italic text" (italic, 14pt)
+            assertEquals("Italic text", paragraphs.get(1).getText());
+            var run1 = paragraphs.get(1).getRuns().get(0);
+            assertTrue(run1.isItalic(), "second run should be italic");
+            assertEquals(14.0, run1.getFontSize(), 0.01);
         }
     }
 

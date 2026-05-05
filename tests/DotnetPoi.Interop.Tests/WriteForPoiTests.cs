@@ -189,6 +189,114 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    public void Write_ComprehensiveDocx_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase-docx-comprehensive.docx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var doc = new XWPFDocument();
+
+        // --- Page setup ---
+        doc.setPageSize(15840, 12240); // landscape A4-ish
+        doc.setLandscape(true);
+        doc.setMargins(720, 720, 720, 720);
+
+        // --- Header / Footer ---
+        doc.setHeaderText("Interop Test Header");
+        doc.setFooterText("Page");
+
+        // --- 1) Rich text paragraph (multiple runs with formatting) ---
+        var richPara = doc.createParagraph();
+        var runBold = richPara.createRun();
+        runBold.setText("Bold ");
+        runBold.setBold(true);
+        runBold.setFontSize(14);
+        runBold.setFontName("Arial");
+        runBold.setColor("FF0000");
+
+        var runItalic = richPara.createRun();
+        runItalic.setText("Italic ");
+        runItalic.setItalic(true);
+        runItalic.setFontSize(12);
+        runItalic.setColor("0000FF");
+
+        var runUnderline = richPara.createRun();
+        runUnderline.setText("Underline ");
+        runUnderline.setUnderline(true);
+        runUnderline.setFontName("Times New Roman");
+
+        var runStrike = richPara.createRun();
+        runStrike.setText("Strikethrough");
+        runStrike.setStrike(true);
+        runStrike.setFontSize(16);
+
+        // --- 2) Numbered list ---
+        var numPara1 = doc.createParagraph();
+        numPara1.setNumberedList();
+        numPara1.createRun().setText("First item");
+
+        var numPara2 = doc.createParagraph();
+        numPara2.setNumberedList();
+        numPara2.createRun().setText("Second item");
+
+        // --- 3) Bullet list ---
+        var bullet1 = doc.createParagraph();
+        bullet1.setBulletList();
+        bullet1.createRun().setText("Bullet A");
+
+        var bullet2 = doc.createParagraph();
+        bullet2.setBulletList();
+        bullet2.createRun().setText("Bullet B");
+
+        // --- 4) Indentation and spacing ---
+        var indentPara = doc.createParagraph();
+        indentPara.setAlignment(ParagraphAlignment.Center);
+        indentPara.setIndentationLeft(720);   // 0.5in
+        indentPara.setIndentationRight(360);  // 0.25in
+        indentPara.setIndentationFirstLine(720);
+        indentPara.setSpacingBefore(240);
+        indentPara.setSpacingAfter(120);
+        indentPara.createRun().setText("Indented centered paragraph with spacing before and after.");
+
+        // --- 5) Hyperlink (external URL) ---
+        var linkPara = doc.createParagraph();
+        var linkRun = linkPara.createRun();
+        linkRun.setText("Click here for DotnetPoi");
+        linkRun.setHyperlink("https://github.com/dotnetpoi/DotnetPoi");
+
+        // --- 6) Table with row / cell text ---
+        var table = doc.createTable();
+        table.addGridCol(4572);
+        table.addGridCol(4572);
+        table.addGridCol(4572);
+
+        var headerRow = table.createRow();
+        headerRow.createCell().addParagraph().createRun().setText("Col A");
+        headerRow.createCell().addParagraph().createRun().setText("Col B");
+        headerRow.createCell().addParagraph().createRun().setText("Col C");
+
+        var dataRow = table.createRow();
+        dataRow.createCell().addParagraph().createRun().setText("A1");
+        dataRow.createCell().addParagraph().createRun().setText("B1");
+        dataRow.createCell().addParagraph().createRun().setText("C1");
+
+        // --- 7) Hyperlink in a table cell ---
+        var linkRow = table.createRow();
+        linkRow.createCell().addParagraph().createRun().setText("Link cell");
+        var linkCell = linkRow.createCell().addParagraph().createRun();
+        linkCell.setText("Example");
+        linkCell.setHyperlink("https://example.com");
+        linkRow.createCell().addParagraph().createRun().setText("End");
+
+        using var stream = File.Create(fixturePath);
+        doc.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
     public void Write_PptxWithPictureAndRotation_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_3-pptx.pptx");
@@ -200,6 +308,51 @@ public class WriteForPoiTests
         var shape = prs.createPicture(slide, picIdx);
         shape.setAnchor(0, 0, XMLSlideShow.DefaultSlideCx, XMLSlideShow.DefaultSlideCy);
         shape.setRotation(90.0);
+
+        using var stream = File.Create(fixturePath);
+        prs.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_PptxWithTextBoxesAndTables_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase-pptx-comprehensive.pptx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var prs = new XMLSlideShow();
+        var slide = prs.createSlide();
+
+        // --- Text box with formatted text ---
+        var tb = slide.createTextBox();
+        tb.setAnchor(100000, 100000, 4000000, 500000);
+        var para = tb.addParagraph();
+        var run = para.addRun("Bold text");
+        run.Bold = true;
+        run.FontSize = 18;
+        var para2 = tb.addParagraph();
+        var run2 = para2.addRun("Italic text");
+        run2.Italic = true;
+        run2.FontSize = 14;
+
+        // --- Table with rows and cells ---
+        var table = slide.createTable();
+        table.setAnchor(100000, 700000, 3000000, 1500000);
+        table.addGridCol(1500000);
+        table.addGridCol(1500000);
+        var row1 = table.createRow();
+        var cellA1 = row1.createCell();
+        cellA1.addParagraph().addRun("Cell A1");
+        var cellB1 = row1.createCell();
+        cellB1.addParagraph().addRun("Cell B1");
+        var row2 = table.createRow();
+        var cellA2 = row2.createCell();
+        cellA2.addParagraph().addRun("Cell A2");
+        var cellB2 = row2.createCell();
+        cellB2.addParagraph().addRun("Cell B2");
 
         using var stream = File.Create(fixturePath);
         prs.write(stream);

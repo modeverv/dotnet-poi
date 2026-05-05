@@ -841,6 +841,25 @@ The `write()` method currently creates a fresh ZIP without copying over parts it
 - Verification passed: `dotnet run --project examples/UsageSamples/UsageSamples.csproj`.
 - Next TODO: add focused usage samples/docs for common spreadsheet workflows from POI quick guide: read existing workbook, formulas as text/cached values, images, page setup/print settings, hyperlinks, and macro-enabled round-trip preservation.
 
+## 2026-05-06 JST - Phase 9 local docs generator
+
+- User requested a tool under `tools/` that generates the GitHub Pages-ready `docs/` site from `docs_src/`, with language/framework left to the agent.
+- Implemented `tools/DotnetPoi.DocsGenerator/` as a small C#/.NET console app with no external packages.
+- Added the generator project to `DotnetPOI.sln`.
+- Generator behavior:
+  - Reads `docs_src/site.json` for title, description, and navigation.
+  - Reads Markdown pages under `docs_src/content/`.
+  - Supports the Markdown subset currently needed by usage docs: headings, paragraphs, bullet lists, fenced code blocks, inline code, and links.
+  - Copies `docs_src/assets/` to `docs/assets/`.
+  - Writes `docs/index.html` plus per-page HTML, using relative links suitable for GitHub Pages project sites.
+- Added `docs_src/assets/site.css` and generated:
+  - `docs/index.html`
+  - `docs/getting-started/usage-samples.html`
+  - `docs/assets/site.css`
+- Verification passed: `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs`.
+- Removed generated `tools/DotnetPoi.DocsGenerator/bin` and `tools/DotnetPoi.DocsGenerator/obj` after verification.
+- Next TODO: as more Markdown pages are added to `docs_src/content/`, add them to `docs_src/site.json` navigation and rerun the generator before pushing `docs/`.
+
 ---
 
 ## 2026-05-14 JST — xlsx rich text + pivot table programmatic creation + docx unknown part preservation
@@ -888,5 +907,15 @@ New model classes with write-only support (existing files round-trip via unknown
 
 - Core: **222** (+3 new: docx unknown parts, xlsx rich text, xlsx pivot wiring verification)
 - Formula: **10**
-- Interop: **31**
-- **Total: 263**
+- Interop: **32** (+1 new: comprehensive docx fixture with tables, hyperlinks, headers/footers, numbering, page setup, rich text)
+- **Total: 264**
+
+---
+
+## 2026-05-15 JST — Interop test 整備
+
+### Plan
+
+1. ✅ **docx Interop B (dotnet → Java POI)**: Expanded fixture to include tables, hyperlinks, headers/footers, numbering, page setup, rich text — C# fixture generator + Java POI validator implemented.
+2. 🔴 **pptx Interop B (dotnet → Java POI)**: Expand fixture to include text boxes, tables, formatting.
+3. 🔴 **docx/pptx Interop A (Java POI → dotnet)**: Add Java fixture generator + C# validator.
