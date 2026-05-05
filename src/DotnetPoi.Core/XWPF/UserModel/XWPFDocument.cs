@@ -2,7 +2,6 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
-using DotnetPoi.POIFS.Crypt;
 using DotnetPoi.SS.Xml;
 
 namespace DotnetPoi.XWPF.UserModel;
@@ -23,6 +22,9 @@ public sealed class XWPFDocument : IDisposable
     private const string ContentTypeVbaData = "application/vnd.ms-word.vbaData+xml";
     private const string RelTypeVbaProject = "http://schemas.microsoft.com/office/2006/relationships/vbaProject";
 
+    private const string RelTypeNumbering = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
+    private const string ContentTypeNumbering = "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml";
+
     /// <summary>True if this document was loaded from docm (has a vbaProject.bin).</summary>
     public bool HasMacros => _vbaProjectBin != null;
 
@@ -33,7 +35,14 @@ public sealed class XWPFDocument : IDisposable
 
     private readonly List<XWPFParagraph> _paragraphs = new();
     private readonly List<XWPFPictureData> _pictures = new();
+    private readonly List<XWPFTable> _tables = new();
     private long _nextDrawingId = 1;
+
+    // Numbering support
+    private readonly List<(int abstractNumId, string numFmt, string lvlText, int startVal)> _abstractNums = new();
+    private readonly List<(int numId, int abstractNumId)> _numInstances = new();
+    private int _nextAbstractNumId;
+    private int _nextNumId = 1;
 
     // docm support: opaque VBA binaries preserved byte-for-byte.
     private byte[]? _vbaProjectBin;
@@ -57,6 +66,15 @@ public sealed class XWPFDocument : IDisposable
 
     public IReadOnlyList<XWPFParagraph> getParagraphs() => _paragraphs;
 
+    public XWPFTable createTable()
+    {
+        var table = new XWPFTable(this);
+        _tables.Add(table);
+        return table;
+    }
+
+    public IReadOnlyList<XWPFTable> getTables() => _tables;
+
     public IReadOnlyList<XWPFPictureData> getAllPictures() => _pictures;
 
     /// <summary>Returns 0-based index of added picture data.</summary>
@@ -76,6 +94,8 @@ public sealed class XWPFDocument : IDisposable
         WriteEntry(archive, "word/document.xml", WriteDocument);
         WriteEntry(archive, "word/_rels/document.xml.rels", WriteDocumentRelationships);
         WriteEntry(archive, "word/settings.xml", WriteSettings);
+        if (_numInstances.Count > 0)
+            WriteEntry(archive, "word/numbering.xml", WriteNumbering);
         foreach (var pic in _pictures)
         {
             WriteBinaryEntry(archive, $"word/media/{pic.getFileName()}", pic.Data);
@@ -92,21 +112,48 @@ public sealed class XWPFDocument : IDisposable
         }
     }
 
-    public void writeEncrypted(Stream stream, string password)
-    {
-        ArgumentNullException.ThrowIfNull(stream);
-        ArgumentNullException.ThrowIfNull(password);
-        using var package = new MemoryStream();
-        write(package);
-
-        var info = new EncryptionInfo(EncryptionMode.agile);
-        info.Encryptor.confirmPassword(password);
-        info.Encryptor.encryptPackage(package.ToArray(), stream);
-    }
-
     public void close() { }
 
     public void Dispose() => close();
+
+    /// <summary>Numbering formats supported by GetOrCreateNumbering.</summary>
+    public enum NumberingFormat
+    {
+        Bullet,
+        Decimal
+    }
+
+    /// <summary>
+    /// Gets or creates a numbering (num) instance with the given format.
+    /// Returns the numId to use in a paragraph's numPr.
+    /// </summary>
+    public int GetOrCreateNumbering(NumberingFormat format)
+    {
+        var (numFmt, lvlText, startVal) = format switch
+        {
+            NumberingFormat.Bullet => ("bullet", "\u2022", 1),
+            NumberingFormat.Decimal => ("decimal", "%1", 1),
+            _ => ("decimal", "%1", 1)
+        };
+
+        // Check if we already have an abstractNum with this format
+        var existingAbs = _abstractNums.FirstOrDefault(a => a.numFmt == numFmt && a.lvlText == lvlText);
+        int abstractNumId;
+        if (existingAbs.abstractNumId == 0 && existingAbs.numFmt is null)
+        {
+            abstractNumId = _nextAbstractNumId++;
+            _abstractNums.Add((abstractNumId, numFmt, lvlText, startVal));
+        }
+        else
+        {
+            abstractNumId = existingAbs.abstractNumId;
+        }
+
+        // Create a num instance referencing this abstractNum
+        var numId = _nextNumId++;
+        _numInstances.Add((numId, abstractNumId));
+        return numId;
+    }
 
     public void setVBAProject(byte[] vbaProjectData)
     {
@@ -196,6 +243,10 @@ public sealed class XWPFDocument : IDisposable
 
         XWPFParagraph? currentParagraph = null;
         XWPFRun? currentRun = null;
+        XWPFTable? currentTable = null;
+        XWPFTableRow? currentRow = null;
+        XWPFTableCell? currentTableCell = null;
+        bool inPPr = false;
         bool inRPr = false;
 
         // Inline image parsing state
@@ -217,7 +268,10 @@ public sealed class XWPFDocument : IDisposable
                         switch (reader.LocalName)
                         {
                             case "p":
-                                currentParagraph = createParagraph();
+                                if (currentTableCell is not null)
+                                    currentParagraph = currentTableCell.addParagraph();
+                                else
+                                    currentParagraph = createParagraph();
                                 break;
                             case "r" when !inRPr:
                                 if (currentParagraph is not null)
@@ -226,11 +280,94 @@ public sealed class XWPFDocument : IDisposable
                             case "rPr":
                                 inRPr = true;
                                 break;
+                            case "pPr":
+                                inPPr = true;
+                                break;
                             case "b" when inRPr:
                                 currentRun?.setBold(true);
                                 break;
                             case "i" when inRPr:
                                 currentRun?.setItalic(true);
+                                break;
+                            case "u" when inRPr:
+                                currentRun?.setUnderline(true);
+                                break;
+                            case "strike" when inRPr:
+                                currentRun?.setStrike(true);
+                                break;
+                            case "rFonts" when inRPr:
+                                var asciiAttr = reader.GetAttribute("w:ascii");
+                                if (asciiAttr is not null)
+                                    currentRun?.setFontName(asciiAttr);
+                                break;
+                            case "sz" when inRPr:
+                                var szVal = reader.GetAttribute("w:val");
+                                if (szVal is not null && double.TryParse(szVal, NumberStyles.Float, CultureInfo.InvariantCulture, out var halfPt))
+                                    currentRun?.setFontSize(halfPt / 2.0);
+                                break;
+                            case "color" when inRPr:
+                                var colorVal = reader.GetAttribute("w:val");
+                                if (colorVal is not null)
+                                    currentRun?.setColor(colorVal);
+                                break;
+                            case "jc" when inPPr:
+                                var jcVal = reader.GetAttribute("w:val");
+                                if (jcVal is not null && currentParagraph is not null)
+                                {
+                                    currentParagraph.setAlignment(jcVal switch
+                                    {
+                                        "left" => ParagraphAlignment.Left,
+                                        "center" => ParagraphAlignment.Center,
+                                        "right" => ParagraphAlignment.Right,
+                                        "both" => ParagraphAlignment.Both,
+                                        _ => ParagraphAlignment.Left
+                                    });
+                                }
+                                break;
+                            case "ind" when inPPr:
+                                var leftAttr = reader.GetAttribute("w:left");
+                                var rightAttr = reader.GetAttribute("w:right");
+                                var firstLineAttr = reader.GetAttribute("w:firstLine");
+                                var hangingAttr = reader.GetAttribute("w:hanging");
+                                if (leftAttr is not null && int.TryParse(leftAttr, out var l))
+                                    currentParagraph?.setIndentationLeft(l);
+                                if (rightAttr is not null && int.TryParse(rightAttr, out var r))
+                                    currentParagraph?.setIndentationRight(r);
+                                if (firstLineAttr is not null && int.TryParse(firstLineAttr, out var fl))
+                                    currentParagraph?.setIndentationFirstLine(fl);
+                                if (hangingAttr is not null && int.TryParse(hangingAttr, out var h))
+                                    currentParagraph?.setIndentationHanging(h);
+                                break;
+                            case "spacing" when inPPr:
+                                var beforeAttr = reader.GetAttribute("w:before");
+                                var afterAttr = reader.GetAttribute("w:after");
+                                var lineAttr = reader.GetAttribute("w:line");
+                                var lineRuleAttr = reader.GetAttribute("w:lineRule");
+                                if (beforeAttr is not null && int.TryParse(beforeAttr, out var b))
+                                    currentParagraph?.setSpacingBefore(b);
+                                if (afterAttr is not null && int.TryParse(afterAttr, out var a))
+                                    currentParagraph?.setSpacingAfter(a);
+                                if (lineAttr is not null && int.TryParse(lineAttr, out var ln))
+                                    currentParagraph?.setSpacingBetween(ln);
+                                if (lineRuleAttr is not null)
+                                    currentParagraph?.setLineSpacingRule(lineRuleAttr switch
+                                    {
+                                        "atLeast" => LineSpacingRule.AtLeast,
+                                        "exact" => LineSpacingRule.Exact,
+                                        _ => LineSpacingRule.Auto
+                                    });
+                                break;
+                            case "numPr" when inPPr:
+                                break;
+                            case "numId" when inPPr:
+                                var numIdAttr = reader.GetAttribute("w:val");
+                                if (numIdAttr is not null && int.TryParse(numIdAttr, out var nid))
+                                    currentParagraph?.setNumId(nid);
+                                break;
+                            case "ilvl" when inPPr:
+                                var ilvlAttr = reader.GetAttribute("w:val");
+                                if (ilvlAttr is not null && int.TryParse(ilvlAttr, out var iv))
+                                    currentParagraph?.setIlvl(iv);
                                 break;
                             case "t" when currentRun is not null && !inRPr:
                                 currentRun.setText(reader.ReadElementContentAsString());
@@ -243,6 +380,15 @@ public sealed class XWPFDocument : IDisposable
                                 blipEmbed = null;
                                 xfrmRot = 0;
                                 inInline = false;
+                                break;
+                            case "tbl":
+                                currentTable = createTable();
+                                break;
+                            case "tr" when currentTable is not null:
+                                currentRow = currentTable.createRow();
+                                break;
+                            case "tc" when currentRow is not null:
+                                currentTableCell = currentRow.createCell();
                                 break;
                         }
                         break;
@@ -283,6 +429,7 @@ public sealed class XWPFDocument : IDisposable
                             case "p":
                                 currentParagraph = null;
                                 currentRun = null;
+                                inPPr = false;
                                 break;
                             case "r" when !inRPr:
                                 currentRun = null;
@@ -290,9 +437,21 @@ public sealed class XWPFDocument : IDisposable
                             case "rPr":
                                 inRPr = false;
                                 break;
+                            case "pPr":
+                                inPPr = false;
+                                break;
                             case "drawing" when inDrawing:
                                 inDrawing = false;
                                 inInline = false;
+                                break;
+                            case "tbl":
+                                currentTable = null;
+                                break;
+                            case "tr":
+                                currentRow = null;
+                                break;
+                            case "tc":
+                                currentTableCell = null;
                                 break;
                         }
                         break;
@@ -402,6 +561,8 @@ public sealed class XWPFDocument : IDisposable
         WriteOverride(writer, "/word/document.xml",
             _vbaProjectBin != null ? ContentTypeDocm : ContentTypeDocx);
         WriteOverride(writer, "/word/settings.xml", ContentTypeSettings);
+        if (_numInstances.Count > 0)
+            WriteOverride(writer, "/word/numbering.xml", ContentTypeNumbering);
         if (_vbaProjectBin != null)
         {
             WriteOverride(writer, "/word/vbaProject.bin", ContentTypeVbaProject);
@@ -437,6 +598,14 @@ public sealed class XWPFDocument : IDisposable
             var vbaRelId = $"rId{_pictures.Count + 2}";
             WriteRelationship(writer, vbaRelId, "vbaProject.bin", RelTypeVbaProject);
         }
+        // numbering relationship after images
+        if (_numInstances.Count > 0)
+        {
+            var numRelId = _vbaProjectBin != null
+                ? $"rId{_pictures.Count + 3}"
+                : $"rId{_pictures.Count + 2}";
+            WriteRelationship(writer, numRelId, "numbering.xml", RelTypeNumbering);
+        }
         writer.WriteEndElement();
     }
 
@@ -463,6 +632,10 @@ public sealed class XWPFDocument : IDisposable
         {
             WriteParagraph(writer, para);
         }
+        foreach (var table in _tables)
+        {
+            WriteTable(writer, table);
+        }
         writer.WriteStartElement("w", "sectPr");
         writer.WriteEndElement();
         writer.WriteEndElement(); // body
@@ -472,6 +645,74 @@ public sealed class XWPFDocument : IDisposable
     private static void WriteParagraph(PoiXmlWriter writer, XWPFParagraph para)
     {
         writer.WriteStartElement("w", "p");
+
+        if (para.Alignment is not null || para.IndentLeft != 0
+            || para.IndentRight != 0 || para.IndentFirstLine != 0 || para.IndentHanging != 0
+            || para.SpacingBefore != 0 || para.SpacingAfter != 0 || para.SpacingBetween != 0
+            || para.NumId is not null)
+        {
+            writer.WriteStartElement("w", "pPr");
+            if (para.Alignment is not null)
+            {
+                writer.WriteStartElement("w", "jc");
+                writer.WriteAttributeString("w", "val", para.Alignment switch
+                {
+                    ParagraphAlignment.Left => "left",
+                    ParagraphAlignment.Center => "center",
+                    ParagraphAlignment.Right => "right",
+                    ParagraphAlignment.Both => "both",
+                    _ => "left"
+                });
+                writer.WriteEndElement();
+            }
+            if (para.IndentLeft != 0 || para.IndentRight != 0
+                || para.IndentFirstLine != 0 || para.IndentHanging != 0)
+            {
+                writer.WriteStartElement("w", "ind");
+                if (para.IndentLeft != 0)
+                    writer.WriteAttributeString("w", "left", para.IndentLeft.ToString(CultureInfo.InvariantCulture));
+                if (para.IndentRight != 0)
+                    writer.WriteAttributeString("w", "right", para.IndentRight.ToString(CultureInfo.InvariantCulture));
+                if (para.IndentFirstLine != 0)
+                    writer.WriteAttributeString("w", "firstLine", para.IndentFirstLine.ToString(CultureInfo.InvariantCulture));
+                if (para.IndentHanging != 0)
+                    writer.WriteAttributeString("w", "hanging", para.IndentHanging.ToString(CultureInfo.InvariantCulture));
+                writer.WriteEndElement();
+            }
+            if (para.SpacingBefore != 0 || para.SpacingAfter != 0
+                || para.SpacingBetween != 0)
+            {
+                writer.WriteStartElement("w", "spacing");
+                if (para.SpacingBefore != 0)
+                    writer.WriteAttributeString("w", "before", para.SpacingBefore.ToString(CultureInfo.InvariantCulture));
+                if (para.SpacingAfter != 0)
+                    writer.WriteAttributeString("w", "after", para.SpacingAfter.ToString(CultureInfo.InvariantCulture));
+                if (para.SpacingBetween != 0)
+                {
+                    writer.WriteAttributeString("w", "line", para.SpacingBetween.ToString(CultureInfo.InvariantCulture));
+                    writer.WriteAttributeString("w", "lineRule", para.LineRule switch
+                    {
+                        LineSpacingRule.AtLeast => "atLeast",
+                        LineSpacingRule.Exact => "exact",
+                        _ => "auto"
+                    });
+                }
+                writer.WriteEndElement();
+            }
+            if (para.NumId is not null)
+            {
+                writer.WriteStartElement("w", "numPr");
+                writer.WriteStartElement("w", "ilvl");
+                writer.WriteAttributeString("w", "val", para.Ilvl.ToString(CultureInfo.InvariantCulture));
+                writer.WriteEndElement();
+                writer.WriteStartElement("w", "numId");
+                writer.WriteAttributeString("w", "val", para.NumId.Value.ToString(CultureInfo.InvariantCulture));
+                writer.WriteEndElement();
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement(); // pPr
+        }
+
         foreach (var run in para.Runs)
         {
             WriteRun(writer, run);
@@ -479,12 +720,50 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteEndElement();
     }
 
+    private static void WriteTable(PoiXmlWriter writer, XWPFTable table)
+    {
+        writer.WriteStartElement("w", "tbl");
+        writer.WriteStartElement("w", "tblPr");
+        writer.WriteStartElement("w", "tblW");
+        writer.WriteAttributeString("w", "w", "5000");
+        writer.WriteAttributeString("w", "type", "dxa");
+        writer.WriteEndElement();
+        writer.WriteEndElement(); // tblPr
+        if (table.GridColWidths.Count > 0)
+        {
+            writer.WriteStartElement("w", "tblGrid");
+            foreach (var w in table.GridColWidths)
+            {
+                writer.WriteStartElement("w", "gridCol");
+                writer.WriteAttributeString("w", "w", w.ToString(CultureInfo.InvariantCulture));
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement(); // tblGrid
+        }
+        foreach (var row in table.Rows)
+        {
+            writer.WriteStartElement("w", "tr");
+            foreach (var cell in row.Cells)
+            {
+                writer.WriteStartElement("w", "tc");
+                foreach (var para in cell.Paragraphs)
+                {
+                    WriteParagraph(writer, para);
+                }
+                writer.WriteEndElement(); // tc
+            }
+            writer.WriteEndElement(); // tr
+        }
+        writer.WriteEndElement(); // tbl
+    }
+
     private static void WriteRun(PoiXmlWriter writer, XWPFRun run)
     {
         if (run.TextValue is not null)
         {
             writer.WriteStartElement("w", "r");
-            if (run.Bold || run.Italic)
+            if (run.Bold || run.Italic || run.Underline || run.Strike
+                || run.FontName is not null || run.FontSize > 0 || run.Color is not null)
             {
                 writer.WriteStartElement("w", "rPr");
                 if (run.Bold)
@@ -497,6 +776,37 @@ public sealed class XWPFDocument : IDisposable
                 {
                     writer.WriteStartElement("w", "i");
                     writer.WriteAttributeString("w", "val", "on");
+                    writer.WriteEndElement();
+                }
+                if (run.Underline)
+                {
+                    writer.WriteStartElement("w", "u");
+                    writer.WriteAttributeString("w", "val", "single");
+                    writer.WriteEndElement();
+                }
+                if (run.Strike)
+                {
+                    writer.WriteStartElement("w", "strike");
+                    writer.WriteAttributeString("w", "val", "on");
+                    writer.WriteEndElement();
+                }
+                if (run.FontName is not null)
+                {
+                    writer.WriteStartElement("w", "rFonts");
+                    writer.WriteAttributeString("w", "ascii", run.FontName);
+                    writer.WriteAttributeString("w", "hAnsi", run.FontName);
+                    writer.WriteEndElement();
+                }
+                if (run.FontSize > 0)
+                {
+                    writer.WriteStartElement("w", "sz");
+                    writer.WriteAttributeString("w", "val", ((int)(run.FontSize * 2)).ToString(CultureInfo.InvariantCulture));
+                    writer.WriteEndElement();
+                }
+                if (run.Color is not null)
+                {
+                    writer.WriteStartElement("w", "color");
+                    writer.WriteAttributeString("w", "val", run.Color);
                     writer.WriteEndElement();
                 }
                 writer.WriteEndElement(); // rPr
@@ -654,5 +964,103 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteAttributeString("Target", target);
         writer.WriteAttributeString("Type", type);
         writer.WriteEndElement();
+    }
+
+    private void WriteNumbering(PoiXmlWriter writer)
+    {
+        writer.WriteStartElement("w", "numbering");
+        writer.WriteAttributeString("xmlns:w", NsW);
+        foreach (var (absId, fmt, text, start) in _abstractNums)
+        {
+            writer.WriteStartElement("w", "abstractNum");
+            writer.WriteAttributeString("w", "abstractNumId", absId.ToString(CultureInfo.InvariantCulture));
+            writer.WriteStartElement("w", "lvl");
+            writer.WriteAttributeString("w", "ilvl", "0");
+            writer.WriteAttributeString("w", "tplc", "FFFFFFFF");
+            writer.WriteStartElement("w", "start");
+            writer.WriteAttributeString("w", "val", start.ToString(CultureInfo.InvariantCulture));
+            writer.WriteEndElement();
+            writer.WriteStartElement("w", "numFmt");
+            writer.WriteAttributeString("w", "val", fmt);
+            writer.WriteEndElement();
+            writer.WriteStartElement("w", "lvlText");
+            writer.WriteAttributeString("w", "val", text);
+            writer.WriteEndElement();
+            writer.WriteEndElement(); // lvl
+            writer.WriteEndElement(); // abstractNum
+        }
+        foreach (var (numId, abstractNumId) in _numInstances)
+        {
+            writer.WriteStartElement("w", "num");
+            writer.WriteAttributeString("w", "numId", numId.ToString(CultureInfo.InvariantCulture));
+            writer.WriteStartElement("w", "abstractNumId");
+            writer.WriteAttributeString("w", "val", abstractNumId.ToString(CultureInfo.InvariantCulture));
+            writer.WriteEndElement();
+            writer.WriteEndElement(); // num
+        }
+        writer.WriteEndElement(); // numbering
+    }
+
+    private void ReadNumbering(ZipArchive archive)
+    {
+        var numberingEntry = archive.GetEntry("word/numbering.xml");
+        if (numberingEntry is null) return;
+
+        using var stream = numberingEntry.Open();
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
+
+        int? currentAbstractNumId = null;
+        int? currentNumId = null;
+
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.Element && reader.NamespaceURI == NsW)
+            {
+                switch (reader.LocalName)
+                {
+                    case "abstractNum":
+                        var absIdAttr = reader.GetAttribute("w:abstractNumId");
+                        if (absIdAttr is not null && int.TryParse(absIdAttr, out var absId))
+                        {
+                            currentAbstractNumId = absId;
+                            if (absId >= _nextAbstractNumId)
+                                _nextAbstractNumId = absId + 1;
+                        }
+                        break;
+                    case "num":
+                        var numIdAttr = reader.GetAttribute("w:numId");
+                        if (numIdAttr is not null && int.TryParse(numIdAttr, out var nid))
+                        {
+                            currentNumId = nid;
+                            if (nid >= _nextNumId)
+                                _nextNumId = nid + 1;
+                        }
+                        break;
+                    case "abstractNumId":
+                        if (currentNumId is not null)
+                        {
+                            var absNumRef = reader.GetAttribute("w:val");
+                            if (absNumRef is not null && int.TryParse(absNumRef, out var absNumVal))
+                            {
+                                _numInstances.Add((currentNumId.Value, absNumVal));
+                            }
+                        }
+                        break;
+                    case "numFmt":
+                        if (currentAbstractNumId is not null)
+                        {
+                            var fmtVal = reader.GetAttribute("w:val");
+                            _abstractNums.Add((currentAbstractNumId.Value,
+                                fmtVal ?? "decimal", "\u2022", 1));
+                        }
+                        break;
+                }
+            }
+            if (reader.NodeType == XmlNodeType.EndElement && reader.NamespaceURI == NsW)
+            {
+                if (reader.LocalName == "abstractNum") currentAbstractNumId = null;
+                if (reader.LocalName == "num") currentNumId = null;
+            }
+        }
     }
 }

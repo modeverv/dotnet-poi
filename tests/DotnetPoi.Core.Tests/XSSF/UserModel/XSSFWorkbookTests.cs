@@ -732,6 +732,101 @@ public class XSSFWorkbookTests
         Assert.Equal("100", loadedRule.Formulas[0]);
     }
 
+    [Fact]
+    public void RoundTrip_FreezePane_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("Freeze");
+        sheet.createRow(0).createCell(0).setCellValue("Header");
+        sheet.createRow(1).createCell(0).setCellValue("Data");
+        sheet.createFreezePane(1, 1);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("Freeze")!;
+        Assert.Equal(1, loadedSheet.FreezeColSplit);
+        Assert.Equal(1, loadedSheet.FreezeRowSplit);
+    }
+
+    [Fact]
+    public void RoundTrip_HiddenRow_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("HideRow");
+        var row0 = sheet.createRow(0);
+        row0.createCell(0).setCellValue("Visible");
+        var row1 = sheet.createRow(1);
+        row1.createCell(0).setCellValue("Hidden");
+        row1.setHidden(true);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("HideRow")!;
+        Assert.False(loadedSheet.getRow(0)!.isHidden());
+        Assert.True(loadedSheet.getRow(1)!.isHidden());
+    }
+
+    [Fact]
+    public void RoundTrip_HiddenColumn_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("HideCol");
+        sheet.createRow(0).createCell(0).setCellValue("A");
+        sheet.createRow(0).createCell(1).setCellValue("B (hidden)");
+        sheet.setColumnHidden(1, true);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("HideCol")!;
+        Assert.False(loadedSheet.isColumnHidden(0));
+        Assert.True(loadedSheet.isColumnHidden(1));
+    }
+
+    [Fact]
+    public void RoundTrip_SharedStrings_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("Strings");
+        var row = sheet.createRow(0);
+        row.createCell(0).setCellValue("Hello");
+        row.createCell(1).setCellValue("World");
+        row.createCell(2).setCellValue("C# with DotnetPoi");
+        var row2 = sheet.createRow(1);
+        row2.createCell(0).setCellValue("Hello"); // duplicate — should share index
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        // Verify the SST has exactly 3 unique entries
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var sstEntry = archive.GetEntry("xl/sharedStrings.xml");
+        Assert.NotNull(sstEntry);
+        using var sstReader = new StreamReader(sstEntry.Open());
+        var sstXml = sstReader.ReadToEnd();
+        Assert.Contains("<t>Hello</t>", sstXml);
+        Assert.Contains("<t>World</t>", sstXml);
+        Assert.Contains("<t>C# with DotnetPoi</t>", sstXml);
+
+        // Reload workbook and verify cell values
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("Strings")!;
+        Assert.Equal("Hello", loadedSheet.getRow(0)!.getCell(0)!.getStringCellValue());
+        Assert.Equal("World", loadedSheet.getRow(0)!.getCell(1)!.getStringCellValue());
+        Assert.Equal("C# with DotnetPoi", loadedSheet.getRow(0)!.getCell(2)!.getStringCellValue());
+        Assert.Equal("Hello", loadedSheet.getRow(1)!.getCell(0)!.getStringCellValue());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

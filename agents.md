@@ -319,7 +319,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 |---|---|---|---|
 | 1 | xlsx/XSSF | ~70% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; no formula evaluation; rich text formatting, pivot tables, charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
-| 3 | docx/XWPF | ~15% | paragraph/run/image write ✅; round-trip not tested |
+| 3 | docx/XWPF | ~40% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ☐; hyperlinks ☐; headers/footers ☐; page setup ☐ |
 | 4 | pptx/XSLF | ~15% | slide/image/rotation write ✅; round-trip not tested |
 | 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
 | 6 | doc/HWPF | ~5% | read-only stub only |
@@ -379,6 +379,46 @@ Do not add these as fixture-specific constants — only fix when a concrete inte
 - [ ] Round-trip slide/text read/write.
 - [ ] Interop A/B with Java POI for representative `.ppt` files.
 - [ ] Shapes, pictures, text formatting, masters, layouts.
+
+
+### Phase 8 — Interop Verification Gate
+
+Goal: make interop checks explicit before declaring a format slice “done”.
+
+- **Direction A/B coverage**: For each supported format, add/maintain both directions in `tests/DotnetPoi.Interop.Tests/`.
+- **Fixture discipline**: Java outputs → `fixtures/from-poi/`, C# outputs → `fixtures/from-dotnet-poi/`; keep deterministic names.
+- **Core content matrix** (per format as applicable): values/types, formulas (text + cached value), styles, layout (merged/width/height/hidden/freeze), shared strings, hyperlinks, data validation, conditional formatting, print settings, drawings/images.
+- **Macro formats**: xlsm/docm/pptm preserve `vbaProject.bin` and macro content types byte-for-byte on round-trip.
+- **Unknown parts**: preserve unmodeled package parts/relationships during round-trip.
+- **XML parity**: only add byte-level fixtures when a real interop failure cannot be fixed semantically.
+
+
+### Phase 9 — Documentation Site Generation
+
+Goal: build modern, verified documentation for dotnet-poi in `docs/`, using Apache POI documentation only as reference material.
+
+This phase is about producing documentation that users can trust because examples are real code, generated outputs are checked, and the final site is built from repository-owned Markdown.
+
+Rules:
+
+- **Reference, do not copy**: Apache POI documentation is Apache License 2.0 material. It may be read to understand scope, terminology, and likely user needs, but do not copy long passages or mirror the structure wholesale. Rephrase, summarize, and reorganize for dotnet-poi.
+- **Do not edit `poi/`**: the Apache POI submodule remains read-only. Use it only as source/reference.
+- **Docs are dotnet-poi owned**: author Markdown under repository-owned documentation sources, then generate static HTML into `docs/`.
+- **Examples first**: create or update runnable examples under `examples/` before documenting behavior. Documentation should refer to examples that compile and run.
+- **Verify examples**: run the relevant `dotnet`, Java, Python, or other tooling needed to confirm examples and generated artifacts. Any language/tool may be used for documentation generation if it is reproducible from the repo.
+- **Prefer generated API truth**: when documenting public API, derive class/member information from the C# source or generated metadata rather than hand-maintaining stale lists.
+- **Keep package split clear**: distinguish `DotnetPoi.Core` from `DotnetPoi.Formula`; do not imply formula evaluation support beyond the deliberately limited scope.
+- **Publishable output**: generated HTML belongs under `docs/`; source Markdown, examples, and generation scripts/config should remain outside `docs/` unless the chosen static site generator requires otherwise.
+
+Recommended workflow:
+
+1. Draft the documentation information architecture: getting started, package installation, format-specific guides, examples, compatibility notes, and limitations.
+2. Implement runnable examples in `examples/` for the documented workflows.
+3. Run examples and tests that prove the documented behavior.
+4. Write Markdown in dotnet-poi's own words, citing examples and known limitations.
+5. Generate HTML into `docs/` with a reproducible script or static site generator.
+6. Spot-check the generated HTML before considering the docs slice complete.
+
 
 ---
 
@@ -925,6 +965,46 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 - [ ] スライド/テキストの read/write ラウンドトリップ。
 - [ ] representative な `.ppt` ファイルで Java POI との Interop A/B。
 - [ ] shape、picture、text formatting、master、layout を実装する。
+
+
+### Phase 8 — Interop 検証ゲート
+
+目標: フォーマットの完了判定前に interop の必須確認項目を明文化する。
+
+- **方向 A/B の両対応**: 各対応フォーマットで双方向テストを `tests/DotnetPoi.Interop.Tests/` に追加・維持する。
+- **fixture 運用**: Java 出力 → `fixtures/from-poi/`、C# 出力 → `fixtures/from-dotnet-poi/` に固定し、ファイル名は決定的にする。
+- **中核マトリクス**（該当する範囲で）: 値/型、数式（テキスト＋キャッシュ値）、スタイル、レイアウト（結合/幅/高さ/非表示/フリーズ）、共有文字列、ハイパーリンク、データ検証、条件付き書式、印刷設定、描画/画像。
+- **マクロ形式**: xlsm/docm/pptm で `vbaProject.bin` と macro content type を byte-for-byte で保持する。
+- **未知パーツ保持**: モデルが未対応の package part / relationship を round-trip で保全する。
+- **XML パリティ**: 実害のある interop 失敗がセマンティックに直せない場合のみ byte-level fixture を追加する。
+
+
+### Phase 9 — Documentation Site Generation
+
+目標: Apache POI のドキュメントを参考資料として読みつつ、dotnet-poi 独自の現代的な Markdown ドキュメントを作り、検証済み examples を根拠に HTML 化して `docs/` に配置する。
+
+このフェーズでは、実際に動く例・検証された出力・リポジトリが所有する Markdown を元に、利用者が信頼できるドキュメントサイトを作る。
+
+ルール:
+
+- **参照はするがコピーしない**: Apache POI の文書は Apache License 2.0 の著作物である。範囲・用語・利用者が知りたい内容を把握するために読むのはよいが、長文コピーや構造の丸写しは避ける。dotnet-poi の言葉で要約・再構成する。
+- **`poi/` は編集しない**: Apache POI submodule は読み取り専用。参照元としてのみ使う。
+- **docs は dotnet-poi 所有物にする**: リポジトリ側の Markdown を原稿にし、静的 HTML を `docs/` に生成する。
+- **examples を先に作る**: ドキュメント化する前に `examples/` の実コードを作成・更新する。ドキュメントは compile/run 済みの例を参照する。
+- **examples を検証する**: `dotnet`、Java、Python、その他必要なツールを使って、サンプルと生成物が正しく動くことを確認する。ドキュメント生成には、リポジトリから再現できる限り任意の言語・ツールを使ってよい。
+- **API 情報は生成元を優先する**: public API を説明する場合、手書き一覧より C# ソースや生成メタデータから導いた情報を優先し、古くなりにくくする。
+- **パッケージ分割を明確にする**: `DotnetPoi.Core` と `DotnetPoi.Formula` の違いを明記し、数式評価については意図的に限定された範囲以上の対応を示唆しない。
+- **公開可能な出力**: 生成 HTML は `docs/` に置く。Markdown 原稿、examples、生成スクリプト/設定は、静的サイトジェネレーターの都合がない限り `docs/` 外に置く。
+
+推奨ワークフロー:
+
+1. ドキュメントの章立てを作る: getting started、package installation、format-specific guides、examples、compatibility notes、limitations。
+2. ドキュメント化するワークフローの runnable example を `examples/` に実装する。
+3. examples と関連テストを実行し、説明する挙動が実際に成立することを確認する。
+4. dotnet-poi 独自の言葉で Markdown を書き、examples と既知の制限を参照する。
+5. 再現可能なスクリプトまたは静的サイトジェネレーターで HTML を `docs/` に生成する。
+6. 生成された HTML を spot-check してから docs slice 完了とみなす。
+
 
 ---
 

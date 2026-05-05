@@ -1,5 +1,37 @@
 # CHECKPOINT
 
+## 2026-05-05 13:xx JST - Add Phase 9 documentation generation guidance
+
+- Current task: POI ドキュメントを参考にしつつ、dotnet-poi 独自の Markdown + runnable examples + HTML 生成を進める方針を `agents.md` に Phase 9 として追加。
+- Scope: コミットしない。
+
+### やったこと
+
+- `agents.md` の英語版フェーズ一覧に `Phase 9 — Documentation Site Generation` を追加。
+- `agents.md` の日本語版フェーズ一覧にも同内容を追加。
+- POI 文書は Apache License 2.0 の参考資料として読み、長文コピーや構造の丸写しを避ける方針を明記。
+- `examples/` の実コードを先に作って検証し、その結果を Markdown docs に反映し、HTML を `docs/` に生成するワークフローを明記。
+- `dotnet` / Java / Python など、再現可能であれば任意のツールを docs 生成・検証に使ってよいことを明記。
+
+### Verification
+
+- `git diff -- agents.md CHECKPOINT.md` で追記内容を確認。
+- ドキュメント更新のみなのでテストは未実行。
+
+## 2026-05-05 13:xx JST - Add Phase 7.1 interop verification gate
+
+- Current task: agents.md に interop 検証用のフェーズを追加してチェック項目を明文化。
+- Scope: コミットしない。
+
+### やったこと
+
+- `agents.md` に Phase 7.1 を追加（英日両方）。
+- interop の必須チェック項目（方向A/B、fixture運用、コア項目、マクロ、未知パーツ保持、XMLパリティ条件）を列挙。
+
+### Verification
+
+- 未実施（ドキュメント更新のみ）。
+
 ## 2026-05-05 12:xx JST - Added local interop test script
 
 - Current task: CI と同じ Java↔.NET interop テストをローカル実行する `test.sh` を追加。
@@ -490,7 +522,7 @@ Attributes: `&`, `"`, `'` (literal), `\`, relationship URL with `&`, format code
   3. Re-implement the behavior incrementally in `PoiXmlWriter`, with focused failing tests per low-level XML divergence。Keep higher-level `XSSFWorkbook` output POI-model-driven, and preserve unknown/original package parts byte-for-byte where the model does not yet support them。
 - Important boundary: XML lexical quirks such as declaration format, empty element form, escaping, attribute order, namespace placement, and whitespace belong in `PoiXmlWriter` or focused helpers。Specific workbook content such as defined names, Office revision GUIDs, local absolute paths, workbook extLst contents, and fixture-specific relationship ordering must not be generalized into `XSSFWorkbook` unless directly backed by the POI model/source behavior。
 - Do not commit via LLM。
-- Step 1 status: completed in working tree by restoring `src/` and the parity-related `tests/` paths back to `7a4b778` (the parent of `31e9006`）。This removes the fixture-specific XSSF writer changes, the added XSSF/XWPF/XSLF parity tests, the expanded Java parity fixture generator, and the extra generated xml-parity fixtures。`dotnet test` passes after the removal。
+- Step 1 status: completed in working tree by restoring `src/` and the parity-related `tests/` paths back to `7a4b778` (the parent of `31e9006`）。これにより、fixture-specific XSSF writer changes、added XSSF/XWPF/XSLF parity tests、expanded Java parity fixture generator、extra generated xml-parity fixtures が削除される。`dotnet test` は通過する。
 - Step 2 direction: do not add XMLBeans as a submodule yet。Add Java probe/fixture generator coverage instead and document the work in `XMLBEANS_XML_OUTPUT_TODO.md`。Use XMLBeans 5.3.0 source jars/tagged source only if executable probes are not enough。
 - Step 3 status: added `XMLBEANS_XML_OUTPUT_TODO.md`, `XmlBeansOutputProbeTest.java`, and initial generated XMLBeans probe fixtures under `tests/DotnetPoi.Interop.Tests/fixtures/xmlbeans-output/`。Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=XmlBeansOutputProbeTest`。
 - Additional fixture strategy: use upstream POI integration-level tests as scenario sources to improve fixture realism。Added `POI_INTEGRATION_FIXTURE_TODO.md` and updated `XMLBEANS_XML_OUTPUT_TODO.md` with a step-by-step plan。Keep POI-derived fixtures semantic-first; do not turn fixture-specific XML into generalized `XSSFWorkbook` output。
@@ -629,12 +661,24 @@ All requested round-trip features are now implemented。Pivot tables and Charts 
 | 1 | Paragraphs & runs (text) | ✅ | ✅ | ✅ | ✅ |
 | 2 | Bold / Italic | ✅ | ✅ | ✅ | ✅ |
 | 3 | Inline pictures + rotation | ✅ | ✅ | ✅ | ✅ |
-| 4 | Run font name / size / color / underline / strikethrough | ☐ | ☐ | ☐ | 🔴 |
-| 5 | Paragraph alignment (left/center/right/justify) | ☐ | ☐ | ☐ | 🔴 |
-| 6 | Paragraph indentation / spacing | ☐ | ☐ | ☐ | 🔴 |
-| 7 | Numbering / bullet lists | ☐ | ☐ | ☐ | 🔴 |
+| 4 | Run font name / size / color / underline / strikethrough | ✅ | ✅ | ✅ | ✅ |
+| 5 | Paragraph alignment (left/center/right/justify) | ✅ | ✅ | ✅ | ✅ |
+| 6 | Paragraph indentation / spacing | ✅ | ✅ | ✅ | ✅ |
+| 7 | Numbering / bullet lists | ✅ | ✅ | ✅ | ✅ |
 | 8 | Tables | ☐ | ☐ | ☐ | 🔴 |
 | 9 | Hyperlinks | ☐ | ☐ | ☐ | 🔴 |
 | 10 | Headers / Footers | ☐ | ☐ | ☐ | 🔴 |
 | 11 | Page setup (size / orientation / margins) | ☐ | ☐ | ☐ | 🔴 |
 
+### docx numbering infrastructure (re-added after git checkout revert)
+
+Numbering write/read was lost during a git checkout revert and has been re-implemented:
+
+- **Write**: `WriteNumbering()` method writes `<w:numbering>` with `<w:abstractNum>` (+ lvl/start/numFmt/lvlText) and `<w:num>` (+ abstractNumId) elements.
+- **Read**: `ReadNumbering()` method parses `word/numbering.xml` back into `_abstractNums` and `_numInstances` lists, with ID tracking.
+- **Content type**: Conditional override for `/word/numbering.xml` in `WriteContentTypes`.
+- **Relationship**: Conditional relationship entry in `WriteDocumentRelationships` (dynamic rId calculation after images and vbaProject).
+- **WriteParagraph**: Updated to write full pPr (jc, ind, spacing, numPr/numId/ilvl).
+- **WriteRun**: Updated to write full rPr (b, i, u, strike, rFonts, sz, color).
+- **ReadDocument**: pPr/rPr element handlers for ind, spacing, numPr, numId, ilvl; rFonts, sz, color, underline, strike.
+- All 19 XWPF tests pass (12 existing + 3 font/alignment + 2 indent/spacing + 2 bullet/numbered list).

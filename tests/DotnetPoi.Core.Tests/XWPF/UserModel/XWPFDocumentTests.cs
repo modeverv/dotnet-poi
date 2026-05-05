@@ -282,6 +282,176 @@ public class XWPFDocumentTests
         Assert.True(lp3.getRuns()[1].isBold());
     }
 
+    [Fact]
+    public void RoundTrip_FontProperties_Restored()
+    {
+        using var original = new XWPFDocument();
+        var para = original.createParagraph();
+        var run = para.createRun();
+        run.setText("styled text");
+        run.setBold(true);
+        run.setItalic(true);
+        run.setFontName("Arial");
+        run.setFontSize(12.0);
+        run.setColor("FF0000");
+        run.setUnderline(true);
+        run.setStrike(true);
+        para.setAlignment(ParagraphAlignment.Center);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        Assert.Single(loaded.getParagraphs());
+        var loadedPara = loaded.getParagraphs()[0];
+        Assert.Single(loadedPara.getRuns());
+        var loadedRun = loadedPara.getRuns()[0];
+        Assert.Equal("styled text", loadedRun.getText(0));
+        Assert.True(loadedRun.isBold());
+        Assert.True(loadedRun.isItalic());
+        Assert.Equal("Arial", loadedRun.getFontName());
+        Assert.Equal(12.0, loadedRun.getFontSize(), precision: 1);
+        Assert.Equal("FF0000", loadedRun.getColor());
+        Assert.True(loadedRun.isUnderline());
+        Assert.True(loadedRun.isStrike());
+        Assert.Equal(ParagraphAlignment.Center, loadedPara.getAlignment());
+    }
+
+    [Fact]
+    public void RoundTrip_RunFontNameSizeColor_Restored()
+    {
+        using var original = new XWPFDocument();
+        var run = original.createParagraph().createRun();
+        run.setText("quick brown fox");
+        run.setFontName("Times New Roman");
+        run.setFontSize(14.0);
+        run.setColor("00FF00");
+        run.setBold(false); // no rPr at all
+        run.setItalic(false);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        var loadedRun = loaded.getParagraphs()[0].getRuns()[0];
+        Assert.Equal("quick brown fox", loadedRun.getText(0));
+        Assert.Equal("Times New Roman", loadedRun.getFontName());
+        Assert.Equal(14.0, loadedRun.getFontSize(), precision: 1);
+        Assert.Equal("00FF00", loadedRun.getColor());
+        Assert.False(loadedRun.isBold());
+        Assert.False(loadedRun.isItalic());
+    }
+
+    [Fact]
+    public void RoundTrip_AlignmentAllValues_Restored()
+    {
+        foreach (var align in new[] { ParagraphAlignment.Left, ParagraphAlignment.Center,
+            ParagraphAlignment.Right, ParagraphAlignment.Both })
+        {
+            using var original = new XWPFDocument();
+            var para = original.createParagraph();
+            para.createRun().setText("text");
+            para.setAlignment(align);
+
+            using var stream = new MemoryStream();
+            original.write(stream);
+            stream.Position = 0;
+
+            using var loaded = new XWPFDocument(stream);
+            Assert.Equal(align, loaded.getParagraphs()[0].getAlignment());
+        }
+    }
+
+    [Fact]
+    public void RoundTrip_ParagraphIndentation_Restored()
+    {
+        using var original = new XWPFDocument();
+        var para = original.createParagraph();
+        para.createRun().setText("indented");
+        para.setIndentationLeft(720);   // 0.5 inch
+        para.setIndentationRight(360);  // 0.25 inch
+        para.setIndentationFirstLine(720);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        var loadedPara = loaded.getParagraphs()[0];
+        Assert.Equal(720, loadedPara.getIndentationLeft());
+        Assert.Equal(360, loadedPara.getIndentationRight());
+        Assert.Equal(720, loadedPara.getIndentationFirstLine());
+    }
+
+    [Fact]
+    public void RoundTrip_ParagraphSpacing_Restored()
+    {
+        using var original = new XWPFDocument();
+        var para = original.createParagraph();
+        para.createRun().setText("spaced");
+        para.setSpacingBefore(240);
+        para.setSpacingAfter(120);
+        para.setSpacingBetween(400);
+        para.setLineSpacingRule(LineSpacingRule.Exact);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        var loadedPara = loaded.getParagraphs()[0];
+        Assert.Equal(240, loadedPara.getSpacingBefore());
+        Assert.Equal(120, loadedPara.getSpacingAfter());
+        Assert.Equal(400, loadedPara.getSpacingBetween());
+        Assert.Equal(LineSpacingRule.Exact, loadedPara.getLineSpacingRule());
+    }
+
+    [Fact]
+    public void RoundTrip_BulletList_Restored()
+    {
+        using var original = new XWPFDocument();
+        var p1 = original.createParagraph();
+        p1.createRun().setText("item 1");
+        p1.setBulletList();
+        var p2 = original.createParagraph();
+        p2.createRun().setText("item 2");
+        p2.setBulletList();
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        Assert.Equal(2, loaded.getParagraphs().Count);
+        Assert.NotNull(loaded.getParagraphs()[0].getNumId());
+        Assert.Equal(0, loaded.getParagraphs()[0].getIlvl());
+        Assert.NotNull(loaded.getParagraphs()[1].getNumId());
+        Assert.Equal(0, loaded.getParagraphs()[1].getIlvl());
+        Assert.Equal("item 1", loaded.getParagraphs()[0].getText());
+        Assert.Equal("item 2", loaded.getParagraphs()[1].getText());
+    }
+
+    [Fact]
+    public void RoundTrip_NumberedList_Restored()
+    {
+        using var original = new XWPFDocument();
+        var para = original.createParagraph();
+        para.createRun().setText("numbered item");
+        para.setNumberedList();
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        var loadedPara = loaded.getParagraphs()[0];
+        Assert.NotNull(loadedPara.getNumId());
+        Assert.Equal(0, loadedPara.getIlvl());
+        Assert.Equal("numbered item", loadedPara.getText());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);
