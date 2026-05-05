@@ -317,9 +317,9 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 
 | step | format | progress | notes |
 |---|---|---|---|
-| 1 | xlsx/XSSF | ~75% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; rich text (per-character formatting) ✅; pivot tables (programmatic create + unknown parts preserve) ✅; no formula evaluation; charts deferred |
+| 1 | xlsx/XSSF | ~78% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; rich text (per-character formatting) ✅; pivot tables (programmatic create + unknown parts preserve) ✅; auto filter ✅; sheet/workbook protection ✅; no formula evaluation; charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
-| 3 | docx/XWPF | ~65% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅ |
+| 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅ |
 | 4 | pptx/XSLF | ~40% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; unknown part preservation ✅; tables (p:graphicFrame/a:tbl) write/read ✅; 8 round-trip tests |
 | 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
 | 6 | doc/HWPF | ~5% | read-only stub only |
@@ -354,7 +354,7 @@ Do not add these as fixture-specific constants — only fix when a concrete inte
 - [x] Interop B: dotnet-poi writes docx → Java POI reads. *(comprehensive fixture with tables, hyperlinks, headers/footers, numbering, page setup, rich text)*
 - [x] Interop A: Java POI writes docx → dotnet-poi reads. *(comprehensive fixture with plain/bold/italic paragraphs, table, header/footer)*
 - [x] Tables, numbering, styles, headers/footers, sections, page settings, fields, hyperlinks, comments, footnotes/endnotes.
-- [ ] Preserve unknown parts and relationships during round-trip.
+- [x] Preserve unknown parts and relationships during round-trip.
 
 #### step 4 pptx / XSLF
 
@@ -961,10 +961,10 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 
 #### step 3 docx / XWPF
 
-- [x] ラウンドトリップ: docx を開いて書いて読み返し、paragraph/run のテキストと書式が同一であることを確認する。 *(font properties, alignment, indent/spacing, numbering, tables, hyperlinks, headers/footers, page setup — 16 round-trip tests)*
+- [x] ラウンドトリップ: docx を開いて書いて読み返し、paragraph/run のテキストと書式が同一であることを確認する。 *(font properties, alignment, indent/spacing, numbering, tables, hyperlinks, headers/footers, page setup, fields — 17 round-trip tests)*
 - [x] Interop B: dotnet-poi が docx を書く → Java POI が読む *(tables/hyperlinks/headers-footers/numbering/page-setup/rich-text を含む包括的 fixture)*
 - [x] Interop A: Java POI が docx を書く → dotnet-poi が読む *(plain/bold/italic paragraph、table、header/footer を含む包括的 fixture)*
-- [x] table、numbering、style、header/footer、section、page setting、field、hyperlink、comment、footnote/endnote を実装する。 *(table/numbering/header-footer/page-setup/hyperlink 完了)*
+- [x] table、numbering、style、header/footer、section、page setting、field、hyperlink、comment、footnote/endnote を実装する。 *(table/numbering/header-footer/page-setup/hyperlink/field 完了)*
 - [x] round-trip 時に未知 part と relationship を保持する。
 
 #### step 4 pptx / XSLF
@@ -1220,9 +1220,9 @@ throw new NotImplementedException("XSSFCell.SetFormula is not yet ported. See Is
 
 | 優先度 | 項目 | フォーマット | 実装コスト | 理由 |
 |---|---|---|---|---|
-| 1 | **セル保護 / ブック保護** | xlsx | 🟢 軽い（半日〜1日） | sheet.xml に `<sheetProtection>` 属性を追加するだけ。パスワードハッシュは後回し可 |
-| 2 | **フィールド（TOC/ページ番号/差し込み印刷）** | docx | 🟡 中程度（2〜3日） | フィールドコードのパースと FldChar（begin/separate/end）の処理が必要 |
-| 3 | **オートフィルター** | xlsx | 🟢 軽い〜中程度（1〜2日） | sheet.xml に `<autoFilter>` 要素を追加。フィルター条件は簡略化可 |
+| 1 | **セル保護 / ブック保護** | xlsx | ✅ 完了 | sheet.xml に `<sheetProtection>` 属性を追加 |
+| 2 | **フィールド（TOC/ページ番号/差し込み印刷）** | docx | ✅ 完了 | FldChar（begin/separate/end）の読み書き対応 |
+| 3 | **オートフィルター** | xlsx | ✅ 完了 | sheet.xml に `<autoFilter>` 要素を追加 |
 | 🔵 後回し | **グラフ作成** | xlsx, pptx | 🔴 極めて重い（数週間〜） | 30種のチャート型、多ファイル構成、DrawingML スキーマ。実装コストが他と比べて一桁大きい |
 
 備考:

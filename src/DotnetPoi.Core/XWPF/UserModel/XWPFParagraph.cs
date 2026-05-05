@@ -20,6 +20,7 @@ public enum LineSpacingRule
 public sealed class XWPFParagraph
 {
     private readonly List<XWPFRun> _runs = new();
+    private readonly List<XWPFField> _fields = new();
     private ParagraphAlignment? _alignment;
     // Indentation (twips = 1/1440 inch)
     private int _indentLeft;
@@ -42,6 +43,7 @@ public sealed class XWPFParagraph
 
     internal XWPFDocument Document { get; }
     internal IReadOnlyList<XWPFRun> Runs => _runs;
+    internal IReadOnlyList<XWPFField> Fields => _fields;
     internal ParagraphAlignment? Alignment => _alignment;
     internal int IndentLeft => _indentLeft;
     internal int IndentRight => _indentRight;
@@ -61,6 +63,22 @@ public sealed class XWPFParagraph
         var run = new XWPFRun(this);
         _runs.Add(run);
         return run;
+    }
+
+    public IReadOnlyList<XWPFField> getFields() => _fields;
+
+    /// <summary>
+    /// Adds a field (e.g. TOC, PAGE, MERGEFIELD) to this paragraph.
+    /// Fields are serialized as fldChar/instrText sequences in the OOXML output.
+    /// </summary>
+    /// <param name="instruction">The field instruction text, e.g. "TOC \\o \"1-3\"" or "PAGE".</param>
+    /// <param name="result">The field result (displayed text), if available.</param>
+    /// <returns>The newly created <see cref="XWPFField"/>.</returns>
+    public XWPFField addField(string instruction, string result = "")
+    {
+        var field = new XWPFField(instruction, result);
+        _fields.Add(field);
+        return field;
     }
 
     public string getText()

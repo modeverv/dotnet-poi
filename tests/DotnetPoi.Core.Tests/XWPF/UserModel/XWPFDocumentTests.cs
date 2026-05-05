@@ -623,6 +623,39 @@ public class XWPFDocumentTests
         Assert.Contains("word/document.xml", entryNames);
     }
 
+    [Fact]
+    public void RoundTrip_Field_Preserved()
+    {
+        using var original = new XWPFDocument();
+        var para = original.createParagraph();
+        para.createRun().setText("Before field. ");
+        para.addField(" PAGE ", "1");
+        para.createRun().setText(" After field.");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        // Verify raw XML contains the field structure
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var docXml = ReadEntry(archive, "word/document.xml");
+        Assert.Contains("fldChar", docXml);
+        Assert.Contains("instrText", docXml);
+        Assert.Contains("PAGE", docXml);
+
+        // Reload and verify fields are restored
+        stream.Position = 0;
+        using var loaded = new XWPFDocument(stream);
+        var loadedPara = loaded.getParagraphs()[0];
+        var fields = loadedPara.getFields();
+        Assert.Single(fields);
+        Assert.Equal(" PAGE ", fields[0].Instruction);
+        Assert.Equal("1", fields[0].Result);
+
+        // Runs should also be preserved (field result "1" appears as a run after text runs, since fields are written after runs)
+        Assert.Equal("Before field.  After field.1", loadedPara.getText());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

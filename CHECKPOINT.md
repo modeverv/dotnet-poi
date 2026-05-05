@@ -903,12 +903,22 @@ New model classes with write-only support (existing files round-trip via unknown
   - GetModelEntryNames: includes pivot parts.
   - write(): emits pivotTable{index}.xml, pivotCacheDefinition{id+1}.xml, pivotCacheRecords{id+1}.xml.
 
+### docx fields (TOC / page numbers / mail merge)
+
+New `XWPFField` model class with write and read round-trip support:
+
+- **`XWPFField`**: Model class with `Instruction` (e.g. `" PAGE "`) and `Result` (e.g. `"1"`).
+- **`XWPFParagraph.addField(string instruction, string result)`, `getFields()`**: Public API to add and retrieve fields per paragraph.
+- **Write path (`WriteParagraph`)**: After runs, emits the full OOXML field sequence: `fldChar begin → instrText → fldChar separate → t (result) → fldChar end`.
+- **Read path (`ReadDocument`)**: Parses `fldChar` (begin/separate/end) and `instrText` elements, accumulates field result from `t` after separate, constructs `XWPFField` on end.
+- **1 round-trip test**: Creates paragraph with text run + PAGE field + text run, writes, reloads, verifies field instruction (`" PAGE "`) and result (`"1"`).
+
 ### Test count
 
-- Core: **222** (+3 new: docx unknown parts, xlsx rich text, xlsx pivot wiring verification)
+- Core: **226** (+1 new: xlsx autofilter)
 - Formula: **10**
 - Interop: **37** (+5 new: comprehensive docx fixture + pptx comprehensive fixture + docx numbering/hyperlinks/table tests from earlier batch)
-- **Total: 267** (Core 222, Formula 10, Interop C# 35)
+- **Total: 271** (Core 226, Formula 10, Interop C# 35)
 
 ---
 
@@ -954,3 +964,55 @@ New model classes with write-only support (existing files round-trip via unknown
 
 - 数式評価（DotnetPoi.Formula）は「テンプレート填充 → 保存 → Excel で開く」のワークフローが成立するため、評価エンジンなしでも実用範囲内と判断し優先度を下げる。
 - グラフは既存ファイルの不明パーツ保存によりラウンドトリップのみ対応。新規作成の需要が出たら改めて検討。
+
+---
+
+## 2026-05-06 JST — 未対応機能の「保持だけで十分」観点の現状確認
+
+User question: xlsx/docx/pptx の未実装機能について、ファイルを読み込んで A1 など一部だけ編集して保存した時に、Office で開いて元の内容が保持されれば十分ではないか。
+
+### 実装確認
+
+- `XSSFWorkbook`, `XWPFDocument`, `XMLSlideShow` はいずれも `_preservedEntries` を持つ。
+- 読み込み時にモデルが理解しない ZIP entry を byte[] として退避し、保存時に preserved entries を先に書いてからモデル生成 entry で上書きする。
+- 焦点テスト実行: `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter "FullyQualifiedName~RoundTrip_UnknownParts_Preserved"` passed。XSSF/XWPF/XSLF の 3 tests 合格。
+
+### 判断
+
+- 別パーツとして存在する未対応機能は、基本的に byte-for-byte で保持される可能性が高い。
+  - xlsx: `xl/charts/*`, `xl/comments*.xml`, VML drawings, unsupported pivot/cache/chart-like parts。
+  - docx: `word/comments.xml`, `word/footnotes.xml`, `word/endnotes.xml`, embedded OLE/media/custom parts/styles など。
+  - pptx: notes slide parts, charts, media binaries, custom layouts/masters/themes, unknown animation/transition/supporting parts など。
+- ただし中心 XML がモデル再生成される箇所は危険。
+  - xlsx: edited/loaded worksheet XML (`xl/worksheets/sheetN.xml`) とその rels はモデルが書き直すため、未対応要素が同じ sheet XML 内に埋まっている場合は消える可能性がある。
+  - docx: `word/document.xml` は再生成されるため、本文内の `w:txbxContent`, track changes (`w:ins`/`w:del`), table cell merge/borders/section columns 等はモデル対応がなければ消える可能性が高い。
+  - pptx: `ppt/slides/slideN.xml` は再生成されるため、同一スライド XML 内の `p:grpSp`, `p:cxnSp`, unsupported shapes, video/audio refs 等は消える可能性が高い。
+- Content Types と relationship parts もモデル生成で上書きされる場合があり、unknown part 本体が残っても参照が消えるリスクがある。特に中心 XML/中心 rels から参照される機能は実ファイル fixtures で確認が必要。
+
+### 次にやると良い確認
+
+実装より先に「実在 Office ファイルを読み込み、A1/本文/スライドに軽微編集して保存し、ZIP entry と rels の差分で保持確認」する fixture tests を追加するのが有効。対象は chart/comment xlsx、docx comments/footnotes/textbox/track changes/OLE、pptx notes/group/connector/media。
+
+### POI test-data の候補ファイル
+
+Apache POI submodule の `poi/test-data/` に実ファイルが多数ある。保持テストの初期候補:
+
+- xlsx chart: `poi/test-data/spreadsheet/WithChart.xlsx`, `WithThreeCharts.xlsx`, `WithTwoCharts.xlsx`, `123233_charts.xlsx`
+- xlsx comments: `poi/test-data/spreadsheet/SimpleWithComments.xlsx`, `comments.xlsx`
+- xlsx textbox / drawing: `poi/test-data/spreadsheet/WithTextBox.xlsx`, `WithTextBox2.xlsx`
+- xlsx OLE/embed: `poi/test-data/spreadsheet/WithEmbeded.xlsx`, `ExcelWithAttachments.xlsm`
+- docx comments: `poi/test-data/document/comment.docx`, `testComment.docx`
+- docx footnotes/endnotes: `poi/test-data/document/footnotes.docx`, `endnotes.docx`, `table_footnotes.docx`, `form_footnotes.docx`
+- docx track changes: `poi/test-data/document/delins.docx`, `bug56075-changeTracking_on.docx`, `documentProtection_trackedChanges_no_password.docx`
+- docx OLE/attachments: `poi/test-data/document/EmbeddedDocument.docx`, `WordWithAttachments.docx`
+- docx columns: `poi/test-data/document/ThreeColHead.docx`, `ThreeColFoot.docx`, `ThreeColHeadFoot.docx`
+- pptx notes/comments: `poi/test-data/slideshow/45545_Comment.pptx`, `sample_pptx_grouping_issues.pptx`
+- pptx charts: `poi/test-data/slideshow/line-chart.pptx`, `bar-chart.pptx`, `pie-chart.pptx`, `scatter-chart.pptx`, `radar-chart.pptx`
+- pptx media: `poi/test-data/slideshow/EmbeddedVideo.pptx`, `EmbeddedAudio.pptx`
+- pptx SmartArt/group/shapes: `poi/test-data/slideshow/SmartArt.pptx`, `smartart-simple.pptx`, `sample_pptx_grouping_issues.pptx`, `shapes.pptx`, `customGeo.pptx`
+- pptx OLE/attachments: `poi/test-data/slideshow/PPTWithAttachments.pptm`, `45545_Comment.pptx`
+
+Notes:
+
+- ZIP entry inspection confirmed representative parts exist, e.g. `xl/charts/chart1.xml`, `xl/comments1.xml`, `word/comments.xml`, `word/footnotes.xml`, `word/embeddings/*`, `ppt/media/media1.mp4`, `ppt/media/media1.mp3`, `ppt/comments/comment1.xml`, `ppt/notesSlides/*`, `ppt/charts/chart1.xml`, `ppt/diagrams/*`, `ppt/embeddings/*`。
+- For preservation tests, assert both unknown part bytes and relationship/reference survival. The most fragile part is regenerated center XML/rels (`word/document.xml`, `ppt/slides/slideN.xml`, `xl/worksheets/sheetN.xml`, and their `.rels`)。

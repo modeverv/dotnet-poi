@@ -482,6 +482,12 @@ public sealed class XWPFDocument : IDisposable
         bool inPPr = false;
         bool inRPr = false;
 
+        // Field parsing state
+        bool inField = false;
+        bool fieldPastSeparate = false;
+        string? fieldInstruction = null;
+        string fieldResult = "";
+
         // Inline image parsing state
         bool inDrawing = false;
         long wpInlineExtCx = 0, wpInlineExtCy = 0;
@@ -637,7 +643,38 @@ public sealed class XWPFDocument : IDisposable
                                 break;
                             }
                             case "t" when currentRun is not null && !inRPr:
-                                currentRun.setText(reader.ReadElementContentAsString());
+                                var tContent = reader.ReadElementContentAsString();
+                                currentRun.setText(tContent);
+                                if (inField && fieldPastSeparate)
+                                {
+                                    fieldResult += tContent;
+                                }
+                                continue;
+                            case "fldChar":
+                                var fldCharType = reader.GetAttribute("w:fldCharType");
+                                if (fldCharType == "begin" && currentParagraph is not null)
+                                {
+                                    inField = true;
+                                    fieldPastSeparate = false;
+                                    fieldInstruction = null;
+                                    fieldResult = "";
+                                }
+                                else if (fldCharType == "separate" && inField)
+                                {
+                                    fieldPastSeparate = true;
+                                }
+                                else if (fldCharType == "end" && inField && currentParagraph is not null)
+                                {
+                                    currentParagraph.addField(fieldInstruction ?? "", fieldResult);
+                                    inField = false;
+                                    fieldPastSeparate = false;
+                                    fieldInstruction = null;
+                                    fieldResult = "";
+                                }
+                                break;
+                            case "instrText" when inField:
+                                var instrText = reader.ReadElementContentAsString();
+                                fieldInstruction = instrText;
                                 continue;
                             case "drawing" when currentRun is not null:
                                 inDrawing = true;
@@ -1100,6 +1137,50 @@ public sealed class XWPFDocument : IDisposable
         {
             WriteRun(writer, run);
         }
+
+        // Write fields as the full fldChar sequence
+        foreach (var field in para.Fields)
+        {
+            // begin
+            writer.WriteStartElement("w", "r");
+            writer.WriteStartElement("w", "fldChar");
+            writer.WriteAttributeString("w", "fldCharType", "begin");
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+
+            // instrText
+            writer.WriteStartElement("w", "r");
+            writer.WriteStartElement("w", "instrText");
+            writer.WriteAttributeString("xml:space", "preserve");
+            writer.WriteString(field.Instruction);
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+
+            // separate
+            writer.WriteStartElement("w", "r");
+            writer.WriteStartElement("w", "fldChar");
+            writer.WriteAttributeString("w", "fldCharType", "separate");
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+
+            // result (if non-empty)
+            if (!string.IsNullOrEmpty(field.Result))
+            {
+                writer.WriteStartElement("w", "r");
+                writer.WriteStartElement("w", "t");
+                writer.WriteString(field.Result);
+                writer.WriteEndElement();
+                writer.WriteEndElement();
+            }
+
+            // end
+            writer.WriteStartElement("w", "r");
+            writer.WriteStartElement("w", "fldChar");
+            writer.WriteAttributeString("w", "fldCharType", "end");
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+        }
+
         writer.WriteEndElement();
     }
 

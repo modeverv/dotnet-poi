@@ -28,4 +28,8 @@ public interface ISheet
     // Sheet protection
     void protectSheet(bool protect);
     bool isSheetProtected();
+
+    // Auto filter
+    void setAutoFilter(CellRangeAddress range);
+    CellRangeAddress? getAutoFilter();
 }

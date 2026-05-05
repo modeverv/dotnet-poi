@@ -184,6 +184,19 @@ public sealed class XSSFSheet : ISheet
 
     public bool isSheetProtected() => _sheetProtected;
 
+    // Auto filter
+    private CellRangeAddress? _autoFilter;
+
+    public void setAutoFilter(CellRangeAddress range)
+    {
+        ArgumentNullException.ThrowIfNull(range);
+        _autoFilter = range;
+    }
+
+    public CellRangeAddress? getAutoFilter() => _autoFilter;
+
+    internal CellRangeAddress? AutoFilter => _autoFilter;
+
     public IReadOnlyList<XSSFPivotTable> PivotTables => _pivotTables;
 
     /// <summary>

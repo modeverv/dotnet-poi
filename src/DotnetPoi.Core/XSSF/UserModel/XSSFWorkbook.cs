@@ -863,6 +863,24 @@ public sealed class XSSFWorkbook : IWorkbook
                 sheet.protectSheet(true);
                 continue;
             }
+            // Parse auto filter
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "autoFilter")
+            {
+                var refAttr = reader.GetAttribute("ref");
+                if (refAttr is not null)
+                {
+                    try
+                    {
+                        var range = CellRangeAddress.Parse(refAttr);
+                        sheet.setAutoFilter(range);
+                    }
+                    catch (ArgumentException)
+                    {
+                        // Ignore malformed range references
+                    }
+                }
+                continue;
+            }
             if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "cols")
             {
                 inCols = !reader.IsEmptyElement;
@@ -2613,6 +2631,12 @@ public sealed class XSSFWorkbook : IWorkbook
         WriteHyperlinks(writer, sheet);
         WriteDataValidations(writer, sheet);
         WriteConditionalFormatting(writer, sheet);
+        if (sheet.AutoFilter is not null)
+        {
+            writer.WriteStartElement("autoFilter");
+            writer.WriteAttributeString("ref", sheet.AutoFilter.FormatAsString());
+            writer.WriteEndElement();
+        }
         writer.WriteStartElement("pageMargins");
         writer.WriteAttributeString("bottom", sheet.PageMarginBottom.ToString("F4", CultureInfo.InvariantCulture));
         writer.WriteAttributeString("footer", sheet.PageMarginFooter.ToString("F4", CultureInfo.InvariantCulture));

@@ -981,6 +981,42 @@ public class XSSFWorkbookTests
         Assert.True(loaded.isWorkbookProtected());
     }
 
+    [Fact]
+    public void RoundTrip_AutoFilter_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("Filtered");
+        sheet.createRow(0).createCell(0).setCellValue("Header1");
+        sheet.createRow(0).createCell(1).setCellValue("Header2");
+        sheet.createRow(1).createCell(0).setCellValue("Data1");
+        sheet.createRow(1).createCell(1).setCellValue("Data2");
+        sheet.setAutoFilter(new CellRangeAddress(0, 1, 0, 1));
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        // Verify the autoFilter element exists in the worksheet XML
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var sheetEntry = archive.GetEntry("xl/worksheets/sheet1.xml");
+        Assert.NotNull(sheetEntry);
+        using var sheetReader = new StreamReader(sheetEntry.Open());
+        var sheetXml = sheetReader.ReadToEnd();
+        Assert.Contains("<autoFilter", sheetXml);
+        Assert.Contains("ref=\"A1:B2\"", sheetXml);
+
+        // Reload and verify
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("Filtered")!;
+        var autoFilter = loadedSheet.getAutoFilter();
+        Assert.NotNull(autoFilter);
+        Assert.Equal(0, autoFilter.FirstRow);
+        Assert.Equal(1, autoFilter.LastRow);
+        Assert.Equal(0, autoFilter.FirstCol);
+        Assert.Equal(1, autoFilter.LastCol);
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

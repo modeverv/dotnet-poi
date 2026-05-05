@@ -66,6 +66,9 @@ public sealed class HSSFSheet : ISheet
     public void protectSheet(bool protect) { }
     public bool isSheetProtected() => false;
 
+    public void setAutoFilter(CellRangeAddress range) { }
+    public CellRangeAddress? getAutoFilter() => null;
+
     IRow ISheet.createRow(int rownum) => createRow(rownum);
 
     IRow? ISheet.getRow(int rownum) => getRow(rownum);
