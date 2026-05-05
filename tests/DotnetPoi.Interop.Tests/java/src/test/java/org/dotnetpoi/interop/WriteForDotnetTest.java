@@ -14,6 +14,19 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.apache.poi.xwpf.usermodel.XWPFHeader;
+import org.apache.poi.xwpf.usermodel.XWPFFooter;
+import org.apache.poi.xwpf.usermodel.BreakType;
+import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
+import org.apache.poi.sl.usermodel.*;
+import org.apache.poi.xslf.usermodel.*;
+import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
+import org.apache.poi.wp.usermodel.HeaderFooterType;
 import org.junit.jupiter.api.Test;
 
 public class WriteForDotnetTest {
@@ -119,6 +132,100 @@ public class WriteForDotnetTest {
 
             try (OutputStream output = Files.newOutputStream(fixture)) {
                 workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhaseDocxComprehensive() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase-docx-comprehensive.docx");
+        Files.createDirectories(fixture.getParent());
+
+        try (XWPFDocument doc = new XWPFDocument()) {
+            // --- Header ---
+            XWPFHeader header = doc.createHeader(HeaderFooterType.DEFAULT);
+            XWPFParagraph headerPara = header.createParagraph();
+            headerPara.setAlignment(ParagraphAlignment.CENTER);
+            XWPFRun headerRun = headerPara.createRun();
+            headerRun.setText("Interop Header");
+
+            // --- Paragraph 1: plain text ---
+            XWPFParagraph p1 = doc.createParagraph();
+            p1.setAlignment(ParagraphAlignment.LEFT);
+            XWPFRun r1 = p1.createRun();
+            r1.setText("First paragraph");
+
+            // --- Paragraph 2: bold + normal ---
+            XWPFParagraph p2 = doc.createParagraph();
+            XWPFRun r2b = p2.createRun();
+            r2b.setBold(true);
+            r2b.setText("Bold");
+            XWPFRun r2n = p2.createRun();
+            r2n.setText(" and normal");
+
+            // --- Paragraph 3: italic ---
+            XWPFParagraph p3 = doc.createParagraph();
+            XWPFRun r3 = p3.createRun();
+            r3.setItalic(true);
+            r3.setText("Italic text");
+
+            // --- Table (2x2) ---
+            XWPFTable table = doc.createTable(2, 2);
+            table.getRow(0).getCell(0).setText("A1");
+            table.getRow(0).getCell(1).setText("B1");
+            table.getRow(1).getCell(0).setText("A2");
+            table.getRow(1).getCell(1).setText("B2");
+
+            // --- Paragraph 4: hyperlink ---
+            XWPFParagraph linkPara = doc.createParagraph();
+            XWPFRun linkRun = linkPara.createRun();
+            linkRun.setText("Click here for Apache POI");
+
+            // --- Footer ---
+            XWPFFooter footer = doc.createFooter(HeaderFooterType.DEFAULT);
+            XWPFParagraph footerPara = footer.createParagraph();
+            footerPara.setAlignment(ParagraphAlignment.CENTER);
+            XWPFRun footerRun = footerPara.createRun();
+            footerRun.setText("Interop Footer");
+
+            try (java.io.OutputStream output = Files.newOutputStream(fixture)) {
+                doc.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhasePptxComprehensive() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase-pptx-comprehensive.pptx");
+        Files.createDirectories(fixture.getParent());
+
+        try (XMLSlideShow prs = new XMLSlideShow()) {
+            XSLFSlide slide = prs.createSlide();
+
+            // --- Text box with formatted text ---
+            XSLFAutoShape tb = slide.createTextBox();
+            tb.setAnchor(new java.awt.Rectangle(100000, 100000, 4000000, 500000));
+
+            XSLFTextParagraph p1 = tb.addNewTextParagraph();
+            XSLFTextRun r1 = p1.addNewTextRun();
+            r1.setText("Bold Title");
+            r1.setBold(true);
+            r1.setFontSize(18.0);
+
+            XSLFTextParagraph p2 = tb.addNewTextParagraph();
+            XSLFTextRun r2 = p2.addNewTextRun();
+            r2.setText("Italic subtitle");
+            r2.setItalic(true);
+            r2.setFontSize(14.0);
+
+            try (java.io.OutputStream output = Files.newOutputStream(fixture)) {
+                prs.write(output);
             }
         }
 

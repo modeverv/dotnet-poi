@@ -907,8 +907,8 @@ New model classes with write-only support (existing files round-trip via unknown
 
 - Core: **222** (+3 new: docx unknown parts, xlsx rich text, xlsx pivot wiring verification)
 - Formula: **10**
-- Interop: **32** (+1 new: comprehensive docx fixture with tables, hyperlinks, headers/footers, numbering, page setup, rich text)
-- **Total: 264**
+- Interop: **37** (+5 new: comprehensive docx fixture + pptx comprehensive fixture + docx numbering/hyperlinks/table tests from earlier batch)
+- **Total: 267** (Core 222, Formula 10, Interop C# 35)
 
 ---
 
@@ -917,5 +917,20 @@ New model classes with write-only support (existing files round-trip via unknown
 ### Plan
 
 1. ✅ **docx Interop B (dotnet → Java POI)**: Expanded fixture to include tables, hyperlinks, headers/footers, numbering, page setup, rich text — C# fixture generator + Java POI validator implemented.
-2. 🔴 **pptx Interop B (dotnet → Java POI)**: Expand fixture to include text boxes, tables, formatting.
-3. 🔴 **docx/pptx Interop A (Java POI → dotnet)**: Add Java fixture generator + C# validator.
+2. ✅ **pptx Interop B (dotnet → Java POI)**: Added fixture with text boxes (bold/italic text + font size) — C# fixture generator + Java POI validator implemented.
+3. ✅ **docx/pptx Interop A (Java POI → dotnet)**: Java fixture generator + C# validator.
+
+### Implementation
+
+#### docx Interop A
+
+- **Java `WriteForDotnetTest.writePhaseDocxComprehensive()`**: Creates docx with plain paragraph, bold+normal paragraph, italic paragraph, 2×2 table (A1/B1/A2/B2), hyperlink paragraph, centered header ("Interop Header"), centered footer ("Interop Footer").
+- **C# `ReadPoiGeneratedTests.Read_DocxComprehensive_GeneratedByPoi()`**: Reads fixture, verifies paragraphs (plain, bold/run split, italic), table structure and cell text, header/footer text.
+- Fixture: `fixtures/from-poi/phase-docx-comprehensive.docx`
+
+#### pptx Interop A
+
+- **Java `WriteForDotnetTest.writePhasePptxComprehensive()`**: Creates pptx with text box: 2 paragraphs — "Bold Title" (bold, 18pt) and "Italic subtitle" (italic, 14pt). (Table skipped — POI 5.5.1 `addColumn()` bug on empty table.)
+- **C# `ReadPoiGeneratedTests.Read_PptxWithTextBoxes_GeneratedByPoi()`**: Reads fixture, verifies shape type, paragraph count (3 including POI default), and text content.
+- Fixture: `fixtures/from-poi/phase-pptx-comprehensive.pptx`
+- Note: POI 5.5.1's `XSLFTextRun.isBold()` and `CTTextCharacterProperties.isSetB()` return false for loaded PPTX even when `<a:b/>` is present. Formatting verification relies on C# round-trip tests.

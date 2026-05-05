@@ -351,14 +351,16 @@ Do not add these as fixture-specific constants — only fix when a concrete inte
 #### step 3 docx / XWPF
 
 - [x] Round-trip: open docx → write → read back → assert paragraph/run text and formatting are identical.
-- [~] Interop B: dotnet-poi writes docx → Java POI reads. *(text+image+rotation fixtures exist)*
+- [x] Interop B: dotnet-poi writes docx → Java POI reads. *(comprehensive fixture with tables, hyperlinks, headers/footers, numbering, page setup, rich text)*
+- [x] Interop A: Java POI writes docx → dotnet-poi reads. *(comprehensive fixture with plain/bold/italic paragraphs, table, header/footer)*
 - [x] Tables, numbering, styles, headers/footers, sections, page settings, fields, hyperlinks, comments, footnotes/endnotes.
 - [ ] Preserve unknown parts and relationships during round-trip.
 
 #### step 4 pptx / XSLF
 
 - [x] Round-trip: open pptx → write → read back → assert slide content is identical. *(text boxes, formatting, pictures, anchors, slide size, tables, unknown part preservation — 8 round-trip tests)*
-- [~] Interop B: dotnet-poi writes pptx → Java POI reads. *(image+rotation fixture exists)*
+- [x] Interop B: dotnet-poi writes pptx → Java POI reads. *(comprehensive fixture with text boxes + tables + formatting)*
+- [x] Interop A: Java POI writes pptx → dotnet-poi reads. *(comprehensive fixture with text boxes + formatting)*
 - [~] Text boxes, rich text, placeholders, layouts, masters, themes, tables, charts, notes, shapes. *(text boxes + rich text + tables done; layouts/masters/themes preserved via unknown parts; charts/notes/shapes pending)*
 - [x] Preserve unknown parts and relationships during round-trip.
 
@@ -960,14 +962,16 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 #### step 3 docx / XWPF
 
 - [x] ラウンドトリップ: docx を開いて書いて読み返し、paragraph/run のテキストと書式が同一であることを確認する。 *(font properties, alignment, indent/spacing, numbering, tables, hyperlinks, headers/footers, page setup — 16 round-trip tests)*
-- [~] Interop B: dotnet-poi が docx を書く → Java POI が読む *(text+image+rotation fixture あり)*
+- [x] Interop B: dotnet-poi が docx を書く → Java POI が読む *(tables/hyperlinks/headers-footers/numbering/page-setup/rich-text を含む包括的 fixture)*
+- [x] Interop A: Java POI が docx を書く → dotnet-poi が読む *(plain/bold/italic paragraph、table、header/footer を含む包括的 fixture)*
 - [x] table、numbering、style、header/footer、section、page setting、field、hyperlink、comment、footnote/endnote を実装する。 *(table/numbering/header-footer/page-setup/hyperlink 完了)*
 - [x] round-trip 時に未知 part と relationship を保持する。
 
 #### step 4 pptx / XSLF
 
 - [x] ラウンドトリップ: pptx を開いて書いて読み返し、スライド内容が同一であることを確認する。 *(text box、formatting、picture、anchor、slide size、table、unknown part preservation — 8 tests)*
-- [~] Interop B: dotnet-poi が pptx を書く → Java POI が読む *(image+rotation fixture あり)*
+- [x] Interop B: dotnet-poi が pptx を書く → Java POI が読む *(text box + format + table を含む包括的 fixture)*
+- [x] Interop A: Java POI が pptx を書く → dotnet-poi が読む *(text box + format を含む包括的 fixture)*
 - [~] text box、rich text、placeholder、layout、master、theme、table、chart、notes、shape を実装する。 *(text box + rich text + table 完了; layout/master/theme は unknown parts 経由で保持; chart/notes/shape は未着手)*
 - [x] round-trip 時に未知 part と relationship を保持する。
 

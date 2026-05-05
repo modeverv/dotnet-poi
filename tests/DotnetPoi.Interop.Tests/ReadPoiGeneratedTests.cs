@@ -1,6 +1,8 @@
 using DotnetPoi.SS.UserModel;
 using DotnetPoi.HSSF.UserModel;
 using DotnetPoi.XSSF.UserModel;
+using DotnetPoi.XWPF.UserModel;
+using DotnetPoi.XSLF.UserModel;
 using Xunit;
 
 namespace DotnetPoi.Interop.Tests;
@@ -105,6 +107,82 @@ public class ReadPoiGeneratedTests
         var formula = workbook.getSheet("Recalc")!.getRow(0)!.getCell(0)!;
         Assert.Equal(CellType.Formula, formula.getCellType());
         Assert.Equal("B1+C1", formula.getCellFormula());
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    public void Read_DocxComprehensive_GeneratedByPoi()
+    {
+        var fixturePath = GetFixturePath("phase-docx-comprehensive.docx");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var doc = new XWPFDocument(stream);
+
+        // --- Paragraph 1: plain text ---
+        var p1 = doc.getParagraphs()[0];
+        Assert.Equal("First paragraph", p1.getText());
+
+        // --- Paragraph 2: bold + normal ---
+        var p2 = doc.getParagraphs()[1];
+        var runs2 = p2.getRuns();
+        Assert.Equal(2, runs2.Count);
+        Assert.Equal("Bold", runs2[0].getText(0));
+        Assert.Equal(" and normal", runs2[1].getText(0));
+
+        // --- Paragraph 3: italic ---
+        var p3 = doc.getParagraphs()[2];
+        Assert.Equal("Italic text", p3.getText());
+
+        // --- Table (2x2) ---
+        var tables = doc.getTables();
+        Assert.Single(tables);
+        var table = tables[0];
+        Assert.Equal(2, table.getRows().Count);
+        Assert.Equal(2, table.getRows()[0].getCells().Count);
+        Assert.Equal("A1", table.getRows()[0].getCells()[0].getParagraphs()[0].getText());
+        Assert.Equal("B1", table.getRows()[0].getCells()[1].getParagraphs()[0].getText());
+        Assert.Equal("A2", table.getRows()[1].getCells()[0].getParagraphs()[0].getText());
+        Assert.Equal("B2", table.getRows()[1].getCells()[1].getParagraphs()[0].getText());
+
+        // --- Hyperlink paragraph ---
+        var linkPara = doc.getParagraphs()[3];
+        Assert.Equal("Click here for Apache POI", linkPara.getText());
+
+        // --- Header ---
+        Assert.Equal("Interop Header", doc.getHeaderText());
+
+        // --- Footer ---
+        Assert.Equal("Interop Footer", doc.getFooterText());
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    public void Read_PptxWithTextBoxes_GeneratedByPoi()
+    {
+        var fixturePath = GetFixturePath("phase-pptx-comprehensive.pptx");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var prs = new XMLSlideShow(stream);
+
+        var slides = prs.getSlides();
+        Assert.Single(slides);
+
+        var slide = slides[0];
+        var autoShapes = slide.getAutoShapes();
+        Assert.Single(autoShapes);
+
+        var tb = autoShapes[0];
+        var paragraphs = tb.Paragraphs;
+        Assert.Equal(3, paragraphs.Count);
+
+        // Paragraph 0 is an empty default paragraph from POI's createTextBox()
+        // Paragraph 1: "Bold Title" (bold, 18pt)
+        Assert.Equal("Bold Title", paragraphs[1].getPlainText());
+
+        // Paragraph 2: "Italic subtitle" (italic, 14pt)
+        Assert.Equal("Italic subtitle", paragraphs[2].getPlainText());
     }
 
     private static string GetFixturePath(string fileName)
