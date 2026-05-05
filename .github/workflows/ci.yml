@@ -36,17 +36,11 @@ jobs:
       - name: Build solution
         run: dotnet build DotnetPOI.sln --no-incremental -c Debug
 
-      - name: Test — DotnetPoi.SS.Tests (XML parity, PoiXmlWriter)
-        run: dotnet test tests/DotnetPoi.SS.Tests/ --no-build -c Debug
+      - name: Test — DotnetPoi.Core.Tests (all formats: xlsx, pptx, docx, xls, xml parity)
+        run: dotnet test tests/DotnetPoi.Core.Tests/ --no-build -c Debug
 
-      - name: Test — DotnetPoi.XSSF.Tests (xlsx read/write)
-        run: dotnet test tests/DotnetPoi.XSSF.Tests/ --no-build -c Debug
-
-      - name: Test — DotnetPoi.XSLF.Tests (pptx read/write)
-        run: dotnet test tests/DotnetPoi.XSLF.Tests/ --no-build -c Debug
-
-      - name: Test — DotnetPoi.XWPF.Tests (docx read/write)
-        run: dotnet test tests/DotnetPoi.XWPF.Tests/ --no-build -c Debug
+      - name: Test — DotnetPoi.Formula.Tests (formula evaluation)
+        run: dotnet test tests/DotnetPoi.Formula.Tests/ --no-build -c Debug
 
   # ── Job 2: Bidirectional Java ↔ .NET interop tests ─────────────────────
   interop:
@@ -93,14 +87,14 @@ jobs:
 
       - name: "[A] C# reads Java fixtures"
         run: >
-          dotnet test tests/DotnetPoi.Interop.Tests/cs/
+          dotnet test tests/DotnetPoi.Interop.Tests/
           --no-build -c Debug
           --filter "Category=ReadFromPoi"
 
       # ── Direction B: C# (dotnet-poi) writes → Java (POI) reads ──────────
       - name: "[B] C# writes fixtures"
         run: >
-          dotnet test tests/DotnetPoi.Interop.Tests/cs/
+          dotnet test tests/DotnetPoi.Interop.Tests/
           --no-build -c Debug
           --filter "Category=WriteForPoi"
 

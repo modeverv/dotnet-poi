@@ -34,6 +34,13 @@ public sealed class HSSFRow : IRow
 
     public HSSFSheet getSheet() => _sheet;
 
+    public void setHeight(float height)
+    {
+        // HSSF row height not yet implemented
+    }
+
+    public float getHeight() => 15.0f;
+
     internal IReadOnlyCollection<HSSFCell> Cells => _cells.Values;
 
     ICell IRow.createCell(int columnIndex) => createCell(columnIndex);

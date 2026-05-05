@@ -156,4 +156,11 @@ public sealed class HSSFCell : ICell
     {
         // HSSF formula evaluation is not yet ported.
     }
+
+    public IHyperlink? getHyperlink() => null;
+
+    public void setHyperlink(IHyperlink? link)
+    {
+        // HSSF hyperlinks not yet implemented
+    }
 }

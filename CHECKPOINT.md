@@ -37,8 +37,8 @@ src/DotnetPoi.Core/    (1 アセンブリ = 全実装)
 src/DotnetPoi.Formula/ (Core に依存)
 ```
 
-**テスト結果 (全 229 tests 正常):**
-- Core.Tests: 188/188
+- **テスト結果 (全 236 tests 正常):**
+- Core.Tests: 195/195
 - Formula.Tests: 10/10
 - Interop.Tests: 31/31
 
@@ -58,7 +58,7 @@ src/
 └── DotnetPoi.Formula/     # NuGet: DotnetPoi.Formula
 
 tests/
-├── DotnetPoi.Core.Tests/     # 全フォーマットのテスト (188 tests)
+├── DotnetPoi.Core.Tests/     # 全フォーマットのテスト (195 tests)
 ├── DotnetPoi.Formula.Tests/  # 数式評価器のテスト (10 tests)
 ├── DotnetPoi.Interop.Tests/  # Java POI との相互運用テスト (31 tests)
 └── test-files/               # 共有テストデータファイル
@@ -495,3 +495,99 @@ Attributes: `&`, `"`, `'` (literal), `\`, relationship URL with `&`, format code
 - The committed `xlsm-basic__*.xml` fixtures are intentionally hybrid: DotnetPoi regenerates workbook/content-types/relationships but preserves unchanged macro workbook parts such as doc props, styles, shared strings, worksheets, drawings, theme, and calcChain.
 - Fix: updated `generateMacroEnabledXlsm` to first generate the POI package, then overlay the preserved xlsm entries from the source workbook so CI regenerates the same hybrid fixture set.
 - Verification: `dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj --filter XmlParity_XlsmBasic_MatchesPoiFixtures` passes. Local Maven is not installed, so the exact GitHub workflow command still needs CI or a Maven-equipped environment.
+
+## 2026-05-10 11:xx JST - Round-trip batch 1: merge cells + column width / row height
+
+- **Merge cells**: Implemented read + write + round-trip test.
+  - Added `CellRangeAddress` class in `DotnetPoi.SS.Util` with `Parse` and `FormatAsString`.
+  - Added `addMergedRegion()` / `getMergedRegions()` to `ISheet` interface.
+  - Implemented in `XSSFSheet` (store list, write `<mergeCells>`/`<mergeCell>` in `WriteWorksheet`, parse in `ReadWorksheet`).
+  - Added stubs in `HSSFSheet` for interface completeness.
+  - Test: `RoundTrip_MergeCells_Preserved` — writes 2 merged regions, reads back, verifies all coordinates.
+- **Column width**: Implemented read + write + round-trip test.
+  - Added `setColumnWidth()` / `getColumnWidth()` to `ISheet` interface.
+  - Implemented in `XSSFSheet` (dictionary, write `<cols>`/`<col>` in `WriteCols`, parse in `ReadWorksheet`).
+  - Test: `RoundTrip_ColumnWidth_Preserved` — sets 80-char and 40-char widths, verifies approximate round-trip.
+- **Row height**: Implemented read + write + round-trip test.
+  - Added `setHeight()` / `getHeight()` to `IRow` interface.
+  - Implemented in `XSSFRow` (store float, write `ht`/`customHeight` attributes in `WriteRow`, parse in `ReadWorksheet`).
+  - Test: `RoundTrip_RowHeight_Preserved` — sets 45 pt custom height, verifies round-trip; default row returns 15 pt.
+- All 191 Core tests pass (188 existing + 3 new). Formula (10) and Interop (31) also pass.
+
+## 2026-05-10 JST - Round-trip batch 2: hyperlinks
+
+- **Hyperlinks**: Implemented read + write + round-trip test.
+  - Created `IHyperlink` interface and `HyperlinkType` enum in `DotnetPoi.SS.UserModel`.
+  - Created `XSSFHyperlink` class with `Address`, `CellRef`, `Type`, `RelationshipId`, `IsExternal` properties.
+  - Added `getHyperlink()`/`setHyperlink()` to `ICell` interface.
+  - Implemented in `XSSFCell` (store `_hyperlink` field, auto-register via `sheet.AddHyperlink` on set).
+  - Added stubs in HSSFCell for interface completeness.
+  - Write: `WriteHyperlinks()` emits `<hyperlinks>` section with `<hyperlink ref="..." r:id="..."/>`.
+  - Write: `WriteSheetRelationships()` emits rels entries with `TargetMode="External"` for URLs.
+  - Write: `AssignHyperlinkRelationshipIds()` pre-assigns relationship IDs before writing.
+  - Write: Sheet rels file is now written when hyperlinks exist (not only when drawing exists).
+  - Read: `ReadSheetHyperlinkRelationships()` reads sheet rels, builds dictionary of relId → (URL, isExternal).
+  - Read: `<hyperlink>` elements parsed in `ReadWorksheet`, hyperlinks created and associated with existing cells.
+  - Added `ParseCellRef()` helper for parsing "A1"-style references.
+  - Fixed `XSSFHyperlink` constructor to set `IsExternal = true` for URL/File/Email types.
+  - Test: `RoundTrip_Hyperlink_Preserved` — creates URL hyperlink, writes, reads back, verifies address, cellRef, type.
+- All 192 Core tests pass (191 + 1 new). Formula (10) and Interop (31) also pass.
+
+## 2026-05-10 JST - Round-trip batch 3: print settings (page layout, header/footer)
+
+- **Page settings**: Implemented read + write + round-trip test.
+  - Added page margin properties to `XSSFSheet` (PageMarginBottom/Footer/Header/Left/Right/Top, double, default OOXML values).
+  - Added page setup properties (PageOrientation, PaperSize, Scale, FitToWidth, FitToHeight).
+  - Added header/footer properties (HeaderCenter, FooterCenter).
+  - Write: Page setup `<pageSetup>` element written only when non-default properties set.
+  - Write: Page margins `<pageMargins>` written from sheet properties (no longer hardcoded).
+  - Write: Header/footer `<headerFooter>` with `<oddHeader>`/`<oddFooter>` children.
+  - Read: Parse `<pageSetup>`, `<pageMargins>`, `<oddHeader>`, `<oddFooter>` in ReadWorksheet.
+  - Added `ParseDoubleAttr()` helper for attribute reading with default fallback.
+  - Test: `RoundTrip_PrintSettings_Preserved` — sets orientation, paper size, margins, header/footer; writes and reads back.
+- All 193 Core tests pass (192 + 1 new). Formula (10) and Interop (31) also pass.
+
+## 2026-05-10 JST - Round-trip batch 4: data validation
+
+- **Data validation**: Implemented read + write + round-trip test.
+  - Created `DataValidationType` and `DataValidationOperator` enums in `SS/UserModel`.
+  - Created `XSSFDataValidation` class with properties: Sqref, Type, Operator, Formula1/2, AllowBlank, ShowInputMessage, ShowErrorMessage, ShowDropDown, ErrorStyle, ErrorTitle/Message, PromptTitle/Message.
+  - Write: `<dataValidations>` element with `<dataValidation>` children, written via `WriteDataValidations()`.
+    - Writes `type`, `operator`, `allowBlank`, `showInputMessage`, `showErrorMessage`, `showDropDown`, `errorStyle`, `errorTitle`, `error`, `promptTitle`, `prompt`, `sqref` attributes.
+    - Writes `<formula1>` / `<formula2>` child elements.
+  - Read: Parses `<dataValidation>` elements in ReadWorksheet, including child formula elements.
+  - Added `GetDataValidationTypeName()` and `GetDataValidationOperatorName()` for write path.
+  - Added `DataValidationTypeFromName()` and `DataValidationOperatorFromName()` for read path.
+  - Test: `RoundTrip_DataValidation_Preserved` — creates whole-number validation (1-100), writes, reads back, verifies all properties.
+- All 194 Core tests pass (193 + 1 new). Formula (10) and Interop (31) also pass.
+
+## 2026-05-10 JST - Round-trip batch 5: conditional formatting
+
+- **Conditional formatting**: Implemented read + write + round-trip test.
+  - Created `ConditionalFormatType` enum and `XSSFCFRule` / `XSSFConditionalFormatting` classes in `XSSF/UserModel`.
+  - Write: `<conditionalFormatting>` elements with `<cfRule>` children, written via `WriteConditionalFormatting()`.
+    - Writes `type`, `priority`, `operator`, `text`, `dxfId` attributes.
+    - Writes `<formula>` child elements.
+  - Read: Parses `<conditionalFormatting>` and nested `<cfRule>` elements in ReadWorksheet, including child formula elements.
+  - Added `GetCfTypeName()` for write path and `CfTypeFromName()` for read path, supporting all OOXML rule types (cellIs, expression, top10, uniqueValues, duplicateValues, containsText, beginsWith, endsWith, containsBlanks, containsErrors, timePeriod, aboveAverage).
+  - Test: `RoundTrip_ConditionalFormatting_Preserved` — creates cellIs > 100 rule, writes, reads back, verifies type/priority/operator/formula.
+- All 195 Core tests pass (194 + 1 new). Formula (10) and Interop (31) also pass.
+
+## 2026-05-10 JST - Round-trip summary (all features complete except Pivot tables / Charts)
+
+All requested round-trip features are now implemented. Pivot tables and Charts are deferred (major features requiring separate XML parts).
+
+### Implemented features (read + write + round-trip test):
+
+| Feature | Status | Test |
+|---------|--------|------|
+| Pictures (rotation, image data) | ✅ Already done (XSSFPictureTests) | `Rotation_RoundTrip_PreservesRotation`, `Read_WorkbookWithJpegMedia_RestoresPictureData` |
+| Fill / Border / Alignment | ✅ Phase 7 | `RoundTrip_StyledCell_FillRestored`, `BorderRestored`, `AlignmentRestored` |
+| Merge cells | ✅ Batch 1 | `RoundTrip_MergeCells_Preserved` |
+| Column width / Row height | ✅ Batch 1 | `RoundTrip_ColumnWidth_Preserved`, `RoundTrip_RowHeight_Preserved` |
+| Hyperlinks | ✅ Batch 2 | `RoundTrip_Hyperlink_Preserved` |
+| Print settings (margins, orientation, header/footer) | ✅ Batch 3 | `RoundTrip_PrintSettings_Preserved` |
+| Data validation | ✅ Batch 4 | `RoundTrip_DataValidation_Preserved` |
+| Conditional formatting | ✅ Batch 5 | `RoundTrip_ConditionalFormatting_Preserved` |
+
+### Total tests: 236 all passing (195 Core + 31 Interop + 10 Formula)

@@ -45,4 +45,14 @@ public interface ICell
     /// Ported from XSSFCell.SetFormulaCachedValue.
     /// </summary>
     void setCachedFormulaResult(CellValue value);
+
+    /// <summary>
+    /// Returns the hyperlink associated with this cell, or null if none.
+    /// </summary>
+    IHyperlink? getHyperlink();
+
+    /// <summary>
+    /// Assigns a hyperlink to this cell.
+    /// </summary>
+    void setHyperlink(IHyperlink? link);
 }

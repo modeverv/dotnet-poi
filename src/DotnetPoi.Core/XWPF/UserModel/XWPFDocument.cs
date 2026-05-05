@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
+using DotnetPoi.POIFS.Crypt;
 using DotnetPoi.SS.Xml;
 
 namespace DotnetPoi.XWPF.UserModel;
@@ -89,6 +90,18 @@ public sealed class XWPFDocument : IDisposable
             if (_vbaProjectBinRels != null)
                 WriteBinaryEntry(archive, "word/_rels/vbaProject.bin.rels", _vbaProjectBinRels);
         }
+    }
+
+    public void writeEncrypted(Stream stream, string password)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(password);
+        using var package = new MemoryStream();
+        write(package);
+
+        var info = new EncryptionInfo(EncryptionMode.agile);
+        info.Encryptor.confirmPassword(password);
+        info.Encryptor.encryptPackage(package.ToArray(), stream);
     }
 
     public void close() { }

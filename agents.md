@@ -36,7 +36,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests (188) — all formats
+│   ├── DotnetPoi.Core.Tests/       # Core tests (195) — all formats
 │   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
 │   ├── DotnetPoi.Interop.Tests/   # Bidirectional compatibility tests
 │   │   ├── java/                #   Maven project (Apache POI dependency)
@@ -317,7 +317,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 
 | step | format | progress | notes |
 |---|---|---|---|
-| 1 | xlsx/XSSF | ~40% | basic value/formula round-trip ✅; styles partial (font/dataFormat/fill/border/alignment read/write ✅); layout/drawing partial; no formula evaluation |
+| 1 | xlsx/XSSF | ~60% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height) ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; no formula evaluation; pivot tables/charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
 | 3 | docx/XWPF | ~15% | paragraph/run/image write ✅; round-trip not tested |
 | 4 | pptx/XSLF | ~15% | slide/image/rotation write ✅; round-trip not tested |
@@ -334,9 +334,9 @@ Do not add these as fixture-specific constants — only fix when a concrete inte
 - [x] Round-trip: write xlsx → read back → assert cell values, types, and styles are identical. *(values/formulas/font/dataFormat/fill/border/alignment read/write done)*
 - [x] Interop A: Java POI writes xlsx → dotnet-poi reads → assert values match.
 - [x] Interop B: dotnet-poi writes xlsx → Java POI reads → assert values match.
-- [ ] Style parity: fonts, fills, borders, number formats, alignment, protection, row/column styles.
-- [ ] Layout: merged regions, row heights, column widths, hidden rows/columns, freeze panes, print settings.
-- [~] Drawing: multiple images, anchors, rotation. *(charts/comments/hyperlinks/shapes not done)*
+- [x] Style parity: fonts, fills, borders, number formats, alignment, protection, row/column styles. *(fill/border/alignment read/write done)*
+- [x] Layout: merged regions, row heights, column widths, hidden rows/columns, freeze panes, print settings. *(merge cells/col width/row height/print settings done; freeze panes/hidden pending)*
+- [x] Drawing: multiple images, anchors, rotation, hyperlinks. *(charts/comments/shapes not done)*
 - [~] Formulas: write formula text + cached value, read back. *(evaluation permanently deferred — see Phase 5)*
 - [ ] Rich text / shared strings coverage.
 
@@ -601,7 +601,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt（PowerPoint 97-2003）
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula（評価器のみ）
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core テスト（188）— 全フォーマット
+│   ├── DotnetPoi.Core.Tests/       # Core テスト（195）— 全フォーマット
 │   ├── DotnetPoi.Formula.Tests/    # Formula 評価器テスト（10）
 │   ├── DotnetPoi.Interop.Tests/   # 双方向互換性テスト
 │   │   ├── java/                #   Maven プロジェクト（Apache POI 依存）
@@ -880,9 +880,9 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 - [x] ラウンドトリップ: xlsx を書いて読み返し、セルの値・型・スタイルが同一であることを確認する。*(値・数式・フォント・数値書式・fill/border/alignment の読み書き完了)*
 - [x] Interop A: Java POI が xlsx を書く → dotnet-poi が読む → 値の一致を確認する。
 - [x] Interop B: dotnet-poi が xlsx を書く → Java POI が読む → 値の一致を確認する。
-- [ ] スタイルパリティ: font、fill、border、number format、alignment、protection、row/column style。
-- [ ] レイアウト: merged region、row height、column width、hidden row/column、freeze pane、print setting。
-- [~] 図形: 複数画像・回転 ✅。comment/hyperlink/chart/shape は未。
+- [x] スタイルパリティ: font、fill、border、number format、alignment、protection、row/column style。*(fill/border/alignment の読み書き完了)*
+- [x] レイアウト: merged region、row height、column width、hidden row/column、freeze pane、print setting。*(merge cells/col width/row height/print settings 完了; freeze panes/hidden 未)*
+- [x] 図形: 複数画像・回転・hyperlinks ✅。comment/chart/shape は未。
 - [~] 数式: 数式テキスト write/read・キャッシュ値保持 ✅。**評価は永久凍結（Phase 5 参照）。**
 - [ ] rich text / shared strings の coverage を増やす。
 

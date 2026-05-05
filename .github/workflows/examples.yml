@@ -27,9 +27,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      # Phase7CellTypesExample reads fixtures/from-poi/phase7-formulas.xlsx.
-      # Phase1InteropExample reads fixtures/from-poi/phase1-basic.xlsx.
-      # Both files are committed; Java is not needed for these examples.
+      # Examples that read Java-generated fixtures handle missing files
+      # gracefully (print a message and exit). Java is not needed here.
 
       - name: Phase 0 — xlsx write
         run: dotnet run --project examples/Phase0WriteExample/
@@ -52,8 +51,20 @@ jobs:
       - name: Phase 3.4 — AGILE encryption
         run: dotnet run --project examples/Phase34AgileEncryptionExample/
 
+      - name: Phase 4 — HSSF .xls write
+        run: dotnet run --project examples/Phase4HssfXlsExample/
+
+      - name: Phase 5 — Formula evaluation
+        run: dotnet run --project examples/Phase5FormulaEvaluatorExample/
+
       - name: Phase 7 — cell type coverage
         run: dotnet run --project examples/Phase7CellTypesExample/
+
+      - name: Phase 8 — Core-only (no Formula evaluator)
+        run: dotnet run --project examples/Phase8CoreOnlyExample/
+
+      - name: Edge case probes
+        run: dotnet run --project examples/EdgeCaseProbeExample/
 
       - name: Upload example outputs
         if: always()

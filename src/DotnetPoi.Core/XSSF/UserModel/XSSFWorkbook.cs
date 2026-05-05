@@ -4,6 +4,7 @@ using System.Text;
 using System.Xml;
 using DotnetPoi.POIFS.Crypt;
 using DotnetPoi.SS.UserModel;
+using DotnetPoi.SS.Util;
 using DotnetPoi.SS.Xml;
 
 namespace DotnetPoi.XSSF.UserModel;
@@ -202,6 +203,7 @@ public sealed class XSSFWorkbook : IWorkbook
         ArgumentNullException.ThrowIfNull(stream);
         EnsureAtLeastOneSheet();
         BuildSharedStrings();
+        AssignHyperlinkRelationshipIds();
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
         WriteEntry(archive, "[Content_Types].xml", WriteContentTypes);
@@ -216,9 +218,13 @@ public sealed class XSSFWorkbook : IWorkbook
         foreach (var sheet in _sheets)
         {
             WriteEntry(archive, $"xl/worksheets/sheet{sheet.SheetIndex}.xml", writer => WriteWorksheet(writer, sheet));
-            if (sheet.Drawing is not null)
+            bool hasRels = sheet.Drawing is not null || sheet.Hyperlinks.Count > 0;
+            if (hasRels)
             {
                 WriteEntry(archive, $"xl/worksheets/_rels/sheet{sheet.SheetIndex}.xml.rels", writer => WriteSheetRelationships(writer, sheet));
+            }
+            if (sheet.Drawing is not null)
+            {
                 WriteEntry(archive, $"xl/drawings/drawing{sheet.Drawing.DrawingIndex}.xml", writer => WriteDrawing(writer, sheet.Drawing));
                 WriteEntry(archive, $"xl/drawings/_rels/drawing{sheet.Drawing.DrawingIndex}.xml.rels", writer => WriteDrawingRelationships(writer, sheet.Drawing));
             }
@@ -330,6 +336,19 @@ public sealed class XSSFWorkbook : IWorkbook
     {
         _borders.Add(style);
         return _borders.Count - 1;
+    }
+
+    internal void AssignHyperlinkRelationshipIds()
+    {
+        int nextId = 1;
+        foreach (var sheet in _sheets)
+        {
+            if (sheet.Drawing is not null) nextId = 2;
+            foreach (var hyperlink in sheet.Hyperlinks)
+            {
+                hyperlink.RelationshipId = $"rId{nextId++}";
+            }
+        }
     }
 
     internal int GetNextDrawingIndex()
@@ -564,6 +583,9 @@ public sealed class XSSFWorkbook : IWorkbook
         var entry = archive.GetEntry(partName)
             ?? throw new InvalidDataException($"The xlsx package is missing {partName}.");
 
+        // Read sheet rels for hyperlinks
+        var hyperlinkRels = ReadSheetHyperlinkRelationships(archive, partName);
+
         using var stream = entry.Open();
         using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
         XSSFRow? currentRow = null;
@@ -577,15 +599,46 @@ public sealed class XSSFWorkbook : IWorkbook
         var inlineText = new StringBuilder();
         var nextRowIndex = 0;
         var nextColumnIndex = 0;
+        bool inCols = false;
 
         while (reader.Read())
         {
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "cols")
+            {
+                inCols = !reader.IsEmptyElement;
+                continue;
+            }
+            if (reader.NodeType == XmlNodeType.EndElement && reader.LocalName == "cols")
+            {
+                inCols = false;
+                continue;
+            }
+
+            if (inCols && reader.NodeType == XmlNodeType.Element && reader.LocalName == "col")
+            {
+                var minAttr = reader.GetAttribute("min");
+                var widthAttr = reader.GetAttribute("width");
+                if (minAttr is not null && widthAttr is not null
+                    && int.TryParse(minAttr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var colNum)
+                    && double.TryParse(widthAttr, NumberStyles.Float, CultureInfo.InvariantCulture, out var width))
+                {
+                    sheet.setColumnWidth(colNum - 1, (int)(width * 256));
+                }
+                continue;
+            }
+
             if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "row")
             {
                 var rowIndex = ParseOneBasedAttribute(reader.GetAttribute("r"), nextRowIndex + 1);
                 currentRow = sheet.createRow(rowIndex);
                 nextRowIndex = rowIndex + 1;
                 nextColumnIndex = 0;
+                // Row height
+                var htAttr = reader.GetAttribute("ht");
+                if (htAttr is not null && double.TryParse(htAttr, NumberStyles.Float, CultureInfo.InvariantCulture, out var ht))
+                {
+                    currentRow.setHeight((float)ht);
+                }
                 continue;
             }
 
@@ -696,6 +749,170 @@ public sealed class XSSFWorkbook : IWorkbook
                 currentFormulaText = null;
                 inFormulaElement = false;
                 formulaText.Clear();
+            }
+
+            // Parse merge cells
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "mergeCell")
+            {
+                var refAttr = reader.GetAttribute("ref");
+                if (refAttr is not null)
+                {
+                    var region = CellRangeAddress.Parse(refAttr);
+                    sheet.addMergedRegion(region);
+                }
+                continue;
+            }
+
+            // Parse page margins
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "pageMargins")
+            {
+                sheet.PageMarginBottom = ParseDoubleAttr(reader, "bottom", 0.75);
+                sheet.PageMarginFooter = ParseDoubleAttr(reader, "footer", 0.3);
+                sheet.PageMarginHeader = ParseDoubleAttr(reader, "header", 0.3);
+                sheet.PageMarginLeft = ParseDoubleAttr(reader, "left", 0.7);
+                sheet.PageMarginRight = ParseDoubleAttr(reader, "right", 0.7);
+                sheet.PageMarginTop = ParseDoubleAttr(reader, "top", 0.75);
+                continue;
+            }
+
+            // Parse page setup
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "pageSetup")
+            {
+                sheet.PageOrientation = reader.GetAttribute("orientation");
+                var ftw = reader.GetAttribute("fitToWidth");
+                if (ftw is not null && int.TryParse(ftw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ftwVal))
+                    sheet.FitToWidth = ftwVal;
+                var fth = reader.GetAttribute("fitToHeight");
+                if (fth is not null && int.TryParse(fth, NumberStyles.Integer, CultureInfo.InvariantCulture, out var fthVal))
+                    sheet.FitToHeight = fthVal;
+                var ps = reader.GetAttribute("paperSize");
+                if (ps is not null && int.TryParse(ps, NumberStyles.Integer, CultureInfo.InvariantCulture, out var psVal))
+                    sheet.PaperSize = psVal;
+                continue;
+            }
+
+            // Parse header/footer
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "oddHeader")
+            {
+                sheet.HeaderCenter = reader.ReadString();
+                continue;
+            }
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "oddFooter")
+            {
+                sheet.FooterCenter = reader.ReadString();
+                continue;
+            }
+
+            // Parse hyperlinks
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "hyperlink")
+            {
+                var refAttr = reader.GetAttribute("ref");
+                var relId = GetAttributeByLocalName(reader, "id");
+                if (refAttr is not null && relId is not null && hyperlinkRels.TryGetValue(relId, out var hyperlinkInfo))
+                {
+                    var (rowNum, colNum) = ParseCellRef(refAttr);
+                    var hyperlink = new XSSFHyperlink(hyperlinkInfo.IsExternal ? HyperlinkType.Url : HyperlinkType.Document)
+                    {
+                        Address = hyperlinkInfo.Target,
+                        CellRef = refAttr,
+                        IsExternal = hyperlinkInfo.IsExternal,
+                        RelationshipId = relId
+                    };
+                    sheet.AddHyperlink(hyperlink);
+                    var existingRow = sheet.getRow(rowNum);
+                    if (existingRow is XSSFRow existingXSSFRow)
+                    {
+                        var existingCell = existingXSSFRow.getCell(colNum);
+                        if (existingCell is XSSFCell targetCell)
+                        {
+                            targetCell.setHyperlink(hyperlink);
+                        }
+                    }
+                }
+                continue;
+            }
+
+            // Parse data validation
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "dataValidations")
+            {
+                continue;
+            }
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "dataValidation")
+            {
+                var dv = new XSSFDataValidation();
+                var typeAttr = reader.GetAttribute("type");
+                if (typeAttr is not null)
+                    dv.Type = DataValidationTypeFromName(typeAttr);
+                var opAttr = reader.GetAttribute("operator");
+                if (opAttr is not null)
+                    dv.Operator = DataValidationOperatorFromName(opAttr);
+                dv.Sqref = reader.GetAttribute("sqref") ?? string.Empty;
+                dv.AllowBlank = ParseBooleanAttribute(reader.GetAttribute("allowBlank"), defaultValue: true);
+                dv.ShowInputMessage = ParseBooleanAttribute(reader.GetAttribute("showInputMessage"), defaultValue: true);
+                dv.ShowErrorMessage = ParseBooleanAttribute(reader.GetAttribute("showErrorMessage"), defaultValue: true);
+                dv.ShowDropDown = ParseBooleanAttribute(reader.GetAttribute("showDropDown"), defaultValue: true);
+                dv.ErrorStyle = reader.GetAttribute("errorStyle");
+                dv.ErrorTitle = reader.GetAttribute("errorTitle");
+                dv.ErrorMessage = reader.GetAttribute("error");
+                dv.PromptTitle = reader.GetAttribute("promptTitle");
+                dv.PromptMessage = reader.GetAttribute("prompt");
+                if (!reader.IsEmptyElement)
+                {
+                    var dvDepth = reader.Depth;
+                    while (reader.Read() && reader.Depth > dvDepth)
+                    {
+                        if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "formula1" && !reader.IsEmptyElement)
+                            dv.Formula1 = reader.ReadString();
+                        if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "formula2" && !reader.IsEmptyElement)
+                            dv.Formula2 = reader.ReadString();
+                    }
+                }
+                sheet.AddDataValidation(dv);
+                continue;
+            }
+
+            // Parse conditional formatting
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "conditionalFormatting")
+            {
+                var cf = new XSSFConditionalFormatting();
+                cf.Sqref = reader.GetAttribute("sqref") ?? string.Empty;
+                if (!reader.IsEmptyElement)
+                {
+                    var cfDepth = reader.Depth;
+                    while (reader.Read() && reader.Depth > cfDepth)
+                    {
+                        if (reader.NodeType != XmlNodeType.Element) continue;
+                        if (reader.LocalName == "cfRule")
+                        {
+                            var rule = new XSSFCFRule();
+                            var rTypeAttr = reader.GetAttribute("type");
+                            if (rTypeAttr is not null)
+                                rule.Type = CfTypeFromName(rTypeAttr);
+                            var priorityAttr = reader.GetAttribute("priority");
+                            if (priorityAttr is not null && int.TryParse(priorityAttr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pri))
+                                rule.Priority = pri;
+                            rule.Operator = reader.GetAttribute("operator");
+                            rule.Text = reader.GetAttribute("text");
+                            var dxfAttr = reader.GetAttribute("dxfId");
+                            if (dxfAttr is not null && int.TryParse(dxfAttr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var dxfId))
+                                rule.DxfId = dxfId;
+                            if (!reader.IsEmptyElement)
+                            {
+                                var ruleDepth = reader.Depth;
+                                while (reader.Read() && reader.Depth > ruleDepth)
+                                {
+                                    if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "formula" && !reader.IsEmptyElement)
+                                    {
+                                        rule.Formulas.Add(reader.ReadString());
+                                    }
+                                }
+                            }
+                            cf.Rules.Add(rule);
+                        }
+                    }
+                }
+                sheet.AddConditionalFormatting(cf);
+                continue;
             }
         }
     }
@@ -946,6 +1163,47 @@ public sealed class XSSFWorkbook : IWorkbook
             }
         }
         return string.Join("/", stack.Reverse());
+    }
+
+    private static Dictionary<string, (string Target, bool IsExternal)> ReadSheetHyperlinkRelationships(ZipArchive archive, string sheetPartName)
+    {
+        var result = new Dictionary<string, (string, bool)>(StringComparer.Ordinal);
+        var dir = Path.GetDirectoryName(sheetPartName)?.Replace('\\', '/') ?? string.Empty;
+        var file = Path.GetFileName(sheetPartName);
+        var relsPath = $"{dir}/_rels/{file}.rels";
+        var relsEntry = archive.GetEntry(relsPath);
+        if (relsEntry is null) return result;
+        using var relsStream = relsEntry.Open();
+        using var relsReader = XmlReader.Create(relsStream, new XmlReaderSettings { IgnoreWhitespace = false });
+        while (relsReader.Read())
+        {
+            if (relsReader.NodeType != XmlNodeType.Element || relsReader.LocalName != "Relationship") continue;
+            var relType = relsReader.GetAttribute("Type");
+            if (relType is null || !relType.EndsWith("/relationships/hyperlink", StringComparison.Ordinal)) continue;
+            var relId = relsReader.GetAttribute("Id");
+            var target = relsReader.GetAttribute("Target");
+            var targetMode = relsReader.GetAttribute("TargetMode");
+            if (relId is not null && target is not null)
+            {
+                result[relId] = (target, string.Equals(targetMode, "External", StringComparison.Ordinal));
+            }
+        }
+        return result;
+    }
+
+    private static (int row, int col) ParseCellRef(string reference)
+    {
+        var clean = reference.TrimStart('$');
+        int i = 0;
+        while (i < clean.Length && char.IsLetter(clean[i])) i++;
+        var colPart = clean.Substring(0, i);
+        var rowPart = clean.Substring(i);
+        int col = 0;
+        foreach (var ch in colPart)
+        {
+            col = col * 26 + (char.ToUpperInvariant(ch) - 'A' + 1);
+        }
+        return (int.Parse(rowPart, CultureInfo.InvariantCulture) - 1, col - 1);
     }
 
     private void ReadStyles(ZipArchive archive)
@@ -1502,11 +1760,20 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteEndElement();
     }
 
-    private static void WriteSheetRelationships(PoiXmlWriter writer, XSSFSheet sheet)
+    private void WriteSheetRelationships(PoiXmlWriter writer, XSSFSheet sheet)
     {
         writer.WriteStartElement("Relationships");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
-        WriteRelationship(writer, "rId1", $"../drawings/drawing{sheet.Drawing!.DrawingIndex}.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing");
+        int relId = 1;
+        if (sheet.Drawing is not null)
+        {
+            WriteRelationship(writer, $"rId{relId++}", $"../drawings/drawing{sheet.Drawing!.DrawingIndex}.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing");
+        }
+        foreach (var hyperlink in sheet.Hyperlinks)
+        {
+            var targetMode = hyperlink.IsExternal ? "External" : null;
+            WriteRelationship(writer, hyperlink.RelationshipId ?? $"rId{relId++}", hyperlink.Address, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", targetMode);
+        }
         writer.WriteEndElement();
     }
 
@@ -1929,20 +2196,55 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteStartElement("sheetFormatPr");
         writer.WriteAttributeString("defaultRowHeight", "15.0");
         writer.WriteEndElement();
+        WriteCols(writer, sheet);
         writer.WriteStartElement("sheetData");
         foreach (var row in sheet.Rows)
         {
             WriteRow(writer, row);
         }
         writer.WriteEndElement();
+        WriteMergeCells(writer, sheet);
+        WriteHyperlinks(writer, sheet);
+        WriteDataValidations(writer, sheet);
+        WriteConditionalFormatting(writer, sheet);
         writer.WriteStartElement("pageMargins");
-        writer.WriteAttributeString("bottom", "0.75");
-        writer.WriteAttributeString("footer", "0.3");
-        writer.WriteAttributeString("header", "0.3");
-        writer.WriteAttributeString("left", "0.7");
-        writer.WriteAttributeString("right", "0.7");
-        writer.WriteAttributeString("top", "0.75");
+        writer.WriteAttributeString("bottom", sheet.PageMarginBottom.ToString("F4", CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("footer", sheet.PageMarginFooter.ToString("F4", CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("header", sheet.PageMarginHeader.ToString("F4", CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("left", sheet.PageMarginLeft.ToString("F4", CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("right", sheet.PageMarginRight.ToString("F4", CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("top", sheet.PageMarginTop.ToString("F4", CultureInfo.InvariantCulture));
         writer.WriteEndElement();
+        if (sheet.PageOrientation is not null || sheet.FitToWidth is not null || sheet.FitToHeight is not null)
+        {
+            writer.WriteStartElement("pageSetup");
+            if (sheet.PageOrientation is not null)
+                writer.WriteAttributeString("orientation", sheet.PageOrientation);
+            if (sheet.FitToWidth is not null)
+                writer.WriteAttributeString("fitToWidth", sheet.FitToWidth.Value.ToString(CultureInfo.InvariantCulture));
+            if (sheet.FitToHeight is not null)
+                writer.WriteAttributeString("fitToHeight", sheet.FitToHeight.Value.ToString(CultureInfo.InvariantCulture));
+            if (sheet.PaperSize is not null)
+                writer.WriteAttributeString("paperSize", sheet.PaperSize.Value.ToString(CultureInfo.InvariantCulture));
+            writer.WriteEndElement();
+        }
+        if (sheet.HeaderCenter is not null || sheet.FooterCenter is not null)
+        {
+            writer.WriteStartElement("headerFooter");
+            if (sheet.HeaderCenter is not null)
+            {
+                writer.WriteStartElement("oddHeader");
+                writer.WriteString(sheet.HeaderCenter);
+                writer.WriteEndElement();
+            }
+            if (sheet.FooterCenter is not null)
+            {
+                writer.WriteStartElement("oddFooter");
+                writer.WriteString(sheet.FooterCenter);
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement();
+        }
         if (sheet.Drawing is not null)
         {
             writer.WriteStartElement("drawing");
@@ -1956,6 +2258,10 @@ public sealed class XSSFWorkbook : IWorkbook
     {
         writer.WriteStartElement("row");
         writer.WriteAttributeString("r", (row.getRowNum() + 1).ToString(CultureInfo.InvariantCulture));
+        if (row.HasCustomHeight)
+            writer.WriteAttributeString("ht", row.HeightValue.ToString("F1", CultureInfo.InvariantCulture));
+        if (row.HasCustomHeight)
+            writer.WriteAttributeString("customHeight", "true");
         foreach (var cell in row.Cells)
         {
             var isFormula = cell.getCellType() == CellType.Formula;
@@ -2027,6 +2333,115 @@ public sealed class XSSFWorkbook : IWorkbook
             }
 
             writer.WriteEndElement(); // </c>
+        }
+        writer.WriteEndElement();
+    }
+
+    private static void WriteMergeCells(PoiXmlWriter writer, XSSFSheet sheet)
+    {
+        var regions = sheet.MergedRegions;
+        if (regions.Count == 0) return;
+        writer.WriteStartElement("mergeCells");
+        writer.WriteAttributeString("count", regions.Count.ToString(CultureInfo.InvariantCulture));
+        foreach (var region in regions)
+        {
+            writer.WriteStartElement("mergeCell");
+            writer.WriteAttributeString("ref", region.FormatAsString());
+            writer.WriteEndElement();
+        }
+        writer.WriteEndElement();
+    }
+
+    private static void WriteHyperlinks(PoiXmlWriter writer, XSSFSheet sheet)
+    {
+        var hyperlinks = sheet.Hyperlinks;
+        if (hyperlinks.Count == 0) return;
+        writer.WriteStartElement("hyperlinks");
+        foreach (var hyperlink in hyperlinks)
+        {
+            writer.WriteStartElement("hyperlink");
+            writer.WriteAttributeString("ref", hyperlink.CellRef);
+            writer.WriteAttributeString("r", "id", hyperlink.RelationshipId ?? string.Empty);
+            writer.WriteEndElement();
+        }
+        writer.WriteEndElement();
+    }
+
+    private static void WriteDataValidations(PoiXmlWriter writer, XSSFSheet sheet)
+    {
+        var validations = sheet.DataValidations;
+        if (validations.Count == 0) return;
+        writer.WriteStartElement("dataValidations");
+        writer.WriteAttributeString("count", validations.Count.ToString(CultureInfo.InvariantCulture));
+        foreach (var dv in validations)
+        {
+            writer.WriteStartElement("dataValidation");
+            writer.WriteAttributeString("type", GetDataValidationTypeName(dv.Type));
+            if (dv.Type != DataValidationType.List && dv.Type != DataValidationType.None)
+                writer.WriteAttributeString("operator", GetDataValidationOperatorName(dv.Operator));
+            if (!dv.AllowBlank) writer.WriteAttributeString("allowBlank", "0");
+            if (!dv.ShowInputMessage) writer.WriteAttributeString("showInputMessage", "0");
+            if (!dv.ShowErrorMessage) writer.WriteAttributeString("showErrorMessage", "0");
+            if (!dv.ShowDropDown) writer.WriteAttributeString("showDropDown", "0");
+            if (dv.ErrorStyle is not null) writer.WriteAttributeString("errorStyle", dv.ErrorStyle);
+            if (dv.ErrorTitle is not null) writer.WriteAttributeString("errorTitle", dv.ErrorTitle);
+            if (dv.ErrorMessage is not null) writer.WriteAttributeString("error", dv.ErrorMessage);
+            if (dv.PromptTitle is not null) writer.WriteAttributeString("promptTitle", dv.PromptTitle);
+            if (dv.PromptMessage is not null) writer.WriteAttributeString("prompt", dv.PromptMessage);
+            writer.WriteAttributeString("sqref", dv.Sqref);
+            if (dv.Formula1 is not null) { writer.WriteStartElement("formula1"); writer.WriteString(dv.Formula1); writer.WriteEndElement(); }
+            if (dv.Formula2 is not null) { writer.WriteStartElement("formula2"); writer.WriteString(dv.Formula2); writer.WriteEndElement(); }
+            writer.WriteEndElement();
+        }
+        writer.WriteEndElement();
+    }
+
+    private static void WriteConditionalFormatting(PoiXmlWriter writer, XSSFSheet sheet)
+    {
+        var cfs = sheet.ConditionalFormatting;
+        if (cfs.Count == 0) return;
+        foreach (var cf in cfs)
+        {
+            writer.WriteStartElement("conditionalFormatting");
+            writer.WriteAttributeString("sqref", cf.Sqref);
+            foreach (var rule in cf.Rules)
+            {
+                writer.WriteStartElement("cfRule");
+                writer.WriteAttributeString("type", GetCfTypeName(rule.Type));
+                writer.WriteAttributeString("priority", rule.Priority.ToString(CultureInfo.InvariantCulture));
+                if (rule.Operator is not null)
+                    writer.WriteAttributeString("operator", rule.Operator);
+                if (rule.Text is not null)
+                    writer.WriteAttributeString("text", rule.Text);
+                if (rule.DxfId >= 0)
+                    writer.WriteAttributeString("dxfId", rule.DxfId.ToString(CultureInfo.InvariantCulture));
+                foreach (var formula in rule.Formulas)
+                {
+                    writer.WriteStartElement("formula");
+                    writer.WriteString(formula);
+                    writer.WriteEndElement();
+                }
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement();
+        }
+    }
+
+    private static void WriteCols(PoiXmlWriter writer, XSSFSheet sheet)
+    {
+        var widths = sheet.ColumnWidths;
+        if (widths.Count == 0) return;
+        writer.WriteStartElement("cols");
+        foreach (var kvp in widths)
+        {
+            var colIndex = kvp.Key;
+            var width = kvp.Value / 256.0;
+            writer.WriteStartElement("col");
+            writer.WriteAttributeString("min", (colIndex + 1).ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("max", (colIndex + 1).ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("width", width.ToString("F2", CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("customWidth", "true");
+            writer.WriteEndElement();
         }
         writer.WriteEndElement();
     }
@@ -2258,11 +2673,136 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteEndElement();
     }
 
+    private static void WriteRelationship(PoiXmlWriter writer, string id, string target, string type, string? targetMode)
+    {
+        writer.WriteStartElement("Relationship");
+        writer.WriteAttributeString("Id", id);
+        writer.WriteAttributeString("Target", target);
+        writer.WriteAttributeString("Type", type);
+        if (targetMode is not null)
+            writer.WriteAttributeString("TargetMode", targetMode);
+        writer.WriteEndElement();
+    }
+
     private static void WriteValElement(PoiXmlWriter writer, string elementName, string value)
     {
         writer.WriteStartElement(elementName);
         writer.WriteAttributeString("val", value);
         writer.WriteEndElement();
+    }
+
+    private static double ParseDoubleAttr(XmlReader reader, string attrName, double defaultValue)
+    {
+        var text = reader.GetAttribute(attrName);
+        if (text is not null && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+            return value;
+        return defaultValue;
+    }
+
+    private static string GetDataValidationTypeName(DataValidationType type)
+    {
+        return type switch
+        {
+            DataValidationType.Whole => "whole",
+            DataValidationType.Decimal => "decimal",
+            DataValidationType.List => "list",
+            DataValidationType.Date => "date",
+            DataValidationType.Time => "time",
+            DataValidationType.TextLength => "textLength",
+            DataValidationType.Custom => "custom",
+            _ => "none"
+        };
+    }
+
+    private static string GetDataValidationOperatorName(DataValidationOperator op)
+    {
+        return op switch
+        {
+            DataValidationOperator.NotBetween => "notBetween",
+            DataValidationOperator.Equal => "equal",
+            DataValidationOperator.NotEqual => "notEqual",
+            DataValidationOperator.LessThan => "lessThan",
+            DataValidationOperator.LessThanOrEqual => "lessThanOrEqual",
+            DataValidationOperator.GreaterThan => "greaterThan",
+            DataValidationOperator.GreaterThanOrEqual => "greaterThanOrEqual",
+            _ => "between"
+        };
+    }
+
+    private static DataValidationType DataValidationTypeFromName(string name)
+    {
+        return name switch
+        {
+            "whole" => DataValidationType.Whole,
+            "decimal" => DataValidationType.Decimal,
+            "list" => DataValidationType.List,
+            "date" => DataValidationType.Date,
+            "time" => DataValidationType.Time,
+            "textLength" => DataValidationType.TextLength,
+            "custom" => DataValidationType.Custom,
+            _ => DataValidationType.None
+        };
+    }
+
+    private static DataValidationOperator DataValidationOperatorFromName(string name)
+    {
+        return name switch
+        {
+            "notBetween" => DataValidationOperator.NotBetween,
+            "equal" => DataValidationOperator.Equal,
+            "notEqual" => DataValidationOperator.NotEqual,
+            "lessThan" => DataValidationOperator.LessThan,
+            "lessThanOrEqual" => DataValidationOperator.LessThanOrEqual,
+            "greaterThan" => DataValidationOperator.GreaterThan,
+            "greaterThanOrEqual" => DataValidationOperator.GreaterThanOrEqual,
+            _ => DataValidationOperator.Between
+        };
+    }
+
+    private static string GetCfTypeName(ConditionalFormatType type)
+    {
+        return type switch
+        {
+            ConditionalFormatType.CellIs => "cellIs",
+            ConditionalFormatType.Formula => "expression",
+            ConditionalFormatType.Top10 => "top10",
+            ConditionalFormatType.UniqueValues => "uniqueValues",
+            ConditionalFormatType.DuplicateValues => "duplicateValues",
+            ConditionalFormatType.ContainsText => "containsText",
+            ConditionalFormatType.NotContainsText => "notContainsText",
+            ConditionalFormatType.BeginsWith => "beginsWith",
+            ConditionalFormatType.EndsWith => "endsWith",
+            ConditionalFormatType.ContainsBlanks => "containsBlanks",
+            ConditionalFormatType.NotContainsBlanks => "notContainsBlanks",
+            ConditionalFormatType.ContainsErrors => "containsErrors",
+            ConditionalFormatType.NotContainsErrors => "notContainsErrors",
+            ConditionalFormatType.TimePeriod => "timePeriod",
+            ConditionalFormatType.AboveAverage => "aboveAverage",
+            _ => "cellIs"
+        };
+    }
+
+    private static ConditionalFormatType CfTypeFromName(string name)
+    {
+        return name switch
+        {
+            "cellIs" => ConditionalFormatType.CellIs,
+            "expression" => ConditionalFormatType.Formula,
+            "top10" => ConditionalFormatType.Top10,
+            "uniqueValues" => ConditionalFormatType.UniqueValues,
+            "duplicateValues" => ConditionalFormatType.DuplicateValues,
+            "containsText" => ConditionalFormatType.ContainsText,
+            "notContainsText" => ConditionalFormatType.NotContainsText,
+            "beginsWith" => ConditionalFormatType.BeginsWith,
+            "endsWith" => ConditionalFormatType.EndsWith,
+            "containsBlanks" => ConditionalFormatType.ContainsBlanks,
+            "notContainsBlanks" => ConditionalFormatType.NotContainsBlanks,
+            "containsErrors" => ConditionalFormatType.ContainsErrors,
+            "notContainsErrors" => ConditionalFormatType.NotContainsErrors,
+            "timePeriod" => ConditionalFormatType.TimePeriod,
+            "aboveAverage" => ConditionalFormatType.AboveAverage,
+            _ => ConditionalFormatType.CellIs
+        };
     }
 
     private sealed record SheetInfo(string Name, string PartName);

@@ -25,6 +25,7 @@ public sealed class XSSFCell : ICell
     private string? _errorString; // raw OOXML error string e.g. "#DIV/0!"
 
     private XSSFCellStyle? _cellStyle;
+    private XSSFHyperlink? _hyperlink;
 
     internal XSSFCell(XSSFRow row, int cellNum)
     {
@@ -307,7 +308,21 @@ public sealed class XSSFCell : ICell
     internal void SetCellStyleIndex(int styleIndex) =>
         _cellStyle = getSheet().getWorkbook().getCellStyleAt(styleIndex);
 
+    public XSSFHyperlink? getHyperlink() => _hyperlink;
+
+    public void setHyperlink(XSSFHyperlink? link)
+    {
+        _hyperlink = link;
+        if (link is not null)
+        {
+            link.CellRef = XSSFHyperlink.FormatCellRef(getRowIndex(), getColumnIndex());
+            getSheet().AddHyperlink(link);
+        }
+    }
+
     ICellStyle ICell.getCellStyle() => getCellStyle();
     ISheet ICell.getSheet() => getSheet();
     IRow ICell.getRow() => getRow();
+    IHyperlink? ICell.getHyperlink() => getHyperlink();
+    void ICell.setHyperlink(IHyperlink? link) => setHyperlink(link as XSSFHyperlink);
 }

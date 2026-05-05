@@ -7,4 +7,8 @@ public interface IRow
     short getLastCellNum();
     int getRowNum();
     ISheet getSheet();
+
+    // Row height
+    void setHeight(float height);
+    float getHeight();
 }

@@ -7,6 +7,7 @@ public sealed class XSSFRow : IRow
     private readonly SortedDictionary<int, XSSFCell> _cells = new();
     private readonly XSSFSheet _sheet;
     private readonly int _rowNum;
+    private float _height = -1; // -1 = default height
 
     internal XSSFRow(XSSFSheet sheet, int rowNum)
     {
@@ -45,6 +46,20 @@ public sealed class XSSFRow : IRow
     {
         return _rowNum;
     }
+
+    public void setHeight(float height)
+    {
+        if (height < 0)
+            throw new ArgumentException("Row height must be non-negative.", nameof(height));
+        _height = height;
+    }
+
+    public float getHeight() => _height >= 0 ? _height : 15.0f; // 15.0 = default
+
+    /// <summary>True if a custom height was explicitly set.</summary>
+    internal bool HasCustomHeight => _height >= 0;
+
+    internal float HeightValue => _height;
 
     internal IReadOnlyCollection<XSSFCell> Cells => _cells.Values;
 

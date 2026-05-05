@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using DotnetPoi.SS.UserModel;
+using DotnetPoi.SS.Util;
 using DotnetPoi.XSSF.UserModel;
 using Xunit;
 
@@ -493,6 +494,242 @@ public class XSSFWorkbookTests
         Assert.True(loadedStyle.getWrapText());
         Assert.Equal((short)1, loadedStyle.getIndention());
         Assert.Equal((short)45, loadedStyle.getRotation());
+    }
+
+    [Fact]
+    public void RoundTrip_MergeCells_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("MergeTest");
+
+        var row1 = sheet.createRow(0);
+        row1.createCell(0).setCellValue("A1");
+        row1.createCell(1).setCellValue("B1");
+        var row2 = sheet.createRow(1);
+        row2.createCell(0).setCellValue("A2");
+        row2.createCell(1).setCellValue("B2");
+
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 1)); // A1:B1
+        sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 0)); // A2:A2
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("MergeTest")!;
+
+        var merged = loadedSheet.getMergedRegions();
+        Assert.Equal(2, merged.Count);
+
+        Assert.Equal(0, merged[0].FirstRow);
+        Assert.Equal(0, merged[0].LastRow);
+        Assert.Equal(0, merged[0].FirstCol);
+        Assert.Equal(1, merged[0].LastCol);
+
+        Assert.Equal(1, merged[1].FirstRow);
+        Assert.Equal(1, merged[1].LastRow);
+        Assert.Equal(0, merged[1].FirstCol);
+        Assert.Equal(0, merged[1].LastCol);
+    }
+
+    [Fact]
+    public void RoundTrip_ColumnWidth_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("WidthTest");
+        sheet.createRow(0).createCell(0).setCellValue("A");
+        sheet.createRow(0).createCell(1).setCellValue("B");
+
+        sheet.setColumnWidth(0, 80 * 256);
+        sheet.setColumnWidth(1, 40 * 256);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("WidthTest")!;
+
+        var loadedWidth0 = loadedSheet.getColumnWidth(0);
+        var loadedWidth1 = loadedSheet.getColumnWidth(1);
+        Assert.InRange(loadedWidth0, 75 * 256, 85 * 256);
+        Assert.InRange(loadedWidth1, 35 * 256, 45 * 256);
+    }
+
+    [Fact]
+    public void RoundTrip_RowHeight_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("HeightTest");
+        var row0 = sheet.createRow(0);
+        row0.createCell(0).setCellValue("Tall");
+        row0.setHeight(45.0f);
+
+        var row1 = sheet.createRow(1);
+        row1.createCell(0).setCellValue("Normal");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("HeightTest")!;
+
+        var loadedRow0 = loadedSheet.getRow(0)!;
+        Assert.Equal(45.0f, loadedRow0.getHeight(), 3);
+
+        var loadedRow1 = loadedSheet.getRow(1)!;
+        Assert.Equal(15.0f, loadedRow1.getHeight(), 3);
+    }
+
+    [Fact]
+    public void RoundTrip_Hyperlink_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("LinkTest");
+        var cell = sheet.createRow(0).createCell(0);
+        cell.setCellValue("Click me");
+
+        var hyperlink = new XSSFHyperlink(HyperlinkType.Url);
+        hyperlink.setAddress("https://example.com");
+        cell.setHyperlink(hyperlink);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("LinkTest")!;
+        var loadedCell = loadedSheet.getRow(0)!.getCell(0)!;
+        Assert.Equal("Click me", loadedCell.getStringCellValue());
+
+        var loadedLink = loadedCell.getHyperlink();
+        Assert.NotNull(loadedLink);
+        Assert.Equal("https://example.com", loadedLink.getAddress());
+        Assert.Equal("A1", loadedLink.getCellRef());
+        Assert.Equal(HyperlinkType.Url, loadedLink.getType());
+    }
+
+    [Fact]
+    public void RoundTrip_PrintSettings_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("PrintTest");
+        sheet.createRow(0).createCell(0).setCellValue("Page 1");
+
+        // Set page layout properties
+        sheet.PageOrientation = "landscape";
+        sheet.PaperSize = 9; // A4
+        sheet.PageMarginLeft = 1.0;
+        sheet.PageMarginRight = 1.0;
+        sheet.PageMarginTop = 1.5;
+        sheet.PageMarginBottom = 1.5;
+        sheet.HeaderCenter = "Confidential";
+        sheet.FooterCenter = "Page 1";
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheetAt(0);
+        var xssfSheet = (XSSFSheet)loadedSheet;
+
+        Assert.Equal("landscape", xssfSheet.PageOrientation);
+        Assert.Equal(9, xssfSheet.PaperSize);
+        Assert.Equal(1.0, xssfSheet.PageMarginLeft, 2);
+        Assert.Equal(1.0, xssfSheet.PageMarginRight, 2);
+        Assert.Equal(1.5, xssfSheet.PageMarginTop, 2);
+        Assert.Equal(1.5, xssfSheet.PageMarginBottom, 2);
+        Assert.Equal("Confidential", xssfSheet.HeaderCenter);
+        Assert.Equal("Page 1", xssfSheet.FooterCenter);
+    }
+
+    [Fact]
+    public void RoundTrip_DataValidation_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("Validation");
+        sheet.createRow(0).createCell(0).setCellValue("Value");
+
+        var dv = new XSSFDataValidation
+        {
+            Sqref = "A1:A10",
+            Type = DataValidationType.Whole,
+            Operator = DataValidationOperator.Between,
+            Formula1 = "1",
+            Formula2 = "100",
+            AllowBlank = false,
+            ShowDropDown = false,
+            ErrorStyle = "stop",
+            ErrorTitle = "Invalid",
+            ErrorMessage = "Value must be between 1 and 100."
+        };
+        sheet.AddDataValidation(dv);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheetAt(0);
+        var xssfSheet = (XSSFSheet)loadedSheet;
+
+        var loadedValidations = xssfSheet.DataValidations;
+        Assert.Single(loadedValidations);
+
+        var loadedDv = loadedValidations[0];
+        Assert.Equal("A1:A10", loadedDv.Sqref);
+        Assert.Equal(DataValidationType.Whole, loadedDv.Type);
+        Assert.Equal(DataValidationOperator.Between, loadedDv.Operator);
+        Assert.Equal("1", loadedDv.Formula1);
+        Assert.Equal("100", loadedDv.Formula2);
+        Assert.False(loadedDv.AllowBlank);
+        Assert.False(loadedDv.ShowDropDown);
+        Assert.Equal("stop", loadedDv.ErrorStyle);
+        Assert.Equal("Invalid", loadedDv.ErrorTitle);
+        Assert.Equal("Value must be between 1 and 100.", loadedDv.ErrorMessage);
+    }
+
+    [Fact]
+    public void RoundTrip_ConditionalFormatting_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("Rules");
+        var cell = sheet.createRow(0).createCell(0);
+        cell.setCellValue(50);
+
+        // Create a conditional formatting rule: cell value > 100 should highlight in red
+        var cf = new XSSFConditionalFormatting();
+        cf.Sqref = "A1:A10";
+        var rule = new XSSFCFRule();
+        rule.Type = ConditionalFormatType.CellIs;
+        rule.Priority = 1;
+        rule.Operator = "greaterThan";
+        rule.Formulas.Add("100");
+        cf.Rules.Add(rule);
+        sheet.AddConditionalFormatting(cf);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("Rules")!;
+        var loadedCfs = loadedSheet.ConditionalFormatting;
+        Assert.Single(loadedCfs);
+
+        var loadedCf = loadedCfs[0];
+        Assert.Equal("A1:A10", loadedCf.Sqref);
+        Assert.Single(loadedCf.Rules);
+
+        var loadedRule = loadedCf.Rules[0];
+        Assert.Equal(ConditionalFormatType.CellIs, loadedRule.Type);
+        Assert.Equal(1, loadedRule.Priority);
+        Assert.Equal("greaterThan", loadedRule.Operator);
+        Assert.Single(loadedRule.Formulas);
+        Assert.Equal("100", loadedRule.Formulas[0]);
     }
 
     private static string ReadEntry(ZipArchive archive, string name)

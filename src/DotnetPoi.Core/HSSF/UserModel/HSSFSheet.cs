@@ -1,4 +1,5 @@
 using DotnetPoi.SS.UserModel;
+using DotnetPoi.SS.Util;
 
 namespace DotnetPoi.HSSF.UserModel;
 
@@ -6,6 +7,8 @@ public sealed class HSSFSheet : ISheet
 {
     private readonly SortedDictionary<int, HSSFRow> _rows = new();
     private readonly HSSFWorkbook _workbook;
+    private readonly List<CellRangeAddress> _mergedRegions = new();
+    private readonly SortedDictionary<int, int> _columnWidths = new();
 
     internal HSSFSheet(HSSFWorkbook workbook, string sheetName)
     {
@@ -34,6 +37,26 @@ public sealed class HSSFSheet : ISheet
     public HSSFWorkbook getWorkbook() => _workbook;
 
     internal IReadOnlyCollection<HSSFRow> Rows => _rows.Values;
+
+    public void addMergedRegion(CellRangeAddress region)
+    {
+        ArgumentNullException.ThrowIfNull(region);
+        _mergedRegions.Add(region);
+    }
+
+    public IReadOnlyList<CellRangeAddress> getMergedRegions() => _mergedRegions;
+
+    public void setColumnWidth(int columnIndex, int width)
+    {
+        if (width < 0)
+            throw new ArgumentException("Column width must be non-negative.", nameof(width));
+        _columnWidths[columnIndex] = width;
+    }
+
+    public int getColumnWidth(int columnIndex)
+    {
+        return _columnWidths.TryGetValue(columnIndex, out var width) ? width : 0;
+    }
 
     IRow ISheet.createRow(int rownum) => createRow(rownum);
 

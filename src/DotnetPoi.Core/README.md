@@ -30,13 +30,13 @@
 | Interface | Purpose |
 |---|---|
 | `IWorkbook` / `ISheet` / `IRow` / `ICell` | Unified spreadsheet API across XSSF and HSSF |
-| `ICellStyle` / `IFont` / `IDataFormat` | Cell formatting (font, fill, border, alignment, number format) |
+| `ICellStyle` / `IFont` / `IDataFormat` | Cell formatting (font, fill, border, alignment, number format) — **full read/write round-trip** for all style properties in xlsx |
 | `ICreationHelper` | Factory for data formats, anchors, formula evaluator |
 
 ### Infrastructure
 
 - **`PoiXmlWriter`** — XML writer that reproduces Apache POI/XMLBeans output at byte level
-- **OOXML Agile Encryption** (AES-128/SHA1) — password-protect `.xlsx` files via `XSSFWorkbook.writeEncrypted()` and decrypt via `EncryptionInfo` / `Encryptor` / `Decryptor` in the `DotnetPoi.POIFS.Crypt` namespace. **docx / pptx encryption is not yet implemented.**
+- **OOXML Agile Encryption** (AES-128/SHA1) — password-protect `.xlsx`, `.docx`, `.pptx` files via `writeEncrypted()` and decrypt via `EncryptionInfo` / `Encryptor` / `Decryptor` in the `DotnetPoi.POIFS.Crypt` namespace
 
 ## Quick start
 
@@ -66,6 +66,37 @@ row.createCell(0).setCellValue("Hello");
 row.createCell(1).setCellValue(42);
 
 using var fs = new FileStream("output.xlsx", FileMode.Create);
+wb.write(fs);
+```
+
+### xlsx styling example (fill, border, alignment)
+
+```csharp
+using DotnetPoi.XSSF.UserModel;
+using DotnetPoi.SS.UserModel;
+
+using var wb = new XSSFWorkbook();
+var sheet = wb.createSheet("Styled");
+var style = wb.createCellStyle();
+
+style.setFillForegroundColor(IndexedColors.Green.getIndex());
+style.setFillPattern(FillPatternType.SolidForeground);
+
+style.setBorderTop(BorderStyle.Thin);
+style.setBorderBottom(BorderStyle.Thin);
+style.setBorderLeft(BorderStyle.Thin);
+style.setBorderRight(BorderStyle.Thin);
+
+style.setAlignment(HorizontalAlignment.Left);
+style.setVerticalAlignment(VerticalAlignment.Center);
+style.setWrapText(true);
+
+var cell = sheet.createRow(0).createCell(0);
+cell.setCellValue("Styled cell");
+cell.setCellStyle(style);
+// All properties survive a write → read round-trip.
+
+using var fs = new FileStream("styled.xlsx", FileMode.Create);
 wb.write(fs);
 ```
 
@@ -111,35 +142,49 @@ using var fs = new FileStream("output.pptx", FileMode.Create);
 prs.write(fs);
 ```
 
-### Encrypted xlsx write example (xlsx only — docx/pptx encryption not yet implemented)
+### Encrypted xlsx / docx / pptx write example
 
 ```csharp
 using DotnetPoi.XSSF.UserModel;
+using DotnetPoi.XWPF.UserModel;
+using DotnetPoi.XSLF.UserModel;
 
+// Encrypt an xlsx
 using var wb = new XSSFWorkbook();
-var sheet = wb.createSheet("Sheet1");
-sheet.createRow(0).createCell(0).setCellValue("Encrypted content");
-
-using var fs = new FileStream("protected.xlsx", FileMode.Create);
+wb.createSheet("Sheet1").createRow(0).createCell(0).setCellValue("Secret xlsx");
+using var fs = new FileStream("secret.xlsx", FileMode.Create);
 wb.writeEncrypted(fs, "password123");
-// Opens in Excel with the password "password123"
+
+// Encrypt a docx
+using var doc = new XWPFDocument();
+doc.createParagraph().createRun().setText("Secret docx");
+using var fs2 = new FileStream("secret.docx", FileMode.Create);
+doc.writeEncrypted(fs2, "password123");
+
+// Encrypt a pptx
+using var prs = new XMLSlideShow();
+prs.createSlide();
+using var fs3 = new FileStream("secret.pptx", FileMode.Create);
+prs.writeEncrypted(fs3, "password123");
+
+// All three open with the password "password123" in Office / Apache POI.
 ```
 
 ### Decrypt and read example
 
 ```csharp
 using DotnetPoi.POIFS.Crypt;
-using DotnetPoi.XSSF.UserModel;
+using DotnetPoi.XSSF.UserModel;   // or XWPFDocument / XMLSlideShow
 
 using var fs = new FileStream("protected.xlsx", FileMode.Open);
-var info = new EncryptionInfo(fs);
+var info = new EncryptionInfo(fs);  // works for .xlsx / .docx / .pptx
 
 var decryptor = info.Decryptor;
 if (decryptor.verifyPassword("password123"))
 {
     var decryptedData = decryptor.getData();
     using var ms = new MemoryStream(decryptedData);
-    using var wb = new XSSFWorkbook(ms);
+    using var wb = new XSSFWorkbook(ms);  // or XWPFDocument(ms) / new XMLSlideShow(ms)
     Console.WriteLine(wb.getSheetAt(0).getRow(0).getCell(0).getStringCellValue());
 }
 ```
@@ -147,6 +192,13 @@ if (decryptor.verifyPassword("password123"))
 Encryption uses OOXML Agile Encryption (AES-128/SHA1, 100,000 spin count), compatible with Apache POI Java and Microsoft Excel.
 
 ## Architecture note
+
+**Project structure.** The library was originally split across 10+ mini-projects (one per format). It is now consolidated into two NuGet-ready packages:
+
+| Package | Contents |
+|---|---|
+| `DotnetPoi.Core` | All format implementations (XSSF, HSSF, XWPF, XSLF, HWPF, HSLF, POIFS), SS interfaces, `PoiXmlWriter`, encryption. **Zero dependencies.** |
+| `DotnetPoi.Formula` | Formula evaluator — references Core. |
 
 `DotnetPoi.Core` contains **everything except formula evaluation**. Formulas are preserved as text and cached values are read/written, but the evaluator engine lives in the separate `DotnetPoi.Formula` package.
 

@@ -573,7 +573,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests (188) — all formats
+│   ├── DotnetPoi.Core.Tests/       # Core tests (195) — all formats
 │   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
 │   ├── DotnetPoi.Interop.Tests/   # Java/.NET bidirectional compatibility tests
 │   │   ├── java/                #   Maven project (Apache POI dependency)
@@ -1113,7 +1113,7 @@ doc.write(fs);
 
 ## なぜこのプロジェクトが必要か
 
-.NET の Excel ライブラリには構造的な問題があります。
+.NET の Office ライブラリには構造的な問題があります。
 
 - **NPOI**: xls / xlsx 両対応だがv2.8.0 以降は商用利用に維持費が必要
 - **ClosedXML / EPPlus**: xlsx のみ対応、xls（BIFF形式）は扱えない
@@ -1149,7 +1149,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt（PowerPoint 97-2003）
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula（評価器のみ）
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core テスト（188）— 全フォーマット
+│   ├── DotnetPoi.Core.Tests/       # Core テスト（195）— 全フォーマット
 │   ├── DotnetPoi.Formula.Tests/    # Formula 評価器テスト（10）
 │   ├── DotnetPoi.Interop.Tests/   # Java/.NET 双方向互換性テスト
 │   │   ├── java/                #   Maven プロジェクト（Apache POI 依存）
