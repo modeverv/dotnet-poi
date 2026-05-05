@@ -256,7 +256,9 @@ Goal: `v0.5`. OLE2 container → BIFF read/write. Heaviest phase.
 
 ### Phase 5 — Formula Engine
 
-Goal: `v1.0`. `FormulaEvaluator`. Expect several months standalone.
+**Permanently deferred.** Full formula evaluation is out of scope.
+The partial `XSSFFormulaEvaluator` (handles SUM, AVERAGE, CONCATENATE, basic arithmetic) stays as-is to support the existing interop fixtures and will not be expanded.
+Formula text write/read and cached-value preservation remain in scope; formula evaluation does not.
 
 ### Phase 6 — Word / PowerPoint Formats
 
@@ -286,21 +288,37 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 4. **Macro-enabled file preservation** — when round-tripping xlsm/docm/pptm without touching macros, `vbaProject.bin` and all macro parts must survive byte-for-byte.
 5. **XML byte-level parity** — only pursue this when a concrete interop failure cannot be fixed by semantic means. Do not chase attribute ordering or `standalone` differences as goals in themselves.
 
+#### Progress assessment (2026-05-05)
+
+| step | format | progress | notes |
+|---|---|---|---|
+| 1 | xlsx/XSSF | ~30% | basic value/formula round-trip ✅; styles/layout/drawing partial; no formula evaluation |
+| 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
+| 3 | docx/XWPF | ~15% | paragraph/run/image write ✅; round-trip not tested |
+| 4 | pptx/XSLF | ~15% | slide/image/rotation write ✅; round-trip not tested |
+| 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
+| 6 | doc/HWPF | ~5% | read-only stub only |
+| 7 | ppt/HSLF | ~5% | read-only stub only |
+
+**Model-layer XML divergences remaining in xlsx** (not blocking interop; Excel ignores these):
+`fileVersion`, `workbookPr` metadata attributes, `workbookView` window sizes, `spans` attribute on rows, `s="0"` style attribute on cells.
+Do not add these as fixture-specific constants — only fix when a concrete interop failure requires it.
+
 #### step 1 xlsx / XSSF
 
-- [ ] Round-trip: write xlsx → read back → assert cell values, types, and styles are identical.
-- [ ] Interop A: Java POI writes xlsx → dotnet-poi reads → assert values match.
-- [ ] Interop B: dotnet-poi writes xlsx → Java POI reads → assert values match.
+- [~] Round-trip: write xlsx → read back → assert cell values, types, and styles are identical. *(values/formulas done; styles not round-tripped)*
+- [x] Interop A: Java POI writes xlsx → dotnet-poi reads → assert values match.
+- [x] Interop B: dotnet-poi writes xlsx → Java POI reads → assert values match.
 - [ ] Style parity: fonts, fills, borders, number formats, alignment, protection, row/column styles.
 - [ ] Layout: merged regions, row heights, column widths, hidden rows/columns, freeze panes, print settings.
-- [ ] Drawing: multiple images, anchors, comments, hyperlinks, charts, shapes.
-- [ ] Formulas: evaluate SUM, AVERAGE, IF, VLOOKUP, date/time, text, error semantics.
+- [~] Drawing: multiple images, anchors, rotation. *(charts/comments/hyperlinks/shapes not done)*
+- [~] Formulas: write formula text + cached value, read back. *(evaluation permanently deferred — see Phase 5)*
 - [ ] Rich text / shared strings coverage.
 
 #### step 2 xls / HSSF
 
-- [ ] Round-trip: write xls → read back → assert values, styles, formulas are identical.
-- [ ] Interop A/B with Java POI.
+- [~] Round-trip: write xls → read back → assert values. *(basic only)*
+- [~] Interop A/B with Java POI. *(basic cases only)*
 - [ ] BIFF records: Row, MulRK, MulBlank, Formula, XF, Font, Format, Palette, MergeCells, ColumnInfo, Hyperlink, drawing.
 - [ ] Styles, formats, merged regions, row/column layout, formulas, pictures, charts, comments, hyperlinks.
 - [ ] Preserve unknown OLE2 streams and BIFF records during round-trip.
@@ -308,22 +326,22 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 #### step 3 docx / XWPF
 
 - [ ] Round-trip: open docx → write → read back → assert paragraph/run text and formatting are identical.
-- [ ] Interop A/B with Java POI.
+- [~] Interop B: dotnet-poi writes docx → Java POI reads. *(text+image+rotation fixtures exist)*
 - [ ] Tables, numbering, styles, headers/footers, sections, page settings, fields, hyperlinks, comments, footnotes/endnotes.
 - [ ] Preserve unknown parts and relationships during round-trip.
 
 #### step 4 pptx / XSLF
 
 - [ ] Round-trip: open pptx → write → read back → assert slide content is identical.
-- [ ] Interop A/B with Java POI.
+- [~] Interop B: dotnet-poi writes pptx → Java POI reads. *(image+rotation fixture exists)*
 - [ ] Text boxes, rich text, placeholders, layouts, masters, themes, tables, charts, notes, shapes.
 - [ ] Preserve unknown parts and relationships during round-trip.
 
 #### step 5 Macro-enabled formats (xlsm, docm, pptm)
 
-- [ ] Round-trip without macro modification: `vbaProject.bin` and macro content types survive byte-for-byte.
-- [ ] Verify that workbook/document edits do not disturb macro parts or unrelated package parts.
-- [ ] Interop: dotnet-poi writes xlsm/docm/pptm → Java POI reads and verifies values.
+- [x] Round-trip without macro modification: `vbaProject.bin` and macro content types survive byte-for-byte.
+- [x] Workbook/document edits do not disturb macro parts.
+- [ ] Interop: dotnet-poi writes xlsm/docm/pptm → Java POI reads and verifies values. *(xlsm in progress)*
 
 #### step 6 doc / HWPF
 
@@ -775,15 +793,9 @@ Agile 暗号化、`EncryptionInfo` XML 出力、`EncryptedPackage` の chunk/HMA
 
 ### Phase 5 — 数式エンジン
 
-目標: `v1.0`。`FormulaEvaluator`。単独で数ヶ月かかる想定。
-
-#### 優先順位
-残ったものは落穂拾いにて対応する
-
-##### step1. 数式の保存・読み込み
-##### step2. Excel に再計算させる設定
-##### step3. 代表的な関数だけ評価
-代表的な関数の評価（SUM, AVERAGE, IF, VLOOKUP など）
+**永久凍結。** 数式評価は実装しない。
+既存の部分実装 `XSSFFormulaEvaluator`（SUM/AVERAGE/CONCATENATE/基本四則演算のみ）は interop fixture のために残すが拡張しない。
+数式テキストの write/read とキャッシュ値の保持はスコープ内。数式評価はスコープ外。
 
 ### Phase 6 — Xls / Word / PowerPoint 形式
 
@@ -815,19 +827,19 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 
 #### step 1 xlsx / XSSF
 
-- [ ] ラウンドトリップ: xlsx を書いて読み返し、セルの値・型・スタイルが同一であることを確認する。
-- [ ] Interop A: Java POI が xlsx を書く → dotnet-poi が読む → 値の一致を確認する。
-- [ ] Interop B: dotnet-poi が xlsx を書く → Java POI が読む → 値の一致を確認する。
+- [~] ラウンドトリップ: xlsx を書いて読み返し、セルの値・型・スタイルが同一であることを確認する。*(値・数式は完了、スタイルは未)*
+- [x] Interop A: Java POI が xlsx を書く → dotnet-poi が読む → 値の一致を確認する。
+- [x] Interop B: dotnet-poi が xlsx を書く → Java POI が読む → 値の一致を確認する。
 - [ ] スタイルパリティ: font、fill、border、number format、alignment、protection、row/column style。
 - [ ] レイアウト: merged region、row height、column width、hidden row/column、freeze pane、print setting。
-- [ ] 図形: 複数画像、anchor、comment、hyperlink、chart、shape。
-- [ ] 数式: SUM、AVERAGE、IF、VLOOKUP、date/time、text、error semantics の評価。
+- [~] 図形: 複数画像・回転 ✅。comment/hyperlink/chart/shape は未。
+- [~] 数式: 数式テキスト write/read・キャッシュ値保持 ✅。**評価は永久凍結（Phase 5 参照）。**
 - [ ] rich text / shared strings の coverage を増やす。
 
 #### step 2 xls / HSSF
 
-- [ ] ラウンドトリップ: xls を書いて読み返し、値・スタイル・数式が同一であることを確認する。
-- [ ] Java POI との Interop A/B。
+- [~] ラウンドトリップ: 基本的な値の write/read *(基本のみ)*
+- [~] Java POI との Interop A/B *(基本ケースのみ)*
 - [ ] BIFF record: Row、MulRK、MulBlank、Formula、XF、Font、Format、Palette、MergeCells、ColumnInfo、Hyperlink、drawing。
 - [ ] style、format、merged region、row/column layout、formula、picture、chart、comment、hyperlink を実装する。
 - [ ] round-trip 時に未知 OLE2 stream と BIFF record を保持する。
@@ -835,22 +847,22 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 #### step 3 docx / XWPF
 
 - [ ] ラウンドトリップ: docx を開いて書いて読み返し、paragraph/run のテキストと書式が同一であることを確認する。
-- [ ] Java POI との Interop A/B。
+- [~] Interop B: dotnet-poi が docx を書く → Java POI が読む *(text+image+rotation fixture あり)*
 - [ ] table、numbering、style、header/footer、section、page setting、field、hyperlink、comment、footnote/endnote を実装する。
 - [ ] round-trip 時に未知 part と relationship を保持する。
 
 #### step 4 pptx / XSLF
 
 - [ ] ラウンドトリップ: pptx を開いて書いて読み返し、スライド内容が同一であることを確認する。
-- [ ] Java POI との Interop A/B。
+- [~] Interop B: dotnet-poi が pptx を書く → Java POI が読む *(image+rotation fixture あり)*
 - [ ] text box、rich text、placeholder、layout、master、theme、table、chart、notes、shape を実装する。
 - [ ] round-trip 時に未知 part と relationship を保持する。
 
 #### step 5 マクロ有効フォーマット（xlsm、docm、pptm）
 
-- [ ] マクロを変更しない round-trip で `vbaProject.bin` とマクロ content type を byte-for-byte に保持する。
-- [ ] workbook/document の編集が macro part や unrelated package part を乱さないことを確認する。
-- [ ] Interop: dotnet-poi が xlsm/docm/pptm を書く → Java POI が読んで値を確認する。
+- [x] マクロを変更しない round-trip で `vbaProject.bin` とマクロ content type を byte-for-byte に保持する。
+- [x] workbook/document の編集が macro part や unrelated package part を乱さないことを確認する。
+- [ ] Interop: dotnet-poi が xlsm/docm/pptm を書く → Java POI が読んで値を確認する。*(xlsm 実装中)*
 
 #### step 6 doc / HWPF
 

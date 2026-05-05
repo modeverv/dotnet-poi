@@ -1,5 +1,35 @@
 # CHECKPOINT
 
+## 2026-05-05 08:xx JST - Phase 7 assessment, formula evaluator dropped, xlsm interop
+
+- Current task: write Phase 7 current-state assessment into AGENTS.md, drop formula evaluator, implement xlsm interop.
+- Scope boundary: AGENTS.md updated (English + Japanese), no commit.
+
+### AGENTS.md updates
+
+- Phase 5 (英日両方): "永久凍結" — `XSSFFormulaEvaluator` は既存テスト用に残すが拡張しない。数式評価はスコープ外。
+- Phase 7 step 1〜5: 現在地を `[x]`/`[~]`/`[ ]` で明示。モデル層の残差異（fileVersion等）をノートとして記録。
+- Phase 7 進捗表（step別パーセンテージ）を追加。
+
+### xlsm interop 実装
+
+C# 側: `WriteForPoiTests.Write_XlsmWithCellsAndVba_CreatesFixtureForPoi`
+- `example.xlsm` から VBA バイトを取得（csproj に content item 追加）
+- `XSSFWorkbook` で "MacroSheet" シート + A1="from dotnet-poi xlsm" + B1=99.5 + setVBAProject
+- `from-dotnet-poi/phase-xlsm-interop.xlsm` に書き出し
+
+Java 側: `ReadFromDotnetTest.readPhaseXlsmInterop`
+- `isMacroEnabled()` == true
+- Sheet "MacroSheet" + A1 = "from dotnet-poi xlsm" + B1 = 99.5
+- OPC パッケージに vbaProject.bin (application/vnd.ms-office.vbaProject) が存在し非空
+- `assertNotNull` import 追加
+
+### Verification
+
+- `dotnet test tests/DotnetPoi.Interop.Tests/cs/...` passed (29 tests, was 28).
+- `mvn test -Dtest=ReadFromDotnetTest` passed (14 tests, was 13).
+- 既存全テストスイート異常なし。
+
 ## 2026-05-05 07:xx JST - Namespace, attribute order, and semantic XSSF tests (items 7-12)
 
 - Current task: implement `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order items 7-12.

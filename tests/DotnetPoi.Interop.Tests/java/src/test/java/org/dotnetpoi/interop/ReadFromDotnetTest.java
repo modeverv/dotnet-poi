@@ -2,6 +2,7 @@ package org.dotnetpoi.interop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -320,6 +321,43 @@ public class ReadFromDotnetTest {
             assertEquals(org.apache.poi.ss.usermodel.CellType.FORMULA, text.getCellType());
             assertEquals("CONCATENATE(\"sum=\",SUM(A1:C1))", text.getCellFormula());
             assertEquals("sum=60", text.getStringCellValue());
+        }
+    }
+
+    @Test
+    void readPhaseXlsmInterop() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-xlsm-interop.xlsm");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XSSFWorkbook workbook = new XSSFWorkbook(input)) {
+
+            // Macro-enabled workbook must have a VBA project.
+            assertTrue(workbook.isMacroEnabled(), "workbook should be macro-enabled");
+
+            Sheet sheet = workbook.getSheet("MacroSheet");
+            assertNotNull(sheet, "sheet 'MacroSheet' should exist");
+
+            Row row = sheet.getRow(0);
+            assertNotNull(row, "row 0 should exist");
+
+            Cell stringCell = row.getCell(0);
+            assertEquals(org.apache.poi.ss.usermodel.CellType.STRING, stringCell.getCellType());
+            assertEquals("from dotnet-poi xlsm", stringCell.getStringCellValue());
+
+            Cell numericCell = row.getCell(1);
+            assertEquals(org.apache.poi.ss.usermodel.CellType.NUMERIC, numericCell.getCellType());
+            assertEquals(99.5, numericCell.getNumericCellValue(), 0.0001);
+
+            // VBA project must be present in the OPC package.
+            java.util.List<org.apache.poi.openxml4j.opc.PackagePart> vbaParts =
+                workbook.getPackage().getPartsByContentType("application/vnd.ms-office.vbaProject");
+            assertFalse(vbaParts.isEmpty(), "xl/vbaProject.bin should be present in the package");
+            try (InputStream vbaStream = vbaParts.get(0).getInputStream();
+                 java.io.ByteArrayOutputStream vbaBuf = new java.io.ByteArrayOutputStream()) {
+                vbaStream.transferTo(vbaBuf);
+                assertTrue(vbaBuf.size() > 0, "vbaProject.bin should be non-empty");
+            }
         }
     }
 

@@ -326,6 +326,40 @@ public class WriteForPoiTests
         Assert.True(new FileInfo(fixturePath).Length > 0);
     }
 
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_XlsmWithCellsAndVba_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase-xlsm-interop.xlsm");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        // Extract VBA bytes from the test xlsm so the fixture carries a real VBA project.
+        byte[] vbaBytes;
+        using (var sourceStream = File.OpenRead("example.xlsm"))
+        using (var sourceZip = new System.IO.Compression.ZipArchive(sourceStream, System.IO.Compression.ZipArchiveMode.Read))
+        {
+            var vbaEntry = sourceZip.GetEntry("xl/vbaProject.bin")
+                ?? throw new InvalidDataException("example.xlsm has no xl/vbaProject.bin");
+            using var vbaStream = vbaEntry.Open();
+            using var ms = new MemoryStream();
+            vbaStream.CopyTo(ms);
+            vbaBytes = ms.ToArray();
+        }
+
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("MacroSheet");
+        var row = sheet.createRow(0);
+        row.createCell(0).setCellValue("from dotnet-poi xlsm");
+        row.createCell(1).setCellValue(99.5);
+        workbook.setVBAProject(vbaBytes);
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;
