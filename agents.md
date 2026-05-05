@@ -317,7 +317,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 
 | step | format | progress | notes |
 |---|---|---|---|
-| 1 | xlsx/XSSF | ~60% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height) ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; no formula evaluation; pivot tables/charts deferred |
+| 1 | xlsx/XSSF | ~70% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; no formula evaluation; rich text formatting, pivot tables, charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
 | 3 | docx/XWPF | ~15% | paragraph/run/image write ✅; round-trip not tested |
 | 4 | pptx/XSLF | ~15% | slide/image/rotation write ✅; round-trip not tested |

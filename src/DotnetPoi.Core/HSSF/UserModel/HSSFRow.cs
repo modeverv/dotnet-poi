@@ -41,6 +41,9 @@ public sealed class HSSFRow : IRow
 
     public float getHeight() => 15.0f;
 
+    public void setHidden(bool hidden) { }
+    public bool isHidden() => false;
+
     internal IReadOnlyCollection<HSSFCell> Cells => _cells.Values;
 
     ICell IRow.createCell(int columnIndex) => createCell(columnIndex);

@@ -1,5 +1,25 @@
 # CHECKPOINT
 
+## 2026-05-05 12:xx JST - Added local interop test script
+
+- Current task: CI と同じ Java↔.NET interop テストをローカル実行する `test.sh` を追加。
+- Scope: コミットしない。
+
+### やったこと
+
+- `test.sh` をリポジトリ直下に追加。
+  - `dotnet build DotnetPOI.sln` 実行。
+  - 方向A: `WriteForDotnetTest` → C# `Category=ReadFromPoi`。
+  - 方向B: C# `Category=WriteForPoi` → `ReadFromDotnetTest`。
+  - `dotnet` / `mvn` / `java` の存在チェックを追加。
+
+### Verification
+
+- `./test.sh` を実行。
+  - .NET ビルド成功（NU1603 警告あり）。
+  - Maven テスト: WriteForDotnetTest 4/4、ReadFromDotnetTest 16/16 成功。
+  - C# interop テスト: ReadFromPoi 4/4、WriteForPoi 16/16 成功。
+
 ## 2026-05-05 12:xx JST - Project restructured: Core + Formula
 
 - Current task: `src/` 配下の全プロジェクトを **DotnetPoi.Core** と **DotnetPoi.Formula** の 2 プロジェクトに統合し、それぞれ独立した NuGet としてビルド可能にした。
@@ -395,14 +415,14 @@ New file: `tests/DotnetPoi.SS.Tests/Xml/PoiXmlWriterEscapingTests.cs`
 Text: `&`, `<`, `>` (literal), `"` (literal), `'` (literal), tab, newline, mixed XMLBeans observation.
 Attributes: `&`, `"`, `'` (literal), `\`, relationship URL with `&`, format code with `"`, `<`.
 
-3 tests failed before the fix (`GreaterThanInText`, `ApostropheInAttribute`, `MixedSpecialChars`), all pass after.
+3 tests failed before the fix (`GreaterThanInText`, `ApostropheInAttribute`, `MixedSpecialChars`), all pass after。
 
 ### Verification
 
-- `dotnet test tests/DotnetPoi.SS.Tests/...` passed (78 tests).
-- `dotnet test tests/DotnetPoi.XSSF.Tests/...` passed (26 tests).
-- `dotnet test tests/DotnetPoi.XWPF.Tests/...` passed (18 tests).
-- `dotnet test tests/DotnetPoi.XSLF.Tests/...` passed (25 tests).
+- `dotnet test tests/DotnetPoi.SS.Tests/...` passed (78 tests)。
+- `dotnet test tests/DotnetPoi.XSSF.Tests/...` passed (26 tests)。
+- `dotnet test tests/DotnetPoi.XWPF.Tests/...` passed (18 tests)。
+- `dotnet test tests/DotnetPoi.XSLF.Tests/...` passed (25 tests)。
 - All commands still show the existing NU1603 warning for `Microsoft.NET.Test.Sdk`.
 
 ## 2026-05-05 05:xx JST - Empty element serialization tests and implementation (items 3 & 4)
@@ -410,172 +430,172 @@ Attributes: `&`, `"`, `'` (literal), `\`, relationship URL with `&`, format code
 - Current task: implement the `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order items 3 and 4.
   - Item 3: Add focused failing tests for empty element serialization.
   - Item 4: Implement empty-element behavior in `PoiXmlWriter`; use stream/text interception if needed.
-- Scope boundary from user: follow AGENTS.md, update `CHECKPOINT.md` while working, and do not commit.
+- Scope boundary from user: follow AGENTS.md, update `CHECKPOINT.md` while working, and do not commit。
 - Implementation decision:
   - `PoiXmlWriter` is already a custom text-writer-based implementation (not a wrapper around `System.Xml.XmlWriter`).
-    It writes `/>` directly in `WriteEndElement()` when the start tag has not yet been closed, producing `<tag/>` with no space before the slash.
-  - The "narrow stream/text interception layer" option from the TODO is satisfied by design: the writer uses `TextWriter` directly rather than delegating to `System.Xml.XmlWriter`.
-  - No new production code was needed; the implementation was already correct.
+    It writes `/>` directly in `WriteEndElement()` when the start tag has not yet been closed, producing `<tag/>` with no space before the slash。
+  - The "narrow stream/text interception layer" option from the TODO is satisfied by design: the writer uses `TextWriter` directly rather than delegating to `System.Xml.XmlWriter`。
+  - No new production code was needed; the implementation was already correct。
 - Completed (item 3, initial pass):
-  - Added `PoiXmlWriterEmptyElementTests` with root, nested, prefixed, and single-attributed empty-element cases.
+  - Added `PoiXmlWriterEmptyElementTests` with root, nested, prefixed, and single-attributed empty-element cases。
 - Completed (item 4, strengthened coverage):
   - Extended `PoiXmlWriterEmptyElementTests` with three additional cases drawn from real OOXML patterns:
     - Multi-attributed empty element: `<Relationship Id="..." Type="..." Target="..."/>` (covers `*.rels` patterns)
     - Prefixed + attributed empty element: `<a:picLocks noChangeAspect="1"/>` (covers drawing namespace patterns)
-    - Empty string write before `WriteEndElement`: confirms `WriteString("")` does not prevent the `<tag/>` form.
+    - Empty string write before `WriteEndElement`: confirms `WriteString("")` does not prevent the `<tag/>` form。
 - Verification:
-  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter PoiXmlWriterEmptyElementTests` passed (7 tests).
-  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj` passed (64 tests).
-  - `dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj` passed (26 tests).
+  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter PoiXmlWriterEmptyElementTests` passed (7 tests)。
+  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj` passed (64 tests)。
+  - `dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj` passed (26 tests)。
   - All test commands still show the existing NU1603 package-resolution warning for `Microsoft.NET.Test.Sdk 17.8.2` resolving to `17.9.0`.
 
 ## 2026-05-05 04:xx JST - XML writer factory/profile layer
 
 - Current task: implement `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order 2.
-- Scope boundary from user: follow AGENTS.md, keep `CHECKPOINT.md` updated, and do not commit.
+- Scope boundary from user: follow AGENTS.md, keep `CHECKPOINT.md` updated, and do not commit。
 - Planned implementation:
-  - Add a small factory/profile layer around `PoiXmlWriter` so callers choose XMLBeans spreadsheet-part vs OPC package-part output deliberately.
-  - Keep declaration serialization in `PoiXmlWriter`, but avoid hard-coding a single global declaration rule across all OOXML parts.
-  - Update XSSF/XWPF/XSLF package writers to create writers through the profile layer instead of directly constructing `PoiXmlWriter`.
-  - Add focused xUnit coverage for the factory/profile selection.
+  - Add a small factory/profile layer around `PoiXmlWriter` so callers choose XMLBeans spreadsheet-part vs OPC package-part output deliberately。
+  - Keep declaration serialization in `PoiXmlWriter`, but avoid hard-coding a single global declaration rule across all OOXML parts。
+  - Update XSSF/XWPF/XSLF package writers to create writers through the profile layer instead of directly constructing `PoiXmlWriter`。
+  - Add focused xUnit coverage for the factory/profile selection。
 - Completed:
-  - Added `PoiXmlWriterFactory` with explicit profile creation and OOXML package part classification.
-  - Classified `[Content_Types].xml`, `*.rels`, and `docProps/core.xml` as OPC package parts; other XML package entries use the XMLBeans profile.
-  - Updated XSSF, XWPF, and XSLF `WriteEntry` helpers to create profiled writers and removed duplicated per-part declaration calls from the writer methods.
-  - Left Agile encryption XML on direct `PoiXmlWriter` construction because that XML payload intentionally has no OOXML ZIP part declaration.
+  - Added `PoiXmlWriterFactory` with explicit profile creation and OOXML package part classification。
+  - Classified `[Content_Types].xml`, `*.rels`, and `docProps/core.xml` as OPC package parts; other XML package entries use the XMLBeans profile。
+  - Updated XSSF, XWPF, and XSLF `WriteEntry` helpers to create profiled writers and removed duplicated per-part declaration calls from the writer methods。
+  - Left Agile encryption XML on direct `PoiXmlWriter` construction because that XML payload intentionally has no OOXML ZIP part declaration。
 - Verification:
-  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter "PoiXmlWriterFactoryTests|PoiXmlWriterDeclarationProfileTests"` passed.
-  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj` passed.
-  - `dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj` passed.
-  - `dotnet test tests/DotnetPoi.XWPF.Tests/DotnetPoi.XWPF.Tests.csproj` passed.
-  - `dotnet test tests/DotnetPoi.XSLF.Tests/DotnetPoi.XSLF.Tests.csproj` passed.
+  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter "PoiXmlWriterFactoryTests|PoiXmlWriterDeclarationProfileTests"` passed。
+  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj` passed。
+  - `dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj` passed。
+  - `dotnet test tests/DotnetPoi.XWPF.Tests/DotnetPoi.XWPF.Tests.csproj` passed。
+  - `dotnet test tests/DotnetPoi.XSLF.Tests/DotnetPoi.XSLF.Tests.csproj` passed。
   - All dotnet test commands still show the existing NU1603 package-resolution warning for `Microsoft.NET.Test.Sdk 17.8.2` resolving to `17.9.0`.
 
 ## 2026-05-05 03:xx JST - XML declaration profile focused tests
 
-- Current task: implement `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order 1 by adding focused `PoiXmlWriter` tests for XML declaration profiles.
-- Scope boundary from user: keep production implementation minimal for now; do not make fixture-specific `XSSFWorkbook` changes; do not commit.
+- Current task: implement `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order 1 by adding focused `PoiXmlWriter` tests for XML declaration profiles。
+- Scope boundary from user: keep production implementation minimal for now; do not make fixture-specific `XSSFWorkbook` changes; do not commit。
 - Target profiles:
-  - XMLBeans spreadsheet parts: `<?xml version="1.0" encoding="UTF-8"?>` followed by a newline, no `standalone`.
-  - OPC package parts: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` immediately followed by the root element, no forced newline.
-- Implementation approach: add a narrow declaration-profile API on `PoiXmlWriter` only, then characterize both profiles with byte-level tests.
-- Completed: added `PoiXmlDeclarationProfile` and focused tests in `PoiXmlWriterDeclarationProfileTests`.
-- Verification: `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter PoiXmlWriterDeclarationProfileTests` passed; full `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj` passed with the existing NU1603 package-resolution warning.
+  - XMLBeans spreadsheet parts: `<?xml version="1.0" encoding="UTF-8"?>` followed by a newline, no `standalone`。
+  - OPC package parts: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` immediately followed by the root element, no forced newline。
+- Implementation approach: add a narrow declaration-profile API on `PoiXmlWriter` only, then characterize both profiles with byte-level tests。
+- Completed: added `PoiXmlDeclarationProfile` and focused tests in `PoiXmlWriterDeclarationProfileTests`。
+- Verification: `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter PoiXmlWriterDeclarationProfileTests` passed; full `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj` passed with the existing NU1603 package-resolution warning。
 
 ## 2026-05-05 02:xx JST - Agreed recovery plan for XML parity work
 
 - New direction agreed with user:
-  1. Remove the `31e9006 parity` work from production/test code for now, including the fixture-specific XSSF writer changes and associated parity tests/fixtures that forced those changes.
-  2. Re-study Java POI XML output behavior and XMLBeans behavior at the correct layer. Add reference code/fixture generators where useful, and write a dedicated Markdown TODO/design file describing observed XMLBeans/POI output patterns, open questions, and the implementation order.
-  3. Re-implement the behavior incrementally in `PoiXmlWriter`, with focused failing tests per low-level XML divergence. Keep higher-level `XSSFWorkbook` output POI-model-driven, and preserve unknown/original package parts byte-for-byte where the model does not yet support them.
-- Important boundary: XML lexical quirks such as declaration format, empty element form, escaping, attribute order, namespace placement, and whitespace belong in `PoiXmlWriter` or focused helpers. Specific workbook content such as defined names, Office revision GUIDs, local absolute paths, workbook extLst contents, and fixture-specific relationship ordering must not be generalized into `XSSFWorkbook` unless directly backed by the POI model/source behavior.
-- Do not commit via LLM.
-- Step 1 status: completed in working tree by restoring `src/` and the parity-related `tests/` paths back to `7a4b778` (the parent of `31e9006`). This removes the fixture-specific XSSF writer changes, the added XSSF/XWPF/XSLF parity tests, the expanded Java parity fixture generator, and the extra generated xml-parity fixtures. `dotnet test` passes after the removal.
-- Step 2 direction: do not add XMLBeans as a submodule yet. Add Java probe/fixture generator coverage instead and document the work in `XMLBEANS_XML_OUTPUT_TODO.md`. Use XMLBeans 5.3.0 source jars/tagged source only if executable probes are not enough.
-- Step 3 status: added `XMLBEANS_XML_OUTPUT_TODO.md`, `XmlBeansOutputProbeTest.java`, and initial generated XMLBeans probe fixtures under `tests/DotnetPoi.Interop.Tests/fixtures/xmlbeans-output/`. Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=XmlBeansOutputProbeTest`.
-- Additional fixture strategy: use upstream POI integration-level tests as scenario sources to improve fixture realism. Added `POI_INTEGRATION_FIXTURE_TODO.md` and updated `XMLBEANS_XML_OUTPUT_TODO.md` with a step-by-step plan. Keep POI-derived fixtures semantic-first; do not turn fixture-specific XML into generalized `XSSFWorkbook` output.
-- Fixture collection progress: surveyed POI XSSF/model/openxml4j tests and `poi/test-data`. Shortlisted 8 selected candidates in `POI_INTEGRATION_FIXTURE_TODO.md`: shared strings basic, shared strings escaping, styles formatting, comments write/read, pictures multi-sheet, relationships hyperlinks/comments, xlsm VBA preserve, and rich text whitespace preserve. First implementation target is `poi-integration-shared-strings-basic`.
-- Fixture collection progress: added `PoiIntegrationFixtureGeneratorTest.java` and generated the first POI-derived integration fixture, `poi-integration-shared-strings-basic`, from POI `sample.xlsx` / `TestSharedStringsTable.testReadWrite` scenario. Output is one xlsx package plus 16 extracted XML/rels files under `tests/DotnetPoi.Interop.Tests/fixtures/poi-integration/`. Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=PoiIntegrationFixtureGeneratorTest`.
-- Fixture collection progress: extended `PoiIntegrationFixtureGeneratorTest.java` with `poi-integration-shared-strings-escaping` from POI `TestSharedStringsTable.testBug48936` and `poi-integration-styles-formatting` from POI `TestStylesTable.testLoadSaveLoad`. Total generated POI integration fixture files are now 40: three workbook packages plus extracted XML/rels. Verified with the same Maven command.
-- Fixture collection progress: extended `PoiIntegrationFixtureGeneratorTest.java` with `poi-integration-comments-write-read`, `poi-integration-pictures-multi-sheet`, and `poi-integration-relationships-hyperlinks-comments`. Total generated POI integration fixture files are now 90: six workbook packages plus extracted XML/rels. Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=PoiIntegrationFixtureGeneratorTest`.
-- Fixture collection progress: extended `PoiIntegrationFixtureGeneratorTest.java` with `poi-integration-xlsm-vba-preserve` from POI `TestXSSFBugs.bug45431` and `poi-integration-rich-text-space-preserve` from POI `TestXSSFRichTextString` whitespace cases. Extraction now includes `.bin` and `.vml` as well as XML/rels so macro/VML preservation fixtures include `xl/vbaProject.bin` and `xl/drawings/vmlDrawing1.vml`. Total POI integration fixture files are now 123: eight workbook packages plus extracted package entries. Verified with the same Maven command.
-- Fixture collection progress: extended `PoiIntegrationFixtureGeneratorTest.java` with `poi-integration-defined-names-print-titles`, `poi-integration-hyperlinks`, `poi-integration-sheet-layout`, and `poi-integration-formula-recalculation`. These cover defined names/print titles, external hyperlink relationships and query escaping, row/column layout with panes/grouping/merged regions, and workbook formula recalculation XML. Total POI integration fixture files are now 165: twelve workbook packages plus extracted package entries. Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=PoiIntegrationFixtureGeneratorTest`.
-- Fixture analysis progress: updated `XMLBEANS_XML_OUTPUT_TODO.md` with observations from the XMLBeans probes and 12 POI integration fixture cases. Key split: spreadsheet XMLBeans parts use UTF-8 declaration plus newline and no `standalone`, while OPC package-level XML parts such as `[Content_Types].xml`, `.rels`, and core properties use `standalone="yes"` with no forced newline before the root. Recorded `PoiXmlWriter` implementation order: declaration profiles, `<tag/>` empty elements, escaping, namespace behavior, attribute-order preservation, then semantic fixture tests and unknown-part preservation.
+  1. Remove the `31e9006 parity` work from production/test code for now, including the fixture-specific XSSF writer changes and associated parity tests/fixtures that forced those changes。
+  2. Re-study Java POI XML output behavior and XMLBeans behavior at the correct layer. Add reference code/fixture generators where useful, and write a dedicated Markdown TODO/design file describing observed XMLBeans/POI output patterns, open questions, and the implementation order。
+  3. Re-implement the behavior incrementally in `PoiXmlWriter`, with focused failing tests per low-level XML divergence。Keep higher-level `XSSFWorkbook` output POI-model-driven, and preserve unknown/original package parts byte-for-byte where the model does not yet support them。
+- Important boundary: XML lexical quirks such as declaration format, empty element form, escaping, attribute order, namespace placement, and whitespace belong in `PoiXmlWriter` or focused helpers。Specific workbook content such as defined names, Office revision GUIDs, local absolute paths, workbook extLst contents, and fixture-specific relationship ordering must not be generalized into `XSSFWorkbook` unless directly backed by the POI model/source behavior。
+- Do not commit via LLM。
+- Step 1 status: completed in working tree by restoring `src/` and the parity-related `tests/` paths back to `7a4b778` (the parent of `31e9006`）。This removes the fixture-specific XSSF writer changes, the added XSSF/XWPF/XSLF parity tests, the expanded Java parity fixture generator, and the extra generated xml-parity fixtures。`dotnet test` passes after the removal。
+- Step 2 direction: do not add XMLBeans as a submodule yet。Add Java probe/fixture generator coverage instead and document the work in `XMLBEANS_XML_OUTPUT_TODO.md`。Use XMLBeans 5.3.0 source jars/tagged source only if executable probes are not enough。
+- Step 3 status: added `XMLBEANS_XML_OUTPUT_TODO.md`, `XmlBeansOutputProbeTest.java`, and initial generated XMLBeans probe fixtures under `tests/DotnetPoi.Interop.Tests/fixtures/xmlbeans-output/`。Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=XmlBeansOutputProbeTest`。
+- Additional fixture strategy: use upstream POI integration-level tests as scenario sources to improve fixture realism。Added `POI_INTEGRATION_FIXTURE_TODO.md` and updated `XMLBEANS_XML_OUTPUT_TODO.md` with a step-by-step plan。Keep POI-derived fixtures semantic-first; do not turn fixture-specific XML into generalized `XSSFWorkbook` output。
+- Fixture collection progress: surveyed POI XSSF/model/openxml4j tests and `poi/test-data`。Shortlisted 8 selected candidates in `POI_INTEGRATION_FIXTURE_TODO.md`: shared strings basic, shared strings escaping, styles formatting, comments write/read, pictures multi-sheet, relationships hyperlinks/comments, xlsm VBA preserve, and rich text whitespace preserve。First implementation target is `poi-integration-shared-strings-basic`。
+- Fixture collection progress: added `PoiIntegrationFixtureGeneratorTest.java` and generated the first POI-derived integration fixture, `poi-integration-shared-strings-basic`, from POI `sample.xlsx` / `TestSharedStringsTable.testReadWrite` scenario。Output is one xlsx package plus 16 extracted XML/rels files under `tests/DotnetPoi.Interop.Tests/fixtures/poi-integration/`。Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=PoiIntegrationFixtureGeneratorTest`。
+- Fixture collection progress: extended `PoiIntegrationFixtureGeneratorTest.java` with `poi-integration-shared-strings-escaping` from POI `TestSharedStringsTable.testBug48936` and `poi-integration-styles-formatting` from POI `TestStylesTable.testLoadSaveLoad`。Total generated POI integration fixture files are now 40: three workbook packages plus extracted XML/rels。Verified with the same Maven command。
+- Fixture collection progress: extended `PoiIntegrationFixtureGeneratorTest.java` with `poi-integration-comments-write-read`, `poi-integration-pictures-multi-sheet`, and `poi-integration-relationships-hyperlinks-comments`。Total generated POI integration fixture files are now 90: six workbook packages plus extracted XML/rels。Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=PoiIntegrationFixtureGeneratorTest`。
+- Fixture collection progress: extended `PoiIntegrationFixtureGeneratorTest.java` with `poi-integration-xlsm-vba-preserve` from POI `TestXSSFBugs.bug45431` and `poi-integration-rich-text-space-preserve` from POI `TestXSSFRichTextString` whitespace cases。Extraction now includes `.bin` and `.vml` as well as XML/rels so macro/VML preservation fixtures include `xl/vbaProject.bin` and `xl/drawings/vmlDrawing1.vml`。Total POI integration fixture files are now 123: eight workbook packages plus extracted package entries。Verified with the same Maven command。
+- Fixture collection progress: extended `PoiIntegrationFixtureGeneratorTest.java` with `poi-integration-defined-names-print-titles`, `poi-integration-hyperlinks`, `poi-integration-sheet-layout`, and `poi-integration-formula-recalculation`。These cover defined names/print titles, external hyperlink relationships and query escaping, row/column layout with panes/grouping/merged regions, and workbook formula recalculation XML。Total POI integration fixture files are now 165: twelve workbook packages plus extracted package entries。Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=PoiIntegrationFixtureGeneratorTest`。
+- Fixture analysis progress: updated `XMLBEANS_XML_OUTPUT_TODO.md` with observations from the XMLBeans probes and 12 POI integration fixture cases。Key split: spreadsheet XMLBeans parts use UTF-8 declaration plus newline and no `standalone`, while OPC package-level XML parts such as `[Content_Types].xml`, `.rels`, and core properties use `standalone="yes"` with no forced newline before the root。Recorded `PoiXmlWriter` implementation order: declaration profiles, `<tag/>` empty elements, escaping, namespace behavior, attribute-order preservation, then semantic fixture tests and unknown-part preservation。
 
 ## 2026-05-05 02:xx JST - Review of recent XSSF writer/parity work
 
-- User raised concern that recent commits may have made XSSF workbook XML writing ad hoc and destabilizing.
-- Reviewed last 5 commits. Main risky commit is `31e9006 parity`; `3830f84` adjusts generated fixtures/timestamps.
-- `dotnet test` passes locally, but `XSSFWorkbook.WriteWorkbook` now contains fixture-specific-looking constants: Office revision namespaces, GUIDs, a local absolute `x15ac:absPath`, hard-coded defined names, workbook window values, and extension list data.
-- Assessment: the concern is valid. The tests currently prove parity for a narrow fixture, not a general POI-faithful writer. Recommended next step is to quarantine this behavior behind preservation of original package parts or fixture-only tests, then revert generalized writer output to minimal/POI-derived data.
+- User raised concern that recent commits may have made XSSF workbook XML writing ad hoc and destabilizing。
+- Reviewed last 5 commits。Main risky commit is `31e9006 parity`; `3830f84` adjusts generated fixtures/timestamps。
+- `dotnet test` passes locally, but `XSSFWorkbook.WriteWorkbook` now contains fixture-specific-looking constants: Office revision namespaces, GUIDs, a local absolute `x15ac:absPath`, hard-coded defined names, workbook window values, and extension list data。
+- Assessment: the concern is valid。The tests currently prove parity for a narrow fixture, not a general POI-faithful writer。Recommended next step is to quarantine this behavior behind preservation of original package parts or fixture-only tests, then revert generalized writer output to minimal/POI-derived data。
 
 ## 2026-05-05 01:54 JST - XML parity CI drift
 
-- GitHub Actions `Verify XML Parity Fixtures` failed because `XmlParityFixtureGeneratorTest` rewrites `xlsm-basic` by opening `tests/test-files/example.xlsm` with Apache POI and saving it through `XSSFWorkbook.write()`.
-- The committed `xlsm-basic__*.xml` fixtures are intentionally hybrid: DotnetPoi regenerates workbook/content-types/relationships but preserves unchanged macro workbook parts such as doc props, styles, shared strings, worksheets, drawings, theme, and calcChain.
-- Fix: updated `generateMacroEnabledXlsm` to first generate the POI package, then overlay the preserved xlsm entries from the source workbook so CI regenerates the same hybrid fixture set.
-- Verification: `dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj --filter XmlParity_XlsmBasic_MatchesPoiFixtures` passes. Local Maven is not installed, so the exact GitHub workflow command still needs CI or a Maven-equipped environment.
+- GitHub Actions `Verify XML Parity Fixtures` failed because `XmlParityFixtureGeneratorTest` rewrites `xlsm-basic` by opening `tests/test-files/example.xlsm` with Apache POI and saving it through `XSSFWorkbook.write()`。
+- The committed `xlsm-basic__*.xml` fixtures are intentionally hybrid: DotnetPoi regenerates workbook/content-types/relationships but preserves unchanged macro workbook parts such as doc props, styles, shared strings, worksheets, drawings, theme, and calcChain。
+- Fix: updated `generateMacroEnabledXlsm` to first generate the POI package, then overlay the preserved xlsm entries from the source workbook so CI regenerates the same hybrid fixture set。
+- Verification: `dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj --filter XmlParity_XlsmBasic_MatchesPoiFixtures` passes。Local Maven is not installed, so the exact GitHub workflow command still needs CI or a Maven-equipped environment。
 
 ## 2026-05-10 11:xx JST - Round-trip batch 1: merge cells + column width / row height
 
-- **Merge cells**: Implemented read + write + round-trip test.
-  - Added `CellRangeAddress` class in `DotnetPoi.SS.Util` with `Parse` and `FormatAsString`.
-  - Added `addMergedRegion()` / `getMergedRegions()` to `ISheet` interface.
-  - Implemented in `XSSFSheet` (store list, write `<mergeCells>`/`<mergeCell>` in `WriteWorksheet`, parse in `ReadWorksheet`).
-  - Added stubs in `HSSFSheet` for interface completeness.
-  - Test: `RoundTrip_MergeCells_Preserved` — writes 2 merged regions, reads back, verifies all coordinates.
-- **Column width**: Implemented read + write + round-trip test.
-  - Added `setColumnWidth()` / `getColumnWidth()` to `ISheet` interface.
-  - Implemented in `XSSFSheet` (dictionary, write `<cols>`/`<col>` in `WriteCols`, parse in `ReadWorksheet`).
-  - Test: `RoundTrip_ColumnWidth_Preserved` — sets 80-char and 40-char widths, verifies approximate round-trip.
-- **Row height**: Implemented read + write + round-trip test.
-  - Added `setHeight()` / `getHeight()` to `IRow` interface.
-  - Implemented in `XSSFRow` (store float, write `ht`/`customHeight` attributes in `WriteRow`, parse in `ReadWorksheet`).
-  - Test: `RoundTrip_RowHeight_Preserved` — sets 45 pt custom height, verifies round-trip; default row returns 15 pt.
-- All 191 Core tests pass (188 existing + 3 new). Formula (10) and Interop (31) also pass.
+- **Merge cells**: Implemented read + write + round-trip test。
+  - Added `CellRangeAddress` class in `DotnetPoi.SS.Util` with `Parse` and `FormatAsString`。
+  - Added `addMergedRegion()` / `getMergedRegions()` to `ISheet` interface。
+  - Implemented in `XSSFSheet` (store list, write `<mergeCells>`/`<mergeCell>` in `WriteWorksheet`, parse in `ReadWorksheet`)。
+  - Added stubs in `HSSFSheet` for interface completeness。
+  - Test: `RoundTrip_MergeCells_Preserved` — writes 2 merged regions, reads back, verifies all coordinates。
+- **Column width**: Implemented read + write + round-trip test。
+  - Added `setColumnWidth()` / `getColumnWidth()` to `ISheet` interface。
+  - Implemented in `XSSFSheet` (dictionary, write `<cols>`/`<col>` in `WriteCols`, parse in `ReadWorksheet`)。
+  - Test: `RoundTrip_ColumnWidth_Preserved` — sets 80-char and 40-char widths, verifies approximate round-trip。
+- **Row height**: Implemented read + write + round-trip test。
+  - Added `setHeight()` / `getHeight()` to `IRow` interface。
+  - Implemented in `XSSFRow` (store float, write `ht`/`customHeight` attributes in `WriteRow`, parse in `ReadWorksheet`)。
+  - Test: `RoundTrip_RowHeight_Preserved` — sets 45 pt custom height, verifies round-trip; default row returns 15 pt。
+- All 191 Core tests pass (188 existing + 3 new)。Formula (10) and Interop (31) も pass。
 
 ## 2026-05-10 JST - Round-trip batch 2: hyperlinks
 
-- **Hyperlinks**: Implemented read + write + round-trip test.
-  - Created `IHyperlink` interface and `HyperlinkType` enum in `DotnetPoi.SS.UserModel`.
-  - Created `XSSFHyperlink` class with `Address`, `CellRef`, `Type`, `RelationshipId`, `IsExternal` properties.
-  - Added `getHyperlink()`/`setHyperlink()` to `ICell` interface.
-  - Implemented in `XSSFCell` (store `_hyperlink` field, auto-register via `sheet.AddHyperlink` on set).
-  - Added stubs in HSSFCell for interface completeness.
-  - Write: `WriteHyperlinks()` emits `<hyperlinks>` section with `<hyperlink ref="..." r:id="..."/>`.
-  - Write: `WriteSheetRelationships()` emits rels entries with `TargetMode="External"` for URLs.
-  - Write: `AssignHyperlinkRelationshipIds()` pre-assigns relationship IDs before writing.
-  - Write: Sheet rels file is now written when hyperlinks exist (not only when drawing exists).
-  - Read: `ReadSheetHyperlinkRelationships()` reads sheet rels, builds dictionary of relId → (URL, isExternal).
-  - Read: `<hyperlink>` elements parsed in `ReadWorksheet`, hyperlinks created and associated with existing cells.
-  - Added `ParseCellRef()` helper for parsing "A1"-style references.
-  - Fixed `XSSFHyperlink` constructor to set `IsExternal = true` for URL/File/Email types.
-  - Test: `RoundTrip_Hyperlink_Preserved` — creates URL hyperlink, writes, reads back, verifies address, cellRef, type.
-- All 192 Core tests pass (191 + 1 new). Formula (10) and Interop (31) also pass.
+- **Hyperlinks**: Implemented read + write + round-trip test。
+  - Created `IHyperlink` interface and `HyperlinkType` enum in `DotnetPoi.SS.UserModel`。
+  - Created `XSSFHyperlink` class with `Address`, `CellRef`, `Type`, `RelationshipId`, `IsExternal` properties。
+  - Added `getHyperlink()`/`setHyperlink()` to `ICell` interface。
+  - Implemented in `XSSFCell` (store `_hyperlink` field, auto-register via `sheet.AddHyperlink` on set)。
+  - Added stubs in HSSFCell for interface completeness。
+  - Write: `WriteHyperlinks()` emits `<hyperlinks>` section with `<hyperlink ref="..." r:id="..."/>`。
+  - Write: `WriteSheetRelationships()` emits rels entries with `TargetMode="External"` for URLs。
+  - Write: `AssignHyperlinkRelationshipIds()` pre-assigns relationship IDs before writing。
+  - Write: Sheet rels file is now written when hyperlinks exist (not only when drawing exists)。
+  - Read: `ReadSheetHyperlinkRelationships()` reads sheet rels, builds dictionary of relId → (URL, isExternal)。
+  - Read: `<hyperlink>` elements parsed in `ReadWorksheet`, hyperlinks created and associated with existing cells。
+  - Added `ParseCellRef()` helper for parsing "A1"-style references。
+  - Fixed `XSSFHyperlink` constructor to set `IsExternal = true` for URL/File/Email types。
+  - Test: `RoundTrip_Hyperlink_Preserved` — creates URL hyperlink, writes, reads back, verifies address, cellRef, type。
+- All 192 Core tests pass (191 + 1 new)。Formula (10) and Interop (31) も pass。
 
 ## 2026-05-10 JST - Round-trip batch 3: print settings (page layout, header/footer)
 
-- **Page settings**: Implemented read + write + round-trip test.
-  - Added page margin properties to `XSSFSheet` (PageMarginBottom/Footer/Header/Left/Right/Top, double, default OOXML values).
-  - Added page setup properties (PageOrientation, PaperSize, Scale, FitToWidth, FitToHeight).
-  - Added header/footer properties (HeaderCenter, FooterCenter).
-  - Write: Page setup `<pageSetup>` element written only when non-default properties set.
-  - Write: Page margins `<pageMargins>` written from sheet properties (no longer hardcoded).
-  - Write: Header/footer `<headerFooter>` with `<oddHeader>`/`<oddFooter>` children.
-  - Read: Parse `<pageSetup>`, `<pageMargins>`, `<oddHeader>`, `<oddFooter>` in ReadWorksheet.
-  - Added `ParseDoubleAttr()` helper for attribute reading with default fallback.
-  - Test: `RoundTrip_PrintSettings_Preserved` — sets orientation, paper size, margins, header/footer; writes and reads back.
-- All 193 Core tests pass (192 + 1 new). Formula (10) and Interop (31) also pass.
+- **Page settings**: Implemented read + write + round-trip test。
+  - Added page margin properties to `XSSFSheet` (PageMarginBottom/Footer/Header/Left/Right/Top, double, default OOXML values)。
+  - Added page setup properties (PageOrientation, PaperSize, Scale, FitToWidth, FitToHeight)。
+  - Added header/footer properties (HeaderCenter, FooterCenter)。
+  - Write: Page setup `<pageSetup>` element written only when non-default properties set。
+  - Write: Page margins `<pageMargins>` written from sheet properties (no longer hardcoded)。
+  - Write: Header/footer `<headerFooter>` with `<oddHeader>`/`<oddFooter>` children。
+  - Read: Parse `<pageSetup>`, `<pageMargins>`, `<oddHeader>`, `<oddFooter>` in ReadWorksheet。
+  - Added `ParseDoubleAttr()` helper for attribute reading with default fallback。
+  - Test: `RoundTrip_PrintSettings_Preserved` — sets orientation, paper size, margins, header/footer; writes and reads back。
+- All 193 Core tests pass (192 + 1 new)。Formula (10) and Interop (31) も pass。
 
 ## 2026-05-10 JST - Round-trip batch 4: data validation
 
-- **Data validation**: Implemented read + write + round-trip test.
-  - Created `DataValidationType` and `DataValidationOperator` enums in `SS/UserModel`.
-  - Created `XSSFDataValidation` class with properties: Sqref, Type, Operator, Formula1/2, AllowBlank, ShowInputMessage, ShowErrorMessage, ShowDropDown, ErrorStyle, ErrorTitle/Message, PromptTitle/Message.
-  - Write: `<dataValidations>` element with `<dataValidation>` children, written via `WriteDataValidations()`.
-    - Writes `type`, `operator`, `allowBlank`, `showInputMessage`, `showErrorMessage`, `showDropDown`, `errorStyle`, `errorTitle`, `error`, `promptTitle`, `prompt`, `sqref` attributes.
-    - Writes `<formula1>` / `<formula2>` child elements.
-  - Read: Parses `<dataValidation>` elements in ReadWorksheet, including child formula elements.
-  - Added `GetDataValidationTypeName()` and `GetDataValidationOperatorName()` for write path.
-  - Added `DataValidationTypeFromName()` and `DataValidationOperatorFromName()` for read path.
-  - Test: `RoundTrip_DataValidation_Preserved` — creates whole-number validation (1-100), writes, reads back, verifies all properties.
-- All 194 Core tests pass (193 + 1 new). Formula (10) and Interop (31) also pass.
+- **Data validation**: Implemented read + write + round-trip test。
+  - Created `DataValidationType` and `DataValidationOperator` enums in `SS/UserModel`。
+  - Created `XSSFDataValidation` class with properties: Sqref, Type, Operator, Formula1/2, AllowBlank, ShowInputMessage, ShowErrorMessage, ShowDropDown, ErrorStyle, ErrorTitle/Message, PromptTitle/Message。
+  - Write: `<dataValidations>` element with `<dataValidation>` children, written via `WriteDataValidations()`。
+    - Writes `type`, `operator`, `allowBlank`, `showInputMessage`, `showErrorMessage`, `showDropDown`, `errorStyle`, `errorTitle`, `error`, `promptTitle`, `prompt`, `sqref` attributes。
+    - Writes `<formula1>` / `<formula2>` child elements。
+  - Read: Parses `<dataValidation>` elements in ReadWorksheet, including child formula elements。
+  - Added `GetDataValidationTypeName()` and `GetDataValidationOperatorName()` for write path。
+  - Added `DataValidationTypeFromName()` and `DataValidationOperatorFromName()` for read path。
+  - Test: `RoundTrip_DataValidation_Preserved` — creates whole-number validation (1-100), writes, reads back, verifies all properties。
+- All 194 Core tests pass (193 + 1 new)。Formula (10) and Interop (31) も pass。
 
 ## 2026-05-10 JST - Round-trip batch 5: conditional formatting
 
-- **Conditional formatting**: Implemented read + write + round-trip test.
-  - Created `ConditionalFormatType` enum and `XSSFCFRule` / `XSSFConditionalFormatting` classes in `XSSF/UserModel`.
-  - Write: `<conditionalFormatting>` elements with `<cfRule>` children, written via `WriteConditionalFormatting()`.
-    - Writes `type`, `priority`, `operator`, `text`, `dxfId` attributes.
-    - Writes `<formula>` child elements.
-  - Read: Parses `<conditionalFormatting>` and nested `<cfRule>` elements in ReadWorksheet, including child formula elements.
-  - Added `GetCfTypeName()` for write path and `CfTypeFromName()` for read path, supporting all OOXML rule types (cellIs, expression, top10, uniqueValues, duplicateValues, containsText, beginsWith, endsWith, containsBlanks, containsErrors, timePeriod, aboveAverage).
-  - Test: `RoundTrip_ConditionalFormatting_Preserved` — creates cellIs > 100 rule, writes, reads back, verifies type/priority/operator/formula.
-- All 195 Core tests pass (194 + 1 new). Formula (10) and Interop (31) also pass.
+- **Conditional formatting**: Implemented read + write + round-trip test。
+  - Created `ConditionalFormatType` enum and `XSSFCFRule` / `XSSFConditionalFormatting` classes in `XSSF/UserModel`。
+  - Write: `<conditionalFormatting>` elements with `<cfRule>` children, written via `WriteConditionalFormatting()`。
+    - Writes `type`, `priority`, `operator`, `text`, `dxfId` attributes。
+    - Writes `<formula>` child elements。
+  - Read: Parses `<conditionalFormatting>` and nested `<cfRule>` elements in ReadWorksheet, including child formula elements。
+  - Added `GetCfTypeName()` for write path and `CfTypeFromName()` for read path, supporting all OOXML rule types (cellIs, expression, top10, uniqueValues, duplicateValues, containsText, beginsWith, endsWith, containsBlanks, containsErrors, timePeriod, aboveAverage)。
+  - Test: `RoundTrip_ConditionalFormatting_Preserved` — creates cellIs > 100 rule, writes, reads back, verifies type/priority/operator/formula。
+- All 195 Core tests pass (194 + 1 new)。Formula (10) and Interop (31) も pass。
 
 ## 2026-05-10 JST - Round-trip summary (all features complete except Pivot tables / Charts)
 
-All requested round-trip features are now implemented. Pivot tables and Charts are deferred (major features requiring separate XML parts).
+All requested round-trip features are now implemented。Pivot tables and Charts are deferred (major features requiring separate XML parts)。
 
 ### Implemented features (read + write + round-trip test):
 
@@ -589,5 +609,32 @@ All requested round-trip features are now implemented. Pivot tables and Charts a
 | Print settings (margins, orientation, header/footer) | ✅ Batch 3 | `RoundTrip_PrintSettings_Preserved` |
 | Data validation | ✅ Batch 4 | `RoundTrip_DataValidation_Preserved` |
 | Conditional formatting | ✅ Batch 5 | `RoundTrip_ConditionalFormatting_Preserved` |
+| Freeze panes | ✅ Batch 6 | `RoundTrip_FreezePane_Preserved` |
+| Hidden rows / Hidden columns | ✅ Batch 6 | `RoundTrip_HiddenRow_Preserved`, `RoundTrip_HiddenColumn_Preserved` |
+| Shared strings (plain text) | ✅ Batch 6 | `RoundTrip_SharedStrings_Preserved` |
 
-### Total tests: 236 all passing (195 Core + 31 Interop + 10 Formula)
+### Total tests: 240 all passing (199 Core + 31 Interop + 10 Formula)
+
+### Remaining deferred features:
+- **Rich text formatting** (preserving `<r>` / `<rPr>` runs in shared strings on write-back)
+- **Pivot tables** (requires separate `xl/pivotTables/` parts)
+- **Charts** (requires separate `xl/charts/` parts)
+- **Comments** (requires `xl/comments/` + vmlDrawing parts)
+- **XLS (HSSF) encryption** (RC4/XOR different scheme from OOXML Agile)
+
+## 2026-05-10 JST - docx (XWPF) round-trip
+
+| # | Feature | Read | Write | Test | Status |
+|---|---------|------|-------|------|--------|
+| 1 | Paragraphs & runs (text) | ✅ | ✅ | ✅ | ✅ |
+| 2 | Bold / Italic | ✅ | ✅ | ✅ | ✅ |
+| 3 | Inline pictures + rotation | ✅ | ✅ | ✅ | ✅ |
+| 4 | Run font name / size / color / underline / strikethrough | ☐ | ☐ | ☐ | 🔴 |
+| 5 | Paragraph alignment (left/center/right/justify) | ☐ | ☐ | ☐ | 🔴 |
+| 6 | Paragraph indentation / spacing | ☐ | ☐ | ☐ | 🔴 |
+| 7 | Numbering / bullet lists | ☐ | ☐ | ☐ | 🔴 |
+| 8 | Tables | ☐ | ☐ | ☐ | 🔴 |
+| 9 | Hyperlinks | ☐ | ☐ | ☐ | 🔴 |
+| 10 | Headers / Footers | ☐ | ☐ | ☐ | 🔴 |
+| 11 | Page setup (size / orientation / margins) | ☐ | ☐ | ☐ | 🔴 |
+

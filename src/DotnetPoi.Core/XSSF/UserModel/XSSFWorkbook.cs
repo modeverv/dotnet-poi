@@ -603,6 +603,22 @@ public sealed class XSSFWorkbook : IWorkbook
 
         while (reader.Read())
         {
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "sheetViews")
+            {
+                using var subtree = reader.ReadSubtree();
+                while (subtree.Read())
+                {
+                    if (subtree.NodeType == XmlNodeType.Element && subtree.LocalName == "pane")
+                    {
+                        var xSplitAttr = subtree.GetAttribute("xSplit");
+                        var ySplitAttr = subtree.GetAttribute("ySplit");
+                        var xS = xSplitAttr is not null && int.TryParse(xSplitAttr, out var xs) ? xs : 0;
+                        var yS = ySplitAttr is not null && int.TryParse(ySplitAttr, out var ys) ? ys : 0;
+                        sheet.createFreezePane(xS, yS);
+                    }
+                }
+                continue;
+            }
             if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "cols")
             {
                 inCols = !reader.IsEmptyElement;
@@ -618,11 +634,18 @@ public sealed class XSSFWorkbook : IWorkbook
             {
                 var minAttr = reader.GetAttribute("min");
                 var widthAttr = reader.GetAttribute("width");
-                if (minAttr is not null && widthAttr is not null
-                    && int.TryParse(minAttr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var colNum)
-                    && double.TryParse(widthAttr, NumberStyles.Float, CultureInfo.InvariantCulture, out var width))
+                var hiddenAttr = reader.GetAttribute("hidden");
+                if (minAttr is not null
+                    && int.TryParse(minAttr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var colNum))
                 {
-                    sheet.setColumnWidth(colNum - 1, (int)(width * 256));
+                    var colIndex = colNum - 1;
+                    if (widthAttr is not null
+                        && double.TryParse(widthAttr, NumberStyles.Float, CultureInfo.InvariantCulture, out var width))
+                    {
+                        sheet.setColumnWidth(colIndex, (int)(width * 256));
+                    }
+                    if (hiddenAttr == "true" || hiddenAttr == "1")
+                        sheet.setColumnHidden(colIndex, true);
                 }
                 continue;
             }
@@ -639,6 +662,10 @@ public sealed class XSSFWorkbook : IWorkbook
                 {
                     currentRow.setHeight((float)ht);
                 }
+                // Hidden row
+                var hiddenAttr = reader.GetAttribute("hidden");
+                if (hiddenAttr == "true" || hiddenAttr == "1")
+                    currentRow.setHidden(true);
                 continue;
             }
 
@@ -2190,7 +2217,30 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteEndElement();
         writer.WriteStartElement("sheetViews");
         writer.WriteStartElement("sheetView");
+        writer.WriteAttributeString("tabSelected", "1");
         writer.WriteAttributeString("workbookViewId", "0");
+        if (sheet.FreezeColSplit > 0 || sheet.FreezeRowSplit > 0)
+        {
+            writer.WriteStartElement("pane");
+            if (sheet.FreezeColSplit > 0)
+                writer.WriteAttributeString("xSplit", sheet.FreezeColSplit.ToString(CultureInfo.InvariantCulture));
+            if (sheet.FreezeRowSplit > 0)
+                writer.WriteAttributeString("ySplit", sheet.FreezeRowSplit.ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("state", "frozen");
+            var activePane = (sheet.FreezeRowSplit > 0, sheet.FreezeColSplit > 0) switch
+            {
+                (true, false) => "bottomLeft",
+                (false, true) => "topRight",
+                _             => "bottomRight"
+            };
+            writer.WriteAttributeString("activePane", activePane);
+            {
+                var topRow = sheet.FreezeRowSplit > 0 ? sheet.FreezeRowSplit : 0;
+                var leftCol = sheet.FreezeColSplit > 0 ? sheet.FreezeColSplit : 0;
+                writer.WriteAttributeString("topLeftCell", FormatCellReference(topRow, leftCol));
+            }
+            writer.WriteEndElement();
+        }
         writer.WriteEndElement();
         writer.WriteEndElement();
         writer.WriteStartElement("sheetFormatPr");
@@ -2262,6 +2312,8 @@ public sealed class XSSFWorkbook : IWorkbook
             writer.WriteAttributeString("ht", row.HeightValue.ToString("F1", CultureInfo.InvariantCulture));
         if (row.HasCustomHeight)
             writer.WriteAttributeString("customHeight", "true");
+        if (row.IsHidden)
+            writer.WriteAttributeString("hidden", "1");
         foreach (var cell in row.Cells)
         {
             var isFormula = cell.getCellType() == CellType.Formula;
@@ -2430,17 +2482,25 @@ public sealed class XSSFWorkbook : IWorkbook
     private static void WriteCols(PoiXmlWriter writer, XSSFSheet sheet)
     {
         var widths = sheet.ColumnWidths;
-        if (widths.Count == 0) return;
+        var hiddenCols = sheet.HiddenColumns;
+        var allCols = new HashSet<int>(widths.Keys);
+        allCols.UnionWith(hiddenCols);
+        if (allCols.Count == 0) return;
         writer.WriteStartElement("cols");
-        foreach (var kvp in widths)
+        foreach (var colIndex in allCols.OrderBy(c => c))
         {
-            var colIndex = kvp.Key;
-            var width = kvp.Value / 256.0;
+            widths.TryGetValue(colIndex, out var width);
+            var isHidden = hiddenCols.Contains(colIndex);
             writer.WriteStartElement("col");
             writer.WriteAttributeString("min", (colIndex + 1).ToString(CultureInfo.InvariantCulture));
             writer.WriteAttributeString("max", (colIndex + 1).ToString(CultureInfo.InvariantCulture));
-            writer.WriteAttributeString("width", width.ToString("F2", CultureInfo.InvariantCulture));
-            writer.WriteAttributeString("customWidth", "true");
+            if (width > 0)
+            {
+                writer.WriteAttributeString("width", (width / 256.0).ToString("F2", CultureInfo.InvariantCulture));
+                writer.WriteAttributeString("customWidth", "true");
+            }
+            if (isHidden)
+                writer.WriteAttributeString("hidden", "1");
             writer.WriteEndElement();
         }
         writer.WriteEndElement();

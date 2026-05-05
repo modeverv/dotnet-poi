@@ -8,6 +8,7 @@ public sealed class XSSFRow : IRow
     private readonly XSSFSheet _sheet;
     private readonly int _rowNum;
     private float _height = -1; // -1 = default height
+    private bool _hidden;
 
     internal XSSFRow(XSSFSheet sheet, int rowNum)
     {
@@ -60,6 +61,12 @@ public sealed class XSSFRow : IRow
     internal bool HasCustomHeight => _height >= 0;
 
     internal float HeightValue => _height;
+
+    public void setHidden(bool hidden) => _hidden = hidden;
+
+    public bool isHidden() => _hidden;
+
+    internal bool IsHidden => _hidden;
 
     internal IReadOnlyCollection<XSSFCell> Cells => _cells.Values;
 

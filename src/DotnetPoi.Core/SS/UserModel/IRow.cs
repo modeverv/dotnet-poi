@@ -11,4 +11,8 @@ public interface IRow
     // Row height
     void setHeight(float height);
     float getHeight();
+
+    // Hidden row
+    void setHidden(bool hidden);
+    bool isHidden();
 }

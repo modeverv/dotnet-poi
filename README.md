@@ -573,7 +573,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests (195) — all formats
+│   ├── DotnetPoi.Core.Tests/       # Core tests (199) — all formats
 │   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
 │   ├── DotnetPoi.Interop.Tests/   # Java/.NET bidirectional compatibility tests
 │   │   ├── java/                #   Maven project (Apache POI dependency)
@@ -1149,7 +1149,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt（PowerPoint 97-2003）
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula（評価器のみ）
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core テスト（195）— 全フォーマット
+│   ├── DotnetPoi.Core.Tests/       # Core テスト（199）— 全フォーマット
 │   ├── DotnetPoi.Formula.Tests/    # Formula 評価器テスト（10）
 │   ├── DotnetPoi.Interop.Tests/   # Java/.NET 双方向互換性テスト
 │   │   ├── java/                #   Maven プロジェクト（Apache POI 依存）

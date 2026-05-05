@@ -58,6 +58,11 @@ public sealed class HSSFSheet : ISheet
         return _columnWidths.TryGetValue(columnIndex, out var width) ? width : 0;
     }
 
+    public void createFreezePane(int colSplit, int rowSplit) { }
+    public void createFreezePane(int colSplit, int rowSplit, int leftmostColumn, int topRow) { }
+    public void setColumnHidden(int columnIndex, bool hidden) { }
+    public bool isColumnHidden(int columnIndex) => false;
+
     IRow ISheet.createRow(int rownum) => createRow(rownum);
 
     IRow? ISheet.getRow(int rownum) => getRow(rownum);

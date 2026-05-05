@@ -16,4 +16,12 @@ public interface ISheet
     // Column width
     void setColumnWidth(int columnIndex, int width);
     int getColumnWidth(int columnIndex);
+
+    // Freeze panes
+    void createFreezePane(int colSplit, int rowSplit);
+    void createFreezePane(int colSplit, int rowSplit, int leftmostColumn, int topRow);
+
+    // Hidden columns
+    void setColumnHidden(int columnIndex, bool hidden);
+    bool isColumnHidden(int columnIndex);
 }

@@ -14,6 +14,13 @@ public sealed class XSSFSheet : ISheet
     private readonly XSSFWorkbook _workbook;
     private XSSFDrawing? _drawing;
 
+    // Freeze panes
+    public int FreezeColSplit { get; private set; } = -1; // -1 = not set
+    public int FreezeRowSplit { get; private set; } = -1;
+
+    // Hidden columns
+    private readonly HashSet<int> _hiddenColumns = new();
+
     // Page margins (inches, default OOXML values)
     public double PageMarginBottom { get; set; } = 0.75;
     public double PageMarginFooter { get; set; } = 0.3;
@@ -128,6 +135,32 @@ public sealed class XSSFSheet : ISheet
         ArgumentNullException.ThrowIfNull(cf);
         _condFormatting.Add(cf);
     }
+
+    public void createFreezePane(int colSplit, int rowSplit)
+    {
+        createFreezePane(colSplit, rowSplit, colSplit, rowSplit);
+    }
+
+    public void createFreezePane(int colSplit, int rowSplit, int leftmostColumn, int topRow)
+    {
+        FreezeColSplit = colSplit;
+        FreezeRowSplit = rowSplit;
+    }
+
+    public void setColumnHidden(int columnIndex, bool hidden)
+    {
+        if (hidden)
+            _hiddenColumns.Add(columnIndex);
+        else
+            _hiddenColumns.Remove(columnIndex);
+    }
+
+    public bool isColumnHidden(int columnIndex)
+    {
+        return _hiddenColumns.Contains(columnIndex);
+    }
+
+    internal IReadOnlySet<int> HiddenColumns => _hiddenColumns;
 
     IRow ISheet.createRow(int rownum) => createRow(rownum);
 
