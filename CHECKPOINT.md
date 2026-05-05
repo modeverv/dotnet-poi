@@ -9,6 +9,9 @@
 - Important boundary: XML lexical quirks such as declaration format, empty element form, escaping, attribute order, namespace placement, and whitespace belong in `PoiXmlWriter` or focused helpers. Specific workbook content such as defined names, Office revision GUIDs, local absolute paths, workbook extLst contents, and fixture-specific relationship ordering must not be generalized into `XSSFWorkbook` unless directly backed by the POI model/source behavior.
 - Do not commit via LLM.
 - Step 1 status: completed in working tree by restoring `src/` and the parity-related `tests/` paths back to `7a4b778` (the parent of `31e9006`). This removes the fixture-specific XSSF writer changes, the added XSSF/XWPF/XSLF parity tests, the expanded Java parity fixture generator, and the extra generated xml-parity fixtures. `dotnet test` passes after the removal.
+- Step 2 direction: do not add XMLBeans as a submodule yet. Add Java probe/fixture generator coverage instead and document the work in `XMLBEANS_XML_OUTPUT_TODO.md`. Use XMLBeans 5.3.0 source jars/tagged source only if executable probes are not enough.
+- Step 3 status: added `XMLBEANS_XML_OUTPUT_TODO.md`, `XmlBeansOutputProbeTest.java`, and initial generated XMLBeans probe fixtures under `tests/DotnetPoi.Interop.Tests/fixtures/xmlbeans-output/`. Verified with `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=XmlBeansOutputProbeTest`.
+- Additional fixture strategy: use upstream POI integration-level tests as scenario sources to improve fixture realism. Added `POI_INTEGRATION_FIXTURE_TODO.md` and updated `XMLBEANS_XML_OUTPUT_TODO.md` with a step-by-step plan. Keep POI-derived fixtures semantic-first; do not turn fixture-specific XML into generalized `XSSFWorkbook` output.
 
 ## 2026-05-05 02:xx JST - Review of recent XSSF writer/parity work
 
