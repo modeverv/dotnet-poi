@@ -1,0 +1,44 @@
+FROM maven:3.9-eclipse-temurin-21 AS javatools
+FROM rust:1-bookworm AS rusttools
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+
+ARG USERNAME=dev
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+USER root
+
+COPY --from=javatools /opt/java/openjdk /opt/java/openjdk
+COPY --from=javatools /usr/share/maven /usr/share/maven
+
+COPY --from=rusttools /usr/local/cargo /usr/local/cargo
+COPY --from=rusttools /usr/local/rustup /usr/local/rustup
+
+ENV JAVA_HOME=/opt/java/openjdk
+ENV MAVEN_HOME=/usr/share/maven
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$CARGO_HOME/bin:$PATH
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates curl git jq unzip zip bash-completion \
+    python3 python3-pip python3-venv \
+    golang-go \
+    pkg-config build-essential libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get update && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid ${USER_GID} ${USERNAME} \
+    && useradd --uid ${USER_UID} --gid ${USER_GID} -m -s /bin/bash ${USERNAME}
+
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}
+
+RUN mkdir -p ~/.npm-global/bin \
+    && npm config set prefix '~/.npm-global' \
+    && npm install -g @vegamo/deepcode-cli
+
+WORKDIR /workspace

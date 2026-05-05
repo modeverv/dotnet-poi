@@ -1,0 +1,57 @@
+services:
+  devbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.devbox
+    container_name: deepseek-devbox
+    working_dir: /workspace
+    command: ["bash", "-lc", "sleep infinity"]
+    user: "1000:1000"
+    stdin_open: true
+    tty: true
+    environment:
+      TZ: Asia/Tokyo
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      DOTNET_CLI_HOME: /tmp/dotnet
+      MAVEN_CONFIG: /home/dev/.m2
+      NUGET_PACKAGES: /home/dev/.nuget/packages
+      CARGO_HOME: /home/dev/.cargo
+      RUSTUP_HOME: /home/dev/.rustup
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+    volumes:
+      - ./:/workspace
+      - devbox-home:/home/dev
+      - nuget-packages:/home/dev/.nuget/packages
+      - maven-repo:/home/dev/.m2
+      - npm-cache:/home/dev/.npm
+      - pip-cache:/home/dev/.cache/pip
+      - cargo-home:/home/dev/.cargo
+      - rustup-home:/home/dev/.rustup
+      - go-pkg:/go/pkg
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    networks:
+      - sandbox_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  sandbox_net:
+    driver: bridge
+    internal: false
+
+volumes:
+  devbox-home:
+  nuget-packages:
+  maven-repo:
+  npm-cache:
+  pip-cache:
+  cargo-home:
+  rustup-home:
+  go-pkg:
