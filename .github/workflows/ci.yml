@@ -36,7 +36,7 @@ jobs:
       - name: Build solution
         run: dotnet build DotnetPOI.sln --no-incremental -c Debug
 
-      - name: Test — DotnetPoi.Core.Tests (all formats: xlsx, pptx, docx, xls, xml parity)
+      - name: "Test — DotnetPoi.Core.Tests (all formats: xlsx, pptx, docx, xls, xml parity)"
         run: dotnet test tests/DotnetPoi.Core.Tests/ --no-build -c Debug
 
       - name: Test — DotnetPoi.Formula.Tests (formula evaluation)
