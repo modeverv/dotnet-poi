@@ -3067,7 +3067,7 @@ public sealed class XSSFWorkbook : IWorkbook
     {
         _ = format switch
         {
-            PICTURE_TYPE_JPEG or PICTURE_TYPE_PNG or PICTURE_TYPE_DIB or PICTURE_TYPE_GIF or PICTURE_TYPE_TIFF or PICTURE_TYPE_EPS or PICTURE_TYPE_BMP or PICTURE_TYPE_WPG => true,
+            PICTURE_TYPE_JPEG or PICTURE_TYPE_PNG or PICTURE_TYPE_DIB or PICTURE_TYPE_GIF or PICTURE_TYPE_TIFF or PICTURE_TYPE_EPS or PICTURE_TYPE_BMP or PICTURE_TYPE_WPG or PICTURE_TYPE_EMF => true,
             _ => throw new ArgumentException($"Picture type {format} is not supported by the Phase 2.5 XSSF writer.", nameof(format))
         };
     }
@@ -3081,6 +3081,7 @@ public sealed class XSSFWorkbook : IWorkbook
             "dib" => PICTURE_TYPE_DIB,
             "gif" => PICTURE_TYPE_GIF,
             "tif" or "tiff" => PICTURE_TYPE_TIFF,
+            "emf" => PICTURE_TYPE_EMF,
             "eps" => PICTURE_TYPE_EPS,
             "bmp" => PICTURE_TYPE_BMP,
             "wpg" => PICTURE_TYPE_WPG,

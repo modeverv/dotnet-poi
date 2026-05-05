@@ -153,8 +153,8 @@
 |---|---|---|
 | Core.Tests | 226 | xlsx 中心に増加中 |
 | Formula.Tests | 10 | 数式評価エンジンは未実装のため最小限 |
-| Interop.Tests (C#) | 35 | 双方向 interop fixture 検証 |
-| **Total (C#)** | **271** | |
+| Interop.Tests (C#) | 51 | 双方向 interop fixture 検証 + preservation tests |
+| **Total (C#)** | **287** | |
 | Java POI 側 (Maven) | 36 tests | うち dotnet-poi 関連 16 tests |
 
 ---

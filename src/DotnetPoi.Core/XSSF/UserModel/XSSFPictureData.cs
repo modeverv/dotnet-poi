@@ -27,6 +27,7 @@ public sealed class XSSFPictureData : IPictureData
         XSSFWorkbook.PICTURE_TYPE_EPS => "eps",
         XSSFWorkbook.PICTURE_TYPE_BMP => "bmp",
         XSSFWorkbook.PICTURE_TYPE_WPG => "wpg",
+        XSSFWorkbook.PICTURE_TYPE_EMF => "emf",
         _ => throw new NotSupportedException($"Picture type {PictureType} is not supported by the Phase 2.5 XSSF writer.")
     };
 
@@ -40,6 +41,7 @@ public sealed class XSSFPictureData : IPictureData
         XSSFWorkbook.PICTURE_TYPE_EPS => "image/eps",
         XSSFWorkbook.PICTURE_TYPE_BMP => "image/bmp",
         XSSFWorkbook.PICTURE_TYPE_WPG => "image/x-wpg",
+        XSSFWorkbook.PICTURE_TYPE_EMF => "image/x-emf",
         _ => throw new NotSupportedException($"Picture type {PictureType} is not supported by the Phase 2.5 XSSF writer.")
     };
 

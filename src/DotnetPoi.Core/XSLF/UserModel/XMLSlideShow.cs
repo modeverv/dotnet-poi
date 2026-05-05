@@ -865,8 +865,11 @@ public sealed class XMLSlideShow : IDisposable
             var name = entry.FullName.Replace('\\', '/');
             // Known model entries are NOT preserved (they get re-written)
             if (known.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
-            // Media entries are re-written from _pictures list
-            if (name.StartsWith("ppt/media/", StringComparison.OrdinalIgnoreCase)) continue;
+            // Media entries that are already tracked in _pictures (image media) will be re-written; skip them.
+            // Entries not in _pictures (video, audio, etc.) are preserved via _preservedEntries
+            if (name.StartsWith("ppt/media/", StringComparison.OrdinalIgnoreCase)
+                && _pictures.Any(p => string.Equals($"ppt/media/{p.getFileName()}", name, StringComparison.OrdinalIgnoreCase)))
+                continue;
             using var s = entry.Open();
             using var ms = new MemoryStream();
             s.CopyTo(ms);

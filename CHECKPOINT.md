@@ -917,8 +917,8 @@ New `XWPFField` model class with write and read round-trip support:
 
 - Core: **226** (+1 new: xlsx autofilter)
 - Formula: **10**
-- Interop: **37** (+5 new: comprehensive docx fixture + pptx comprehensive fixture + docx numbering/hyperlinks/table tests from earlier batch)
-- **Total: 271** (Core 226, Formula 10, Interop C# 35)
+- Interop: **51** (+16 preservation fixture tests for unsupported features: charts, comments, textboxes, OLE, SmartArt, video, audio, shapes, footnotes, change tracking, columns, etc.)
+- **Total: 287** (Core 226, Formula 10, Interop C# 51)
 
 ---
 

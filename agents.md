@@ -320,7 +320,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 | 1 | xlsx/XSSF | ~78% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; rich text (per-character formatting) ✅; pivot tables (programmatic create + unknown parts preserve) ✅; auto filter ✅; sheet/workbook protection ✅; no formula evaluation; charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
 | 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅ |
-| 4 | pptx/XSLF | ~40% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; unknown part preservation ✅; tables (p:graphicFrame/a:tbl) write/read ✅; 8 round-trip tests |
+| 4 | pptx/XSLF | ~40% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; unknown part preservation ✅; tables (p:graphicFrame/a:tbl) write/read ✅; non-image media (video/audio) round-trip preserve ✅; 18 round-trip tests |
 | 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
 | 6 | doc/HWPF | ~5% | read-only stub only |
 | 7 | ppt/HSLF | ~5% | read-only stub only |
@@ -1005,7 +1005,6 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 - **未知パーツ保持**: モデルが未対応の package part / relationship を round-trip で保全する。
 - **XML パリティ**: 実害のある interop 失敗がセマンティックに直せない場合のみ byte-level fixture を追加する。
 
-
 ### Phase 9 — Documentation Site Generation
 
 目標: Apache POI のドキュメントを参考資料として読みつつ、dotnet-poi 独自の現代的な Markdown ドキュメントを作り、検証済み examples を根拠に HTML 化して `docs/` に配置する。
@@ -1023,6 +1022,7 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 - **API 情報は生成元を優先する**: public API を説明する場合、手書き一覧より C# ソースや生成メタデータから導いた情報を優先し、古くなりにくくする。
 - **パッケージ分割を明確にする**: `DotnetPoi.Core` と `DotnetPoi.Formula` の違いを明記し、数式評価については意図的に限定された範囲以上の対応を示唆しない。
 - **ソースと出力を分ける**: `docs_src/` を Markdown 原稿とドキュメント生成スクリプト/設定の標準配置場所にする。生成 HTML は `docs/` に置く。静的サイトジェネレーターがどうしても要求する場合を除き、Markdown 原稿と生成スクリプト/設定は `docs/` に置かない。runnable example code は引き続き `examples/` に置く。
+- **スニペットはページ内に埋め込み、フルコードは examples へリンクする**: ドキュメントページには単機能を示す短いスニペット（概ね 20 行以内）を直接埋め込む。スニペットの直後またはページ末尾に `examples/` のフルコードへのリンクを置き、「全体を見たい場合はこちら」という形にする。長い複合サンプルは重複させず `examples/` にのみ置いてリンクする。
 
 採用する実装方針:
 
@@ -1040,7 +1040,6 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 - **生成出力構成**:
   - `docs/` — 生成された静的サイト専用。生成 HTML を手で編集しない。
   - `docs/assets/` — `docs_src/assets/` からコピー/最適化されたアセット。
-- **examples は分離する**: 実行可能なコードは `examples/` に置き続ける。docs は examples にリンクし、ずれやすい長いコードリストを重複させない。
 - **ビルドコマンド**: `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs`。
 - **検証コマンド**: ドキュメント化した example project を先に実行し、その後 docs generator を実行する。完了扱いにする前に生成 HTML を spot-check する。
 - **ソリューション方針**: docs generator はメインの `DotnetPOI.sln` に入れる。docs tool を独立リリースする必要が出るまでは別 solution を作らない。
@@ -1050,11 +1049,10 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 1. ドキュメントの章立てを作る: getting started、package installation、format-specific guides、examples、compatibility notes、limitations。
 2. ドキュメント化するワークフローの runnable example を `examples/` に実装する。
 3. examples と関連テストを実行し、説明する挙動が実際に成立することを確認する。
-4. `docs_src/` に dotnet-poi 独自の言葉で Markdown を書き、examples と既知の制限を参照する。
+4. `docs_src/` に dotnet-poi 独自の言葉で Markdown を書く。単機能スニペットはページ内に直接埋め込み、スニペット直後またはページ末尾に `examples/` のフルコードへのリンクを置く。
 5. 再現可能なスクリプトまたは静的サイトジェネレーターで HTML を `docs/` に生成する。
 6. 生成された HTML を spot-check してから docs slice 完了とみなす。
-
-
+ 
 ---
 
 ## 1クラスの移植手順
