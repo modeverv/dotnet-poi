@@ -8,32 +8,21 @@ public sealed class XSSFSheet : ISheet
     private readonly XSSFWorkbook _workbook;
     private XSSFDrawing? _drawing;
 
-    internal XSSFSheet(XSSFWorkbook workbook, string sheetName, int sheetIndex, int sheetId = 0, bool isHidden = false)
+    internal XSSFSheet(XSSFWorkbook workbook, string sheetName, int sheetIndex)
     {
         _workbook = workbook;
         SheetName = sheetName;
         SheetIndex = sheetIndex;
-        SheetId = sheetId != 0 ? sheetId : sheetIndex;
-        IsHidden = isHidden;
     }
 
     internal string SheetName { get; }
 
     internal int SheetIndex { get; }
 
-    internal int SheetId { get; }
-
-    internal bool IsHidden { get; }
-
     public XSSFWorkbook getWorkbook()
     {
         return _workbook;
     }
-
-    internal bool IsRowsDirty { get; private set; }
-
-    // Preserved original worksheet XML bytes for round-trip fidelity
-    internal byte[]? PreservedWorksheetXml { get; set; }
 
     public XSSFRow createRow(int rownum)
     {
@@ -42,10 +31,8 @@ public sealed class XSSFSheet : ISheet
             throw new ArgumentException("Row number must be non-negative.", nameof(rownum));
         }
 
-        if (!_workbook.IsLoading) IsRowsDirty = true;
         var row = new XSSFRow(this, rownum);
         _rows[rownum] = row;
-        _workbook.MarkDirty();
         return row;
     }
 
@@ -56,7 +43,6 @@ public sealed class XSSFSheet : ISheet
 
     public XSSFDrawing createDrawingPatriarch()
     {
-        _workbook.MarkDirty();
         return _drawing ??= new XSSFDrawing(this, _workbook.GetNextDrawingIndex());
     }
 
@@ -68,10 +54,6 @@ public sealed class XSSFSheet : ISheet
     internal IReadOnlyCollection<XSSFRow> Rows => _rows.Values;
 
     internal XSSFDrawing? Drawing => _drawing;
-
-    // Preserved original bytes for drawing and its rels when loaded from file
-    internal byte[]? PreservedDrawingXml { get; set; }
-    internal byte[]? PreservedDrawingRelsXml { get; set; }
 
     IRow ISheet.createRow(int rownum) => createRow(rownum);
 

@@ -11,9 +11,6 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.apache.poi.xslf.usermodel.XMLSlideShow;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -47,9 +44,6 @@ public class XmlParityFixtureGeneratorTest {
         generateMultiSheetCases(fixturesRoot, workbooksRoot);
         generateNamespaceCases(fixturesRoot, workbooksRoot);
         generateInlineStringCases(fixturesRoot, workbooksRoot);
-        generateDocxBasicCases(fixturesRoot, workbooksRoot);
-        generatePptxBasicCases(fixturesRoot, workbooksRoot);
-        generateMacroEnabledCases(fixturesRoot, workbooksRoot);
     }
 
     private static Path getFixturesRoot() {
@@ -60,17 +54,6 @@ public class XmlParityFixtureGeneratorTest {
                         .resolve("DotnetPoi.Interop.Tests")
                         .resolve("fixtures")
                         .resolve("xml-parity");
-            }
-            directory = directory.getParent();
-        }
-        throw new IllegalStateException("Could not locate the dotnet-poi repository root.");
-    }
-
-    private static Path getRepoRoot() {
-        Path directory = Paths.get("").toAbsolutePath();
-        while (directory != null) {
-            if (Files.exists(directory.resolve("DotnetPOI.sln"))) {
-                return directory;
             }
             directory = directory.getParent();
         }
@@ -199,78 +182,6 @@ public class XmlParityFixtureGeneratorTest {
         extractXmlEntries(workbookPath, caseName, fixturesRoot);
     }
 
-    private static void generateDocxBasicCases(Path fixturesRoot, Path workbooksRoot) throws IOException {
-        String caseName = "docx-basic";
-        cleanupCaseFiles(fixturesRoot, caseName);
-
-        try (XWPFDocument doc = new XWPFDocument()) {
-            XWPFParagraph para = doc.createParagraph();
-            para.createRun().setText("docx parity");
-
-            Path outputPath = workbooksRoot.resolve(caseName + ".docx");
-            writeAndExtractPackage(caseName, outputPath, doc::write, fixturesRoot);
-        }
-    }
-
-    private static void generatePptxBasicCases(Path fixturesRoot, Path workbooksRoot) throws IOException {
-        String caseName = "pptx-basic";
-        cleanupCaseFiles(fixturesRoot, caseName);
-
-        try (XMLSlideShow show = new XMLSlideShow()) {
-            show.createSlide();
-
-            Path outputPath = workbooksRoot.resolve(caseName + ".pptx");
-            writeAndExtractPackage(caseName, outputPath, show::write, fixturesRoot);
-        }
-    }
-
-    private static void generateMacroEnabledCases(Path fixturesRoot, Path workbooksRoot) throws IOException {
-        Path repoRoot = getRepoRoot();
-
-        generateMacroEnabledXlsm(fixturesRoot, workbooksRoot,
-                repoRoot.resolve("tests/test-files/example.xlsm"));
-        generateMacroEnabledDocm(fixturesRoot, workbooksRoot,
-                repoRoot.resolve("tests/test-files/example.docm"));
-        generateMacroEnabledPptm(fixturesRoot, workbooksRoot,
-                repoRoot.resolve("tests/test-files/example.pptm"));
-    }
-
-    private static void generateMacroEnabledXlsm(Path fixturesRoot, Path workbooksRoot, Path source) throws IOException {
-        String caseName = "xlsm-basic";
-        cleanupCaseFiles(fixturesRoot, caseName);
-
-        try (XSSFWorkbook workbook = new XSSFWorkbook(Files.newInputStream(source))) {
-            Path outputPath = workbooksRoot.resolve(caseName + ".xlsm");
-            writeAndExtractPackage(caseName, outputPath, workbook::write, fixturesRoot);
-        }
-
-        // DotnetPoi intentionally preserves unchanged xlsm package parts such as
-        // styles, shared strings, worksheets, drawings, and doc props. Keep these
-        // fixtures aligned with that round-trip contract while still using POI's
-        // regenerated package parts for workbook/content-types/relationships.
-        overlayPreservedXlsmParts(source, caseName, fixturesRoot);
-    }
-
-    private static void generateMacroEnabledDocm(Path fixturesRoot, Path workbooksRoot, Path source) throws IOException {
-        String caseName = "docm-basic";
-        cleanupCaseFiles(fixturesRoot, caseName);
-
-        try (XWPFDocument doc = new XWPFDocument(Files.newInputStream(source))) {
-            Path outputPath = workbooksRoot.resolve(caseName + ".docm");
-            writeAndExtractPackage(caseName, outputPath, doc::write, fixturesRoot);
-        }
-    }
-
-    private static void generateMacroEnabledPptm(Path fixturesRoot, Path workbooksRoot, Path source) throws IOException {
-        String caseName = "pptm-basic";
-        cleanupCaseFiles(fixturesRoot, caseName);
-
-        try (XMLSlideShow show = new XMLSlideShow(Files.newInputStream(source))) {
-            Path outputPath = workbooksRoot.resolve(caseName + ".pptm");
-            writeAndExtractPackage(caseName, outputPath, show::write, fixturesRoot);
-        }
-    }
-
     private static void cleanupCaseFiles(Path fixturesRoot, String caseName) throws IOException {
         if (!Files.exists(fixturesRoot)) {
             return;
@@ -294,22 +205,6 @@ public class XmlParityFixtureGeneratorTest {
         extractXmlEntries(workbookPath, caseName, fixturesRoot);
     }
 
-    @FunctionalInterface
-    private interface PackageWriter {
-        void write(OutputStream outputStream) throws IOException;
-    }
-
-    private static void writeAndExtractPackage(String caseName,
-                                               Path outputPath,
-                                               PackageWriter writer,
-                                               Path fixturesRoot) throws IOException {
-        try (OutputStream outputStream = Files.newOutputStream(outputPath)) {
-            writer.write(outputStream);
-        }
-
-        extractXmlEntries(outputPath, caseName, fixturesRoot);
-    }
-
     private static void extractXmlEntries(Path workbookPath, String caseName, Path fixturesRoot) throws IOException {
         try (ZipFile zipFile = new ZipFile(workbookPath.toFile())) {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
@@ -321,36 +216,6 @@ public class XmlParityFixtureGeneratorTest {
                 }
 
                 String flatName = caseName + "__" + name.replace("/", "__");
-                Path outputPath = fixturesRoot.resolve(flatName);
-                try (InputStream inputStream = zipFile.getInputStream(entry)) {
-                    Files.copy(inputStream, outputPath, StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-        }
-    }
-
-    private static void overlayPreservedXlsmParts(Path source, String caseName, Path fixturesRoot) throws IOException {
-        String[] preservedEntries = {
-                "docProps/app.xml",
-                "docProps/core.xml",
-                "xl/calcChain.xml",
-                "xl/drawings/drawing1.xml",
-                "xl/sharedStrings.xml",
-                "xl/styles.xml",
-                "xl/theme/theme1.xml",
-                "xl/worksheets/sheet1.xml",
-                "xl/worksheets/sheet2.xml",
-                "xl/worksheets/sheet3.xml"
-        };
-
-        try (ZipFile zipFile = new ZipFile(source.toFile())) {
-            for (String entryName : preservedEntries) {
-                ZipEntry entry = zipFile.getEntry(entryName);
-                if (entry == null) {
-                    throw new IOException("Missing expected xlsm preserved entry: " + entryName);
-                }
-
-                String flatName = caseName + "__" + entryName.replace("/", "__");
                 Path outputPath = fixturesRoot.resolve(flatName);
                 try (InputStream inputStream = zipFile.getInputStream(entry)) {
                     Files.copy(inputStream, outputPath, StandardCopyOption.REPLACE_EXISTING);

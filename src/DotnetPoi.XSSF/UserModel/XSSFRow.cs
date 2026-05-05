@@ -28,7 +28,6 @@ public sealed class XSSFRow : IRow
 
         var cell = new XSSFCell(this, columnIndex);
         _cells[columnIndex] = cell;
-        _sheet.getWorkbook().MarkDirty();
         return cell;
     }
 

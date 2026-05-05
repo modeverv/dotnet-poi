@@ -37,8 +37,8 @@ public class XSSFPictureTests
         Assert.NotNull(archive.GetEntry("xl/worksheets/_rels/sheet1.xml.rels"));
 
         var contentTypes = ReadEntry(archive, "[Content_Types].xml");
-        Assert.Contains("<Default ContentType=\"image/jpeg\" Extension=\"jpeg\"/>", contentTypes);
-        Assert.Contains("<Override ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\" PartName=\"/xl/drawings/drawing1.xml\"/>", contentTypes);
+        Assert.Contains("<Default Extension=\"jpeg\" ContentType=\"image/jpeg\"/>", contentTypes);
+        Assert.Contains("<Override PartName=\"/xl/drawings/drawing1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\"/>", contentTypes);
 
         var sheetXml = ReadEntry(archive, "xl/worksheets/sheet1.xml");
         Assert.Contains("<drawing r:id=\"rId1\"/>", sheetXml);

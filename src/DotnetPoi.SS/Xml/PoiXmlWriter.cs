@@ -17,7 +17,7 @@ public sealed class PoiXmlWriter : IDisposable
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
     }
 
-    public void WriteStartDocument(string encoding, bool? standalone = null)
+    public void WriteStartDocument(string encoding, bool standalone)
     {
         if (_wroteDeclaration)
         {
@@ -27,7 +27,7 @@ public sealed class PoiXmlWriter : IDisposable
         _writer.Write("<?xml version=\"1.0\" encoding=\"");
         _writer.Write(encoding);
         _writer.Write("\"");
-        if (standalone == true)
+        if (standalone)
         {
             _writer.Write(" standalone=\"yes\"");
         }
