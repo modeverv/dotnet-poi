@@ -1,0 +1,15 @@
+{
+  "title": "dotnet-poi Documentation",
+  "description": "Usage-focused documentation for working with Office files from .NET.",
+  "navigation": [
+    {
+      "title": "Getting Started",
+      "items": [
+        {
+          "title": "Usage Samples",
+          "path": "getting-started/usage-samples.md"
+        }
+      ]
+    }
+  ]
+}

@@ -827,6 +827,107 @@ public class XSSFWorkbookTests
         Assert.Equal("Hello", loadedSheet.getRow(1)!.getCell(0)!.getStringCellValue());
     }
 
+    [Fact]
+    public void RoundTrip_RichTextFormatting_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("RichText");
+        var cell = sheet.createRow(0).createCell(0);
+
+        // Create rich text with two formatted runs
+        var richText = new XSSFRichTextString();
+        richText.addRun("Hello ", bold: true, italic: false, underline: false, strikethrough: false,
+            fontSize: 14.0, fontName: "Arial", color: "FFFF0000");
+        richText.addRun("World", bold: false, italic: true, underline: false, strikethrough: false,
+            fontSize: 12.0, fontName: "Calibri", color: "FF0000FF");
+
+        cell.setCellValue(richText);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedCell = loaded.getSheet("RichText")!.getRow(0)!.getCell(0)!;
+
+        // Verify plain text
+        Assert.Equal("Hello World", loadedCell.getStringCellValue());
+
+        // Verify rich text
+        var loadedRich = loadedCell.getRichStringCellValue();
+        Assert.NotNull(loadedRich);
+        Assert.True(loadedRich.IsRichText);
+        Assert.Equal(2, loadedRich.Runs.Count);
+
+        // First run: "Hello " bold red
+        var run0 = loadedRich.Runs[0];
+        Assert.Equal("Hello ", run0.Text);
+        Assert.True(run0.Bold);
+        Assert.False(run0.Italic);
+        Assert.Equal(14.0, run0.FontSize, 1); // tolerance due to OOXML rounding
+        Assert.Equal("Arial", run0.FontName);
+        Assert.Contains("FF0000", run0.Color ?? string.Empty);
+
+        // Second run: "World" italic blue
+        var run1 = loadedRich.Runs[1];
+        Assert.Equal("World", run1.Text);
+        Assert.False(run1.Bold);
+        Assert.True(run1.Italic);
+        Assert.Equal(12.0, run1.FontSize, 1);
+        Assert.Equal("Calibri", run1.FontName);
+        Assert.Contains("0000FF", run1.Color ?? string.Empty);
+    }
+
+    [Fact]
+    public void RoundTrip_UnknownParts_Preserved()
+    {
+        // Write a basic xlsx
+        byte[] xlsxBytes;
+        using (var original = new XSSFWorkbook())
+        {
+            var sheet = original.createSheet("Data");
+            sheet.createRow(0).createCell(0).setCellValue("Hello");
+            using var ms = new MemoryStream();
+            original.write(ms);
+            xlsxBytes = ms.ToArray();
+        }
+
+        // Inject an extra entry (simulating pivot table parts) into a copy
+        using var injectedStream = new MemoryStream();
+        using (var srcArchive = new ZipArchive(new MemoryStream(xlsxBytes), ZipArchiveMode.Read))
+        {
+            // Copy all existing entries verbatim
+            using var dstArchive = new ZipArchive(injectedStream, ZipArchiveMode.Create, leaveOpen: true);
+            foreach (var e in srcArchive.Entries)
+            {
+                var newEntry = dstArchive.CreateEntry(e.FullName, CompressionLevel.Optimal);
+                using var src = e.Open();
+                using var dst = newEntry.Open();
+                src.CopyTo(dst);
+            }
+            // Add the pivot part
+            var pivotEntry = dstArchive.CreateEntry("xl/pivotTables/pivotTable1.xml", CompressionLevel.Optimal);
+            using var sw = new StreamWriter(pivotEntry.Open());
+            sw.Write("FakePivotContent");
+        }
+
+        injectedStream.Position = 0;
+
+        // Load & re-save — the pivot part should survive
+        using var loaded = new XSSFWorkbook(injectedStream);
+        Assert.Equal("Hello", loaded.getSheet("Data")!.getRow(0)!.getCell(0)!.getStringCellValue());
+
+        using var outStream = new MemoryStream();
+        loaded.write(outStream);
+        outStream.Position = 0;
+
+        using var resultArchive = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var pivotEntryResult = resultArchive.GetEntry("xl/pivotTables/pivotTable1.xml");
+        Assert.NotNull(pivotEntryResult); // pivot table part must survive
+        using var reader = new StreamReader(pivotEntryResult.Open());
+        Assert.Equal("FakePivotContent", reader.ReadToEnd());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

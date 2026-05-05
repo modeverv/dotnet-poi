@@ -1,5 +1,27 @@
 # Examples
 
+## UsageSamples
+
+Creates practical, user-facing sample files and reads them back to verify the output:
+
+```bash
+dotnet run --project examples/UsageSamples/UsageSamples.csproj
+```
+
+Output:
+
+```text
+examples/output/usage-workbook.xlsx
+examples/output/usage-document.docx
+examples/output/usage-presentation.pptx
+```
+
+The sample covers:
+
+- `.xlsx`: cells, styles, merged title, freeze pane, validation, conditional formatting, and rich text
+- `.docx`: paragraphs, formatted runs, hyperlink metadata, table, and image
+- `.pptx`: slides, text boxes, image, and table
+
 ## Phase0WriteExample
 
 Generates an `.xlsx` file with the Phase 0 XSSF write API:

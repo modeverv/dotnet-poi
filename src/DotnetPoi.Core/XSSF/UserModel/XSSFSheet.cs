@@ -1,3 +1,4 @@
+using System.Globalization;
 using DotnetPoi.SS.UserModel;
 using DotnetPoi.SS.Util;
 
@@ -11,6 +12,7 @@ public sealed class XSSFSheet : ISheet
     private readonly List<XSSFHyperlink> _hyperlinks = new();
     private readonly List<XSSFDataValidation> _dataValidations = new();
     private readonly List<XSSFConditionalFormatting> _condFormatting = new();
+    private readonly List<XSSFPivotTable> _pivotTables = new();
     private readonly XSSFWorkbook _workbook;
     private XSSFDrawing? _drawing;
 
@@ -161,6 +163,42 @@ public sealed class XSSFSheet : ISheet
     }
 
     internal IReadOnlySet<int> HiddenColumns => _hiddenColumns;
+
+    public IReadOnlyList<XSSFPivotTable> PivotTables => _pivotTables;
+
+    /// <summary>
+    /// Creates a pivot table on this sheet with data from the given source range.
+    /// </summary>
+    /// <param name="destCell">Destination cell for the top-left of the pivot table (e.g. "E5").</param>
+    /// <param name="sourceRef">Source cell range (e.g. "A1:C100").</param>
+    /// <param name="sourceSheetName">Name of the sheet containing the source data.</param>
+    /// <returns>The created XSSFPivotTable.</returns>
+    public XSSFPivotTable createPivotTable(string destCell, string sourceRef, string sourceSheetName)
+    {
+        ArgumentNullException.ThrowIfNull(destCell);
+        ArgumentNullException.ThrowIfNull(sourceRef);
+        ArgumentNullException.ThrowIfNull(sourceSheetName);
+
+        int cacheId = _workbook.AllocatePivotCacheId();
+
+        var pivotTable = new XSSFPivotTable
+        {
+            PivotTableIndex = _pivotTables.Count + 1,
+            CacheId = cacheId,
+            Name = "PivotTable" + (cacheId + 1).ToString(CultureInfo.InvariantCulture),
+            DataCaption = "Values",
+            DestinationCell = destCell,
+            SourceAreaRef = sourceRef,
+            SourceSheetName = sourceSheetName,
+            Cache = new XSSFPivotCache(cacheId),
+            CacheDefinition = new XSSFPivotCacheDefinition(cacheId, sourceSheetName, sourceRef),
+            CacheRecords = new XSSFPivotCacheRecords(cacheId),
+        };
+
+        _pivotTables.Add(pivotTable);
+        _workbook.RegisterPivotTable(pivotTable);
+        return pivotTable;
+    }
 
     IRow ISheet.createRow(int rownum) => createRow(rownum);
 

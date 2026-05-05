@@ -72,6 +72,12 @@ public sealed class XWPFDocument : IDisposable
     private int _headerCount;
     private int _footerCount;
 
+    // Unknown part preservation: ZIP entries not understood by the model are stored
+    // byte-for-byte and re-emitted during write, ensuring layouts, themes, styles,
+    // docProps, and other unmodeled parts survive round-trip.
+    private readonly Dictionary<string, byte[]> _preservedEntries
+        = new(StringComparer.OrdinalIgnoreCase);
+
     public XWPFDocument() { }
 
     public XWPFDocument(Stream stream)
@@ -171,6 +177,11 @@ public sealed class XWPFDocument : IDisposable
         ArgumentNullException.ThrowIfNull(stream);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
         CollectHyperlinks();
+
+        // Emit preserved (unknown) entries first, then model entries overwrite below
+        foreach (var kv in _preservedEntries)
+            WriteBinaryEntry(archive, kv.Key, kv.Value);
+
         WriteEntry(archive, "[Content_Types].xml", WriteContentTypes);
         WriteEntry(archive, "_rels/.rels", WriteRootRelationships);
         WriteEntry(archive, "word/document.xml", WriteDocument);
@@ -277,6 +288,7 @@ public sealed class XWPFDocument : IDisposable
         _vbaProjectBin = null;
         _vbaDataXml = null;
         _vbaProjectBinRels = null;
+        _preservedEntries.Clear();
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
 
@@ -284,6 +296,49 @@ public sealed class XWPFDocument : IDisposable
         ReadDocument(archive);
         ReadVbaFiles(archive);
         ReadHeadersFooters(archive);
+        CollectPreservedEntries(archive);
+    }
+
+    private HashSet<string> GetModelEntryNames()
+    {
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "[Content_Types].xml",
+            "_rels/.rels",
+            "word/document.xml",
+            "word/_rels/document.xml.rels",
+            "word/settings.xml",
+        };
+        if (_numInstances.Count > 0)
+            known.Add("word/numbering.xml");
+        if (_headerCount > 0)
+            known.Add("word/header1.xml");
+        if (_footerCount > 0)
+            known.Add("word/footer1.xml");
+        if (_vbaProjectBin != null)
+        {
+            known.Add("word/vbaProject.bin");
+            if (_vbaDataXml != null) known.Add("word/vbaData.xml");
+            if (_vbaProjectBinRels != null) known.Add("word/_rels/vbaProject.bin.rels");
+        }
+        foreach (var pic in _pictures)
+            known.Add($"word/media/{pic.getFileName()}");
+        return known;
+    }
+
+    private void CollectPreservedEntries(ZipArchive archive)
+    {
+        _preservedEntries.Clear();
+        var known = GetModelEntryNames();
+        foreach (var entry in archive.Entries)
+        {
+            var name = entry.FullName.Replace('\\', '/');
+            if (known.Contains(name)) continue;
+            using var s = entry.Open();
+            using var ms = new MemoryStream();
+            s.CopyTo(ms);
+            _preservedEntries[name] = ms.ToArray();
+        }
     }
 
     private void CollectHyperlinks()

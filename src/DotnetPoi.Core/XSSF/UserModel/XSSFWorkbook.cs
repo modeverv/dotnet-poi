@@ -26,7 +26,7 @@ public sealed class XSSFWorkbook : IWorkbook
     private readonly List<XSSFSheet> _sheets = new();
     private readonly List<XSSFPictureData> _pictures = new();
     private readonly Dictionary<string, int> _sharedStringIndexes = new(StringComparer.Ordinal);
-    private readonly List<string> _sharedStrings = new();
+    private readonly List<XSSFRichTextString> _sharedStrings = new();
     private readonly List<XSSFFont> _fonts = new();
     private readonly List<XSSFCellStyle> _cellStyles = new();
     private readonly List<XSSFCellStyle?> _fills = new();
@@ -42,6 +42,15 @@ public sealed class XSSFWorkbook : IWorkbook
     // xlsm support: opaque VBA binary preserved byte-for-byte.
     // Non-null iff the loaded/constructed workbook is macro-enabled.
     private byte[]? _vbaProjectBin;
+
+    // Pivot table support
+    private readonly List<XSSFPivotTable> _pivotTables = new();
+    private int _nextPivotCacheId;
+
+    // Unknown part preservation: ZIP entries not understood by the model
+    // (pivot tables, charts, etc.) are stored byte-for-byte during Load()
+    // and re-emitted during write() before model parts overwrite.
+    private readonly Dictionary<string, byte[]> _preservedEntries = new(StringComparer.OrdinalIgnoreCase);
 
     private const string ContentTypeXlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
     private const string ContentTypeXlsm = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
@@ -206,6 +215,13 @@ public sealed class XSSFWorkbook : IWorkbook
         AssignHyperlinkRelationshipIds();
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+
+        // Emit preserved (unknown) entries first so model entries can overwrite
+        foreach (var kv in _preservedEntries)
+        {
+            WriteBinaryEntry(archive, kv.Key, kv.Value);
+        }
+
         WriteEntry(archive, "[Content_Types].xml", WriteContentTypes);
         WriteEntry(archive, "_rels/.rels", WriteRootRelationships);
         WriteEntry(archive, "docProps/app.xml", WriteAppProperties);
@@ -218,7 +234,7 @@ public sealed class XSSFWorkbook : IWorkbook
         foreach (var sheet in _sheets)
         {
             WriteEntry(archive, $"xl/worksheets/sheet{sheet.SheetIndex}.xml", writer => WriteWorksheet(writer, sheet));
-            bool hasRels = sheet.Drawing is not null || sheet.Hyperlinks.Count > 0;
+            bool hasRels = sheet.Drawing is not null || sheet.Hyperlinks.Count > 0 || sheet.PivotTables.Count > 0;
             if (hasRels)
             {
                 WriteEntry(archive, $"xl/worksheets/_rels/sheet{sheet.SheetIndex}.xml.rels", writer => WriteSheetRelationships(writer, sheet));
@@ -237,6 +253,16 @@ public sealed class XSSFWorkbook : IWorkbook
 
         if (_vbaProjectBin != null)
             WriteBinaryEntry(archive, "xl/vbaProject.bin", _vbaProjectBin);
+
+        // Pivot table parts
+        foreach (var pt in _pivotTables)
+        {
+            var ptIndex = pt.PivotTableIndex;
+            var cacheId = pt.CacheId;
+            WriteEntry(archive, $"xl/pivotTables/pivotTable{ptIndex}.xml", pt.WritePivotTableDefinition);
+            WriteEntry(archive, $"xl/pivotCache/pivotCacheDefinition{cacheId + 1}.xml", writer => WritePivotCacheDefinition(writer, pt.CacheDefinition));
+            WriteEntry(archive, $"xl/pivotCache/pivotCacheRecords{cacheId + 1}.xml", writer => WritePivotCacheRecords(writer, pt.CacheRecords));
+        }
     }
 
     public void writeEncrypted(Stream stream, string password)
@@ -356,6 +382,18 @@ public sealed class XSSFWorkbook : IWorkbook
         return _nextDrawingIndex++;
     }
 
+    internal int AllocatePivotCacheId()
+    {
+        return _nextPivotCacheId++;
+    }
+
+    internal void RegisterPivotTable(XSSFPivotTable pivotTable)
+    {
+        _pivotTables.Add(pivotTable);
+    }
+
+    internal IReadOnlyList<XSSFPivotTable> PivotTables => _pivotTables;
+
     internal XSSFPictureData GetPictureData(int pictureIndex)
     {
         if ((uint)pictureIndex >= (uint)_pictures.Count)
@@ -379,11 +417,12 @@ public sealed class XSSFWorkbook : IWorkbook
                 {
                     if (cell.getCellType() != CellType.String) continue;
 
-                    var value = cell.getStringCellValue();
-                    if (_sharedStringIndexes.ContainsKey(value)) continue;
+                    var rts = cell.getRichStringCellValue();
+                    var plainText = rts.getString();
+                    if (_sharedStringIndexes.ContainsKey(plainText)) continue;
 
-                    _sharedStringIndexes[value] = _sharedStrings.Count;
-                    _sharedStrings.Add(value);
+                    _sharedStringIndexes[plainText] = _sharedStrings.Count;
+                    _sharedStrings.Add(rts);
                 }
             }
         }
@@ -431,6 +470,8 @@ public sealed class XSSFWorkbook : IWorkbook
             ReadWorksheet(archive, sheetInfo.PartName, sheet, sharedStrings);
             ReadSheetDrawing(archive, sheetInfo.PartName, sheet);
         }
+
+        CollectPreservedEntries(archive);
     }
 
     private void ReadWorkbookCalcPr(ZipArchive archive)
@@ -465,6 +506,73 @@ public sealed class XSSFWorkbook : IWorkbook
         _vbaProjectBin = ms.ToArray();
     }
 
+    /// <summary>
+    /// Collects ZIP entries not understood by the model and stores them
+    /// byte-for-byte so they survive round-trip (pivot tables, charts, etc.).
+    /// Ported from XWPFDocument / XMLSlideShow approach.
+    /// </summary>
+    private void CollectPreservedEntries(ZipArchive archive)
+    {
+        _preservedEntries.Clear();
+        var known = GetModelEntryNames();
+        foreach (var entry in archive.Entries)
+        {
+            var name = entry.FullName.Replace('\\', '/');
+            if (known.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
+            if (name.StartsWith("xl/media/", StringComparison.OrdinalIgnoreCase)) continue;
+            using var s = entry.Open();
+            using var ms = new MemoryStream();
+            s.CopyTo(ms);
+            _preservedEntries[name] = ms.ToArray();
+        }
+    }
+
+    /// <summary>Returns the set of entry paths that the model knows how to write.</summary>
+    private HashSet<string> GetModelEntryNames()
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "[Content_Types].xml",
+            "_rels/.rels",
+            "docProps/app.xml",
+            "docProps/core.xml",
+            "xl/workbook.xml",
+            "xl/_rels/workbook.xml.rels",
+            "xl/styles.xml",
+            "xl/sharedStrings.xml",
+        };
+
+        foreach (var sheet in _sheets)
+        {
+            names.Add($"xl/worksheets/sheet{sheet.SheetIndex}.xml");
+            bool hasRels = sheet.Drawing is not null || sheet.Hyperlinks.Count > 0;
+            if (hasRels)
+                names.Add($"xl/worksheets/_rels/sheet{sheet.SheetIndex}.xml.rels");
+            if (sheet.Drawing is not null)
+            {
+                names.Add($"xl/drawings/drawing{sheet.Drawing.DrawingIndex}.xml");
+                names.Add($"xl/drawings/_rels/drawing{sheet.Drawing.DrawingIndex}.xml.rels");
+            }
+        }
+
+        foreach (var picture in _pictures)
+        {
+            names.Add($"xl/media/image{picture.Index}.{picture.Extension}");
+        }
+
+        if (_vbaProjectBin != null)
+            names.Add("xl/vbaProject.bin");
+
+        foreach (var pt in _pivotTables)
+        {
+            names.Add($"xl/pivotTables/pivotTable{pt.PivotTableIndex}.xml");
+            names.Add($"xl/pivotCache/pivotCacheDefinition{pt.CacheId + 1}.xml");
+            names.Add($"xl/pivotCache/pivotCacheRecords{pt.CacheId + 1}.xml");
+        }
+
+        return names;
+    }
+
     private void ReadPictures(ZipArchive archive)
     {
         _pictures.Clear();
@@ -479,27 +587,140 @@ public sealed class XSSFWorkbook : IWorkbook
         }
     }
 
-    private static List<string> ReadSharedStrings(ZipArchive archive)
+    private static List<XSSFRichTextString> ReadSharedStrings(ZipArchive archive)
     {
         var entry = archive.GetEntry("xl/sharedStrings.xml");
         if (entry is null)
         {
-            return new List<string>();
+            return new List<XSSFRichTextString>();
         }
 
         using var stream = entry.Open();
         using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
-        var sharedStrings = new List<string>();
+        var sharedStrings = new List<XSSFRichTextString>();
 
         while (reader.Read())
         {
             if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "si")
             {
-                sharedStrings.Add(ReadTextDescendants(reader));
+                sharedStrings.Add(ReadRichSi(reader));
             }
         }
 
         return sharedStrings;
+    }
+
+    /// <summary>
+    /// Reads a single &lt;si&gt; element, returning an XSSFRichTextString.
+    /// If the si contains &lt;r&gt; elements, constructs a rich text with per-run formatting.
+    /// Otherwise falls back to concatenating all &lt;t&gt; descendants (plain text).
+    /// Ported from POI's SharedStringsTable parsing.
+    /// </summary>
+    private static XSSFRichTextString ReadRichSi(XmlReader siReader)
+    {
+        if (siReader.IsEmptyElement)
+            return new XSSFRichTextString(string.Empty);
+
+        using var subtree = siReader.ReadSubtree();
+        var runs = new List<XSSFRichTextString.TextRun>();
+        var plainText = new StringBuilder();
+        bool hasRuns = false;
+
+        while (subtree.Read())
+        {
+            if (subtree.NodeType == XmlNodeType.Element && subtree.LocalName == "r")
+            {
+                hasRuns = true;
+                var run = ReadTextRun(subtree);
+                runs.Add(run);
+                continue;
+            }
+
+            if (subtree.NodeType == XmlNodeType.Element && subtree.LocalName == "t" && !hasRuns)
+            {
+                plainText.Append(subtree.ReadElementContentAsString());
+                continue;
+            }
+        }
+
+        if (hasRuns)
+            return new XSSFRichTextString(runs);
+
+        return new XSSFRichTextString(plainText.ToString());
+    }
+
+    /// <summary>Reads a single &lt;r&gt; element: optional &lt;rPr&gt; + mandatory &lt;t&gt;.</summary>
+    private static XSSFRichTextString.TextRun ReadTextRun(XmlReader runReader)
+    {
+        var run = new XSSFRichTextString.TextRun();
+
+        if (runReader.IsEmptyElement)
+            return run;
+
+        using var subtree = runReader.ReadSubtree();
+        bool inRPr = false;
+
+        while (subtree.Read())
+        {
+            if (subtree.NodeType == XmlNodeType.Element && subtree.LocalName == "rPr")
+            {
+                inRPr = true;
+                continue;
+            }
+            if (subtree.NodeType == XmlNodeType.EndElement && subtree.LocalName == "rPr")
+            {
+                inRPr = false;
+                continue;
+            }
+
+            if (inRPr)
+            {
+                // Element presence => formatting flags
+                if (subtree.NodeType == XmlNodeType.Element)
+                {
+                    switch (subtree.LocalName)
+                    {
+                        case "b":
+                        case "bChar":
+                            run.Bold = true;
+                            break;
+                        case "i":
+                        case "iChar":
+                            run.Italic = true;
+                            break;
+                        case "u":
+                            run.Underline = true;
+                            break;
+                        case "strike":
+                            run.Strikethrough = true;
+                            break;
+                        case "sz":
+                            var szVal = subtree.GetAttribute("val");
+                            if (szVal is not null && double.TryParse(szVal,
+                                NumberStyles.Integer, CultureInfo.InvariantCulture, out var sz))
+                                run.FontSize = sz / 100.0; // OOXML sz is in hundredths of a point
+                            break;
+                        case "rFont":
+                            var tf = subtree.GetAttribute("val") ?? subtree.GetAttribute("ascii");
+                            if (tf is not null) run.FontName = tf;
+                            break;
+                        case "color":
+                            var cv = subtree.GetAttribute("rgb") ?? subtree.GetAttribute("val");
+                            if (cv is not null) run.Color = cv;
+                            break;
+                    }
+                }
+                continue;
+            }
+
+            // Text content
+            if (subtree.NodeType == XmlNodeType.Element && subtree.LocalName == "t")
+            {
+                run.Text = subtree.ReadElementContentAsString();
+            }
+        }
+
+        return run;
     }
 
     private static string ReadTextDescendants(XmlReader reader)
@@ -578,7 +799,7 @@ public sealed class XSSFWorkbook : IWorkbook
         return sheets;
     }
 
-    private static void ReadWorksheet(ZipArchive archive, string partName, XSSFSheet sheet, IReadOnlyList<string> sharedStrings)
+    private static void ReadWorksheet(ZipArchive archive, string partName, XSSFSheet sheet, IReadOnlyList<XSSFRichTextString> sharedStrings)
     {
         var entry = archive.GetEntry(partName)
             ?? throw new InvalidDataException($"The xlsx package is missing {partName}.");
@@ -964,7 +1185,7 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private static void ApplyCellValue(
         XSSFCell cell, string? cellTypeAttr, bool isFormula, string? formulaText,
-        string rawValue, IReadOnlyList<string> sharedStrings)
+        string rawValue, IReadOnlyList<XSSFRichTextString> sharedStrings)
     {
         // Resolve the base cell type from the t attribute
         // For numeric types: if rawValue is empty/null → Blank (no <v> set)
@@ -976,7 +1197,9 @@ public sealed class XSSFWorkbook : IWorkbook
             var idx = int.Parse(rawValue, CultureInfo.InvariantCulture);
             if ((uint)idx >= (uint)sharedStrings.Count)
                 throw new InvalidDataException($"Shared string index {idx} is outside the table.");
-            rawValue = sharedStrings[idx];
+            var rts = sharedStrings[idx];
+            rawValue = rts.getString();
+            cell.SetRichTextStringFromSst(rts);
         }
 
         if (isFormula)
@@ -1774,6 +1997,16 @@ public sealed class XSSFWorkbook : IWorkbook
                 WriteOverride(writer, $"/xl/drawings/drawing{sheet.Drawing.DrawingIndex}.xml", "application/vnd.openxmlformats-officedocument.drawing+xml");
             }
         }
+        // Pivot table content types
+        foreach (var pt in _pivotTables)
+        {
+            WriteOverride(writer, $"/xl/pivotTables/pivotTable{pt.PivotTableIndex}.xml",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml");
+            WriteOverride(writer, $"/xl/pivotCache/pivotCacheDefinition{pt.CacheId + 1}.xml",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml");
+            WriteOverride(writer, $"/xl/pivotCache/pivotCacheRecords{pt.CacheId + 1}.xml",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml");
+        }
         writer.WriteEndElement();
     }
 
@@ -1800,6 +2033,12 @@ public sealed class XSSFWorkbook : IWorkbook
         {
             var targetMode = hyperlink.IsExternal ? "External" : null;
             WriteRelationship(writer, hyperlink.RelationshipId ?? $"rId{relId++}", hyperlink.Address, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", targetMode);
+        }
+        // Pivot table relationships
+        foreach (var pt in sheet.PivotTables)
+        {
+            WriteRelationship(writer, $"rId{relId++}", $"../pivotTables/pivotTable{pt.PivotTableIndex}.xml",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable");
         }
         writer.WriteEndElement();
     }
@@ -2081,7 +2320,22 @@ public sealed class XSSFWorkbook : IWorkbook
             writer.WriteAttributeString("sheetId", sheet.SheetIndex.ToString(CultureInfo.InvariantCulture));
             writer.WriteEndElement();
         }
-        writer.WriteEndElement();
+        writer.WriteEndElement(); // sheets
+
+        // pivotCaches
+        if (_pivotTables.Count > 0)
+        {
+            writer.WriteStartElement("pivotCaches");
+            foreach (var pt in _pivotTables)
+            {
+                writer.WriteStartElement("pivotCache");
+                writer.WriteAttributeString("cacheId", pt.CacheId.ToString(CultureInfo.InvariantCulture));
+                writer.WriteAttributeString("r", "id", pt.CacheRelId ?? $"rId{_sheets.Count + 2 + pt.PivotTableIndex}");
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement();
+        }
+
         if (_hasCalcPr)
         {
             writer.WriteStartElement("calcPr");
@@ -2098,15 +2352,26 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         WriteRelationship(writer, "rId1", "sharedStrings.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings");
         WriteRelationship(writer, "rId2", "styles.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles");
+        int nextRelId = 3;
         foreach (var sheet in _sheets)
         {
-            WriteRelationship(writer, "rId" + (sheet.SheetIndex + 2).ToString(CultureInfo.InvariantCulture), $"worksheets/sheet{sheet.SheetIndex}.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
+            WriteRelationship(writer, "rId" + nextRelId.ToString(CultureInfo.InvariantCulture), $"worksheets/sheet{sheet.SheetIndex}.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
+            nextRelId++;
         }
         // xlsm: append vbaProject relationship after all worksheet rels
         if (_vbaProjectBin != null)
         {
-            var vbaRelId = "rId" + (_sheets.Count + 3).ToString(CultureInfo.InvariantCulture);
-            WriteRelationship(writer, vbaRelId, "vbaProject.bin", RelTypeVbaProject);
+            WriteRelationship(writer, "rId" + nextRelId.ToString(CultureInfo.InvariantCulture), "vbaProject.bin", RelTypeVbaProject);
+            nextRelId++;
+        }
+        // Pivot cache definition relationships
+        foreach (var pt in _pivotTables)
+        {
+            var relId = "rId" + nextRelId.ToString(CultureInfo.InvariantCulture);
+            pt.CacheRelId = relId;
+            nextRelId++;
+            WriteRelationship(writer, relId, $"pivotCache/pivotCacheDefinition{pt.CacheId + 1}.xml",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition");
         }
         writer.WriteEndElement();
     }
@@ -2182,15 +2447,69 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteAttributeString("count", CountStringCells().ToString(CultureInfo.InvariantCulture));
         writer.WriteAttributeString("uniqueCount", _sharedStrings.Count.ToString(CultureInfo.InvariantCulture));
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
-        foreach (var value in _sharedStrings)
+        foreach (var rts in _sharedStrings)
         {
             writer.WriteStartElement("si");
-            writer.WriteStartElement("t");
-            writer.WriteString(value);
-            writer.WriteEndElement();
-            writer.WriteEndElement();
+
+            if (rts.IsRichText)
+            {
+                // Write si with <r> elements for formatted runs
+                foreach (var run in rts.Runs)
+                {
+                    writer.WriteStartElement("r");
+
+                    // Write rPr if any formatting is set
+                    if (run.Bold || run.Italic || run.Underline || run.Strikethrough
+                        || run.FontSize > 0 || run.FontName is not null || run.Color is not null)
+                    {
+                        writer.WriteStartElement("rPr");
+
+                        if (run.Bold) { writer.WriteStartElement("b"); writer.WriteEndElement(); }
+                        if (run.Italic) { writer.WriteStartElement("i"); writer.WriteEndElement(); }
+                        if (run.Underline) { writer.WriteStartElement("u"); writer.WriteEndElement(); }
+                        if (run.Strikethrough) { writer.WriteStartElement("strike"); writer.WriteEndElement(); }
+
+                        if (run.FontSize > 0)
+                        {
+                            writer.WriteStartElement("sz");
+                            writer.WriteAttributeString("val", ((int)(run.FontSize * 100)).ToString(CultureInfo.InvariantCulture));
+                            writer.WriteEndElement();
+                        }
+
+                        if (run.FontName is not null)
+                        {
+                            writer.WriteStartElement("rFont");
+                            writer.WriteAttributeString("val", run.FontName);
+                            writer.WriteEndElement();
+                        }
+
+                        if (run.Color is not null)
+                        {
+                            writer.WriteStartElement("color");
+                            writer.WriteAttributeString("rgb", run.Color);
+                            writer.WriteEndElement();
+                        }
+
+                        writer.WriteEndElement(); // rPr
+                    }
+
+                    writer.WriteStartElement("t");
+                    writer.WriteString(run.Text);
+                    writer.WriteEndElement(); // t
+                    writer.WriteEndElement(); // r
+                }
+            }
+            else
+            {
+                // Plain text: single <t> element
+                writer.WriteStartElement("t");
+                writer.WriteString(rts.getString());
+                writer.WriteEndElement();
+            }
+
+            writer.WriteEndElement(); // si
         }
-        writer.WriteEndElement();
+        writer.WriteEndElement(); // sst
     }
 
     private int CountStringCells()
@@ -2863,6 +3182,36 @@ public sealed class XSSFWorkbook : IWorkbook
             "aboveAverage" => ConditionalFormatType.AboveAverage,
             _ => ConditionalFormatType.CellIs
         };
+    }
+
+    private static void WritePivotCacheDefinition(PoiXmlWriter writer, XSSFPivotCacheDefinition cacheDef)
+    {
+        writer.WriteStartElement("pivotCacheDefinition", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
+        writer.WriteAttributeString("xmlns:r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships");
+        writer.WriteAttributeString("r", "id", "");
+        writer.WriteAttributeString("refreshOnLoad", "1");
+        writer.WriteAttributeString("updatedBy", "DotnetPoi");
+        writer.WriteAttributeString("createdVersion", "3");
+        writer.WriteAttributeString("minRefreshableVersion", "3");
+        writer.WriteAttributeString("recordCount", "0");
+        writer.WriteAttributeString("upgradeOnRefresh", "1");
+
+        writer.WriteStartElement("cacheSource");
+        writer.WriteAttributeString("type", "worksheet");
+        writer.WriteStartElement("worksheetSource");
+        writer.WriteAttributeString("ref", cacheDef.SourceRef ?? string.Empty);
+        writer.WriteAttributeString("sheet", cacheDef.SourceSheetName ?? string.Empty);
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+
+        writer.WriteEndElement();
+    }
+
+    private static void WritePivotCacheRecords(PoiXmlWriter writer, XSSFPivotCacheRecords records)
+    {
+        writer.WriteStartElement("pivotCacheRecords", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
+        writer.WriteAttributeString("count", "0");
+        writer.WriteEndElement();
     }
 
     private sealed record SheetInfo(string Name, string PartName);

@@ -570,6 +570,59 @@ public class XWPFDocumentTests
         Assert.Equal("Page 1", loaded.getFooterText());
     }
 
+    [Fact]
+    public void RoundTrip_UnknownParts_Preserved()
+    {
+        using var original = new XWPFDocument();
+        original.createParagraph().createRun().setText("test");
+
+        byte[] raw;
+        using (var ms = new MemoryStream())
+        {
+            original.write(ms);
+            raw = ms.ToArray();
+        }
+
+        // Re-pack with extra non-model entries
+        using var injectedStream = new MemoryStream();
+        using (var writerArchive = new ZipArchive(injectedStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            using (var readerArchive = new ZipArchive(new MemoryStream(raw), ZipArchiveMode.Read))
+            {
+                foreach (var entry in readerArchive.Entries)
+                {
+                    using var s = entry.Open();
+                    using var ms = new MemoryStream();
+                    s.CopyTo(ms);
+                    var newEntry = writerArchive.CreateEntry(entry.FullName);
+                    using var ws = newEntry.Open();
+                    ws.Write(ms.ToArray(), 0, (int)ms.Length);
+                }
+            }
+            var extraEntry = writerArchive.CreateEntry("word/styles.xml");
+            using (var ws = extraEntry.Open())
+                ws.Write(System.Text.Encoding.UTF8.GetBytes("<w:styles/>"));
+            extraEntry = writerArchive.CreateEntry("docProps/custom.xml");
+            using (var ws = extraEntry.Open())
+                ws.Write(System.Text.Encoding.UTF8.GetBytes("<Properties/>"));
+        }
+        injectedStream.Position = 0;
+
+        using var loaded = new XWPFDocument(injectedStream);
+        Assert.Equal("test", loaded.getParagraphs()[0].getText());
+
+        // Write again and verify extra entries survived
+        using var outStream = new MemoryStream();
+        loaded.write(outStream);
+        outStream.Position = 0;
+
+        using var verifyArchive = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var entryNames = verifyArchive.Entries.Select(e => e.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("word/styles.xml", entryNames);
+        Assert.Contains("docProps/custom.xml", entryNames);
+        Assert.Contains("word/document.xml", entryNames);
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

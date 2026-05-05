@@ -27,6 +27,9 @@ public sealed class XSSFCell : ICell
     private XSSFCellStyle? _cellStyle;
     private XSSFHyperlink? _hyperlink;
 
+    // Rich text (per-character formatting). Null when cell contains plain text.
+    private XSSFRichTextString? _richTextStringValue;
+
     internal XSSFCell(XSSFRow row, int cellNum)
     {
         _row = row;
@@ -71,6 +74,7 @@ public sealed class XSSFCell : ICell
     public void setCellValue(string? value)
     {
         _stringValue = value ?? string.Empty;
+        _richTextStringValue = null;
         _hasCachedValue = true;
         if (_isFormula)
         {
@@ -80,6 +84,50 @@ public sealed class XSSFCell : ICell
         {
             _cellType = CellType.String;
         }
+    }
+
+    /// <summary>
+    /// Sets a rich text string value. The cell type becomes STRING.
+    /// Ported from XSSFCell.setCellValue(RichTextString).
+    /// </summary>
+    public void setCellValue(XSSFRichTextString? value)
+    {
+        if (value is null)
+        {
+            setCellValue((string?)null);
+            return;
+        }
+        _richTextStringValue = value;
+        _stringValue = value.getString();
+        _hasCachedValue = true;
+        if (_isFormula)
+            _cachedFormulaResultType = CellType.String;
+        else
+            _cellType = CellType.String;
+    }
+
+    /// <summary>
+    /// Returns the rich text string value. If the cell contains plain text,
+    /// wraps it in an XSSFRichTextString with a single unformatted run.
+    /// Ported from XSSFCell.getRichStringCellValue().
+    /// </summary>
+    public XSSFRichTextString getRichStringCellValue()
+    {
+        var effectiveType = _isFormula ? _cachedFormulaResultType : _cellType;
+        if (effectiveType != CellType.String)
+            throw new InvalidOperationException($"Cannot get a string value from a {_cellType} cell.");
+        if (_richTextStringValue is not null)
+            return _richTextStringValue;
+        return new XSSFRichTextString(_stringValue ?? string.Empty);
+    }
+
+    /// <summary>
+    /// Sets the rich text string from a shared strings table entry during load.
+    /// </summary>
+    internal void SetRichTextStringFromSst(XSSFRichTextString rts)
+    {
+        _richTextStringValue = rts;
+        _stringValue = rts.getString();
     }
 
     public void setCellValue(double value)

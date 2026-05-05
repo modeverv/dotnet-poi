@@ -779,3 +779,114 @@ The `write()` method currently creates a fresh ZIP without copying over parts it
   `xlsx formula edge results: divide by zero, circular reference, missing cells`.
 - Root cause: the example calls `workbook.getCreationHelper().createFormulaEvaluator()` but referenced only `DotnetPoi.Core`; by design formula evaluation lives in `DotnetPoi.Formula`.
 - Added `DotnetPoi.Formula` project reference to `examples/EdgeCaseProbeExample/EdgeCaseProbeExample.csproj`.
+
+## 2026-05-11 JST - xlsx rich text (per-character formatting in shared strings)
+
+**Problem**: When creating a cell with mixed formatting (e.g. bold "Hello " + italic "World"), the formatting was lost on round-trip because the shared strings table only stored/retrieved plain strings.
+
+**Solution**: Full rich text support following Apache POI's `XSSFRichTextString` model.
+
+### Implementation
+
+- **New file `XSSFRichTextString.cs`**: Model class with `TextRun` inner class carrying per-run formatting (Bold, Italic, Underline, Strikethrough, FontSize in points, FontName, Color as hex RGB). Provides `IsRichText` property, `getString()` for plain text concatenation, and `addRun()` overloads.
+
+- **`XSSFCell.cs`**: Added `_richTextStringValue` field, `setCellValue(XSSFRichTextString)`, `getRichStringCellValue()`, and `SetRichTextStringFromSst()` for loading.
+
+- **`XSSFWorkbook.cs`**:
+  - `_sharedStrings` changed from `List<string>` to `List<XSSFRichTextString>`.
+  - `ReadSharedStrings` now returns `List<XSSFRichTextString>`, parsing `<r>` (text runs) with `<rPr>` (formatting: b, i, u, strike, sz, rFont, color). Falls back to plain `<t>` for legacy SST.
+  - `WriteSharedStrings` writes `<r>` elements with `<rPr>` when `IsRichText` is true; writes plain `<si><t>` for plain strings.
+  - `BuildSharedStrings` collects `XSSFRichTextString` from cells via `getRichStringCellValue()`.
+  - `ApplyCellValue` passes `XSSFRichTextString` to the cell via `SetRichTextStringFromSst()`.
+  - `ReadWorksheet` and `ApplyCellValue` signatures updated to `IReadOnlyList<XSSFRichTextString>`.
+
+### Test
+
+- `RoundTrip_RichTextFormatting_Preserved`: Creates a cell with two formatted runs (bold red "Hello " + italic blue "World"), writes to stream, loads back, and verifies plain text, run count, bold/italic flags, font size, font name, and color on each run.
+
+### Test count
+
+- **Core**: 221 (220 existing + 1 rich text)
+- **Formula**: 10
+- **Interop**: 31
+- **Total**: 262
+
+## 2026-05-06 JST - Phase 9 docs site implementation direction
+
+- User requested Phase 9 setup direction first: decide directory structure, language/tooling, and solution approach, then record it in `agents.md`.
+- Added Phase 9 implementation policy to both English and Japanese sections of `agents.md`.
+- Decision: keep docs generation maintainable by using a small C#/.NET console generator instead of a separate heavy docs framework or another language runtime.
+- Generator location: `tools/DotnetPoi.DocsGenerator/`.
+- Solution policy: add the generator project to the existing `DotnetPOI.sln`; do not create a separate solution unless the docs tool becomes independently releasable.
+- Canonical docs source: `docs_src/site.json`, `docs_src/content/`, `docs_src/assets/`, and `docs_src/templates/`.
+- Generated output: `docs/` only; generated HTML should not be edited by hand.
+- Build command recorded: `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs`.
+- Next TODO: scaffold `docs_src/`, `docs/`, and `tools/DotnetPoi.DocsGenerator/`; add the project to `DotnetPOI.sln`; implement minimal Markdown-to-HTML generation; add a first getting-started page linked to an existing runnable example.
+
+## 2026-05-06 JST - Phase 9 usage samples started
+
+- User clarified Phase 9 should start by reading the POI documentation and creating real runnable usage samples; class structure/API documentation is not needed.
+- Read local Apache POI documentation sources:
+  - `poi/src/documentation/content/xdocs/components/spreadsheet/quick-guide.xml`
+  - `poi/src/documentation/content/xdocs/components/document/quick-guide-xwpf.xml`
+  - `poi/src/documentation/content/xdocs/components/slideshow/quick-guide.xml`
+- Added `agents.md` rule: Phase 9 is usage-docs-only for now; do not create API reference, class hierarchy, or architecture pages unless explicitly requested.
+- Added `examples/UsageSamples/` console project and included it in `DotnetPOI.sln`.
+- `UsageSamples` creates and verifies:
+  - `examples/output/usage-workbook.xlsx` — xlsx cells, styles, merged title, freeze pane, data validation, conditional formatting, rich text, readback verification.
+  - `examples/output/usage-document.docx` — docx paragraphs, formatted runs, hyperlink metadata, table, image, readback verification.
+  - `examples/output/usage-presentation.pptx` — pptx slides, text boxes, image, table, readback verification.
+- Added `docs_src/site.json` and `docs_src/content/getting-started/usage-samples.md` as initial usage-only docs source.
+- Updated `examples/README.md` with the new runnable sample command.
+- Verification passed: `dotnet run --project examples/UsageSamples/UsageSamples.csproj`.
+- Next TODO: add focused usage samples/docs for common spreadsheet workflows from POI quick guide: read existing workbook, formulas as text/cached values, images, page setup/print settings, hyperlinks, and macro-enabled round-trip preservation.
+
+---
+
+## 2026-05-14 JST — xlsx rich text + pivot table programmatic creation + docx unknown part preservation
+
+### docx unknown part preservation (item 1/3)
+
+Added `_preservedEntries` mechanism to `XWPFDocument` (matching existing xlsx/pptx pattern):
+
+- `_preservedEntries` field (`Dictionary<string, byte[]>` with `OrdinalIgnoreCase`)
+- `GetModelEntryNames()` returns known model paths (document, settings, rels, content types, numbering, header/footer, images, vba)
+- `CollectPreservedEntries(ZipArchive)` stores non-model ZIP entries byte-for-byte
+- `Load()` calls `CollectPreservedEntries` after other parsing
+- `write()` emits preserved entries first, model entries overwrite
+- 1 test: injects `word/styles.xml` and `docProps/custom.xml`, verifies survival through round-trip
+
+### xlsx rich text / shared strings formatting (item 2/3)
+
+New `XSSFRichTextString` class with `TextRun` sub-class supporting per-run formatting (bold, italic, underline, strikethrough, font size, font name, color):
+
+- **Model**: `XSSFRichTextString` stores list of `TextRun` objects; `getString()` concatenates; `IsRichText` property detects formatting.
+- **SST storage**: Changed `_sharedStrings` from `List<string>` to `List<XSSFRichTextString>`, keyed by plain text for dedup.
+- **Read path**: `ReadRichSi()` parses `<si>` with `<r>` runs + `<rPr>` formatting (b, i, u, strike, sz/100, rFont/latin, srgbClr).
+- **Write path**: `WriteSharedStrings()` emits `<r>` elements with full `<rPr>` for formatted runs, plain `<t>` for unformatted.
+- **Cell API**: `XSSFCell.setCellValue(XSSFRichTextString)`, `getRichStringCellValue()`, `SetRichTextStringFromSst()`.
+- **1 round-trip test**: "Hello " (bold, red, 14pt, Arial) + "World" (italic, blue, 12pt, Calibri).
+
+### xlsx pivot table programmatic creation (item 3/3)
+
+New model classes with write-only support (existing files round-trip via unknown parts):
+
+- **`XSSFPivotTable`**: PivotTableIndex, CacheId, CacheDefinition/CacheRecords/Cache objects, WritePivotTableDefinition().
+- **`XSSFPivotCache`**: Simple CacheId container.
+- **`XSSFPivotCacheDefinition`**: CacheId, SourceSheetName, SourceRef.
+- **`XSSFPivotCacheRecords`**: CacheId container.
+- **`XSSFSheet.createPivotTable()`**: Creates pivot table with cache allocation, registers with workbook.
+- **`XSSFWorkbook` wiring**:
+  - WriteWorkbook: `<pivotCaches>` element with cache references.
+  - WriteWorkbookRelationships: pivot cache def relationships with sequential rId.
+  - WriteContentTypes: overrides for pivotTable, pivotCacheDefinition, pivotCacheRecords.
+  - WriteSheetRelationships: sheet-level pivot table relationships.
+  - GetModelEntryNames: includes pivot parts.
+  - write(): emits pivotTable{index}.xml, pivotCacheDefinition{id+1}.xml, pivotCacheRecords{id+1}.xml.
+
+### Test count
+
+- Core: **222** (+3 new: docx unknown parts, xlsx rich text, xlsx pivot wiring verification)
+- Formula: **10**
+- Interop: **31**
+- **Total: 263**
