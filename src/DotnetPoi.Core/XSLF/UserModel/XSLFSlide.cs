@@ -4,12 +4,16 @@ namespace DotnetPoi.XSLF.UserModel;
 public sealed class XSLFSlide
 {
     private readonly List<XSLFPictureShape> _shapes = new();
+    private readonly List<XSLFAutoShape> _autoShapes = new();
     private int _nextShapeId = 2; // 1 is reserved for the group shape container
 
     internal XSLFSlide() { }
 
     /// <summary>All picture shapes added to this slide.</summary>
     public IReadOnlyList<XSLFPictureShape> getShapes() => _shapes;
+
+    /// <summary>All auto shapes (text boxes) on this slide.</summary>
+    public IReadOnlyList<XSLFAutoShape> getAutoShapes() => _autoShapes;
 
     /// <summary>
     /// Creates a picture shape referencing the picture at the given 0-based index.
@@ -30,4 +34,15 @@ public sealed class XSLFSlide
     }
 
     internal void AttachShape(XSLFPictureShape shape) => _shapes.Add(shape);
+
+    /// <summary>Creates a text box (auto shape) on this slide.</summary>
+    public XSLFAutoShape createTextBox()
+    {
+        int shapeId = _nextShapeId++;
+        var shape = new XSLFAutoShape(shapeId);
+        _autoShapes.Add(shape);
+        return shape;
+    }
+
+    internal void AttachAutoShape(XSLFAutoShape shape) => _autoShapes.Add(shape);
 }

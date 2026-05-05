@@ -320,7 +320,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 | 1 | xlsx/XSSF | ~70% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; no formula evaluation; rich text formatting, pivot tables, charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
 | 3 | docx/XWPF | ~40% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ☐; hyperlinks ☐; headers/footers ☐; page setup ☐ |
-| 4 | pptx/XSLF | ~15% | slide/image/rotation write ✅; round-trip not tested |
+| 4 | pptx/XSLF | ~30% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; 6 round-trip tests added |
 | 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
 | 6 | doc/HWPF | ~5% | read-only stub only |
 | 7 | ppt/HSLF | ~5% | read-only stub only |
@@ -357,9 +357,9 @@ Do not add these as fixture-specific constants — only fix when a concrete inte
 
 #### step 4 pptx / XSLF
 
-- [ ] Round-trip: open pptx → write → read back → assert slide content is identical.
+- [x] Round-trip: open pptx → write → read back → assert slide content is identical. *(text boxes, formatting, pictures, anchors, slide size — 6 round-trip tests)*
 - [~] Interop B: dotnet-poi writes pptx → Java POI reads. *(image+rotation fixture exists)*
-- [ ] Text boxes, rich text, placeholders, layouts, masters, themes, tables, charts, notes, shapes.
+- [~] Text boxes, rich text, placeholders, layouts, masters, themes, tables, charts, notes, shapes. *(text boxes + rich text done; layouts/masters/themes/tables/charts/notes/shapes pending)*
 - [ ] Preserve unknown parts and relationships during round-trip.
 
 #### step 5 Macro-enabled formats (xlsm, docm, pptm)
@@ -403,19 +403,19 @@ Rules:
 
 - **Reference, do not copy**: Apache POI documentation is Apache License 2.0 material. It may be read to understand scope, terminology, and likely user needs, but do not copy long passages or mirror the structure wholesale. Rephrase, summarize, and reorganize for dotnet-poi.
 - **Do not edit `poi/`**: the Apache POI submodule remains read-only. Use it only as source/reference.
-- **Docs are dotnet-poi owned**: author Markdown under repository-owned documentation sources, then generate static HTML into `docs/`.
+- **Docs are dotnet-poi owned**: author Markdown and documentation source files under `docs_src/`, then generate static HTML into `docs/`.
 - **Examples first**: create or update runnable examples under `examples/` before documenting behavior. Documentation should refer to examples that compile and run.
 - **Verify examples**: run the relevant `dotnet`, Java, Python, or other tooling needed to confirm examples and generated artifacts. Any language/tool may be used for documentation generation if it is reproducible from the repo.
 - **Prefer generated API truth**: when documenting public API, derive class/member information from the C# source or generated metadata rather than hand-maintaining stale lists.
 - **Keep package split clear**: distinguish `DotnetPoi.Core` from `DotnetPoi.Formula`; do not imply formula evaluation support beyond the deliberately limited scope.
-- **Publishable output**: generated HTML belongs under `docs/`; source Markdown, examples, and generation scripts/config should remain outside `docs/` unless the chosen static site generator requires otherwise.
+- **Source/output split**: `docs_src/` is the canonical location for Markdown sources and documentation generation scripts/config. Generated HTML belongs under `docs/`. Keep source Markdown and generation scripts/config out of `docs/` unless the chosen static site generator strictly requires otherwise; runnable example code still belongs under `examples/`.
 
 Recommended workflow:
 
 1. Draft the documentation information architecture: getting started, package installation, format-specific guides, examples, compatibility notes, and limitations.
 2. Implement runnable examples in `examples/` for the documented workflows.
 3. Run examples and tests that prove the documented behavior.
-4. Write Markdown in dotnet-poi's own words, citing examples and known limitations.
+4. Write Markdown under `docs_src/` in dotnet-poi's own words, citing examples and known limitations.
 5. Generate HTML into `docs/` with a reproducible script or static site generator.
 6. Spot-check the generated HTML before considering the docs slice complete.
 
@@ -943,9 +943,9 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 
 #### step 4 pptx / XSLF
 
-- [ ] ラウンドトリップ: pptx を開いて書いて読み返し、スライド内容が同一であることを確認する。
+- [x] ラウンドトリップ: pptx を開いて書いて読み返し、スライド内容が同一であることを確認する。 *(text box、formatting、picture、anchor、slide size — 6 tests)*
 - [~] Interop B: dotnet-poi が pptx を書く → Java POI が読む *(image+rotation fixture あり)*
-- [ ] text box、rich text、placeholder、layout、master、theme、table、chart、notes、shape を実装する。
+- [~] text box、rich text、placeholder、layout、master、theme、table、chart、notes、shape を実装する。 *(text box + rich text 完了; layout/master/theme/table/chart/notes/shape は未着手)*
 - [ ] round-trip 時に未知 part と relationship を保持する。
 
 #### step 5 マクロ有効フォーマット（xlsm、docm、pptm）
@@ -989,19 +989,19 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 
 - **参照はするがコピーしない**: Apache POI の文書は Apache License 2.0 の著作物である。範囲・用語・利用者が知りたい内容を把握するために読むのはよいが、長文コピーや構造の丸写しは避ける。dotnet-poi の言葉で要約・再構成する。
 - **`poi/` は編集しない**: Apache POI submodule は読み取り専用。参照元としてのみ使う。
-- **docs は dotnet-poi 所有物にする**: リポジトリ側の Markdown を原稿にし、静的 HTML を `docs/` に生成する。
+- **docs は dotnet-poi 所有物にする**: Markdown とドキュメント生成用のソースファイルは `docs_src/` に置き、静的 HTML を `docs/` に生成する。
 - **examples を先に作る**: ドキュメント化する前に `examples/` の実コードを作成・更新する。ドキュメントは compile/run 済みの例を参照する。
 - **examples を検証する**: `dotnet`、Java、Python、その他必要なツールを使って、サンプルと生成物が正しく動くことを確認する。ドキュメント生成には、リポジトリから再現できる限り任意の言語・ツールを使ってよい。
 - **API 情報は生成元を優先する**: public API を説明する場合、手書き一覧より C# ソースや生成メタデータから導いた情報を優先し、古くなりにくくする。
 - **パッケージ分割を明確にする**: `DotnetPoi.Core` と `DotnetPoi.Formula` の違いを明記し、数式評価については意図的に限定された範囲以上の対応を示唆しない。
-- **公開可能な出力**: 生成 HTML は `docs/` に置く。Markdown 原稿、examples、生成スクリプト/設定は、静的サイトジェネレーターの都合がない限り `docs/` 外に置く。
+- **ソースと出力を分ける**: `docs_src/` を Markdown 原稿とドキュメント生成スクリプト/設定の標準配置場所にする。生成 HTML は `docs/` に置く。静的サイトジェネレーターがどうしても要求する場合を除き、Markdown 原稿と生成スクリプト/設定は `docs/` に置かない。runnable example code は引き続き `examples/` に置く。
 
 推奨ワークフロー:
 
 1. ドキュメントの章立てを作る: getting started、package installation、format-specific guides、examples、compatibility notes、limitations。
 2. ドキュメント化するワークフローの runnable example を `examples/` に実装する。
 3. examples と関連テストを実行し、説明する挙動が実際に成立することを確認する。
-4. dotnet-poi 独自の言葉で Markdown を書き、examples と既知の制限を参照する。
+4. `docs_src/` に dotnet-poi 独自の言葉で Markdown を書き、examples と既知の制限を参照する。
 5. 再現可能なスクリプトまたは静的サイトジェネレーターで HTML を `docs/` に生成する。
 6. 生成された HTML を spot-check してから docs slice 完了とみなす。
 

@@ -3,6 +3,7 @@
 ## 2026-05-05 13:xx JST - Add Phase 9 documentation generation guidance
 
 - Current task: POI ドキュメントを参考にしつつ、dotnet-poi 独自の Markdown + runnable examples + HTML 生成を進める方針を `agents.md` に Phase 9 として追加。
+- Follow-up: ドキュメントソースと生成スクリプト/設定の標準配置場所を `docs_src/` に明示。
 - Scope: コミットしない。
 
 ### やったこと
@@ -11,6 +12,7 @@
 - `agents.md` の日本語版フェーズ一覧にも同内容を追加。
 - POI 文書は Apache License 2.0 の参考資料として読み、長文コピーや構造の丸写しを避ける方針を明記。
 - `examples/` の実コードを先に作って検証し、その結果を Markdown docs に反映し、HTML を `docs/` に生成するワークフローを明記。
+- Markdown 原稿と生成スクリプト/設定は `docs_src/`、生成 HTML は `docs/`、runnable example code は `examples/` に置くように追記。
 - `dotnet` / Java / Python など、再現可能であれば任意のツールを docs 生成・検証に使ってよいことを明記。
 
 ### Verification
@@ -682,3 +684,30 @@ Numbering write/read was lost during a git checkout revert and has been re-imple
 - **WriteRun**: Updated to write full rPr (b, i, u, strike, rFonts, sz, color).
 - **ReadDocument**: pPr/rPr element handlers for ind, spacing, numPr, numId, ilvl; rFonts, sz, color, underline, strike.
 - All 19 XWPF tests pass (12 existing + 3 font/alignment + 2 indent/spacing + 2 bullet/numbered list).
+
+---
+
+## 2026-05-10 JST - PPTX (XSLF) round-trip: text boxes + slide size
+
+### Text box (p:sp) write/read
+
+- **XSLFAutoShape**, **XSLFTextParagraph**, **XSLFTextRun**: New classes for text box model with formatting (bold, italic, underline, strikethrough, font size, font name, color).
+- **XSLFSlide**: Added `createTextBox()`, `getAutoShapes()`, `_autoShapes` list.
+- **WriteAutoShape**: Writes `p:sp` element with `p:nvSpPr`, `p:spPr` (xfrm with rot/flip/off/ext, prstGeom rect), `p:txBody` (a:bodyPr, a:lstStyle, a:p → a:r → a:t with rPr formatting).
+- **ParseSlideXml**: Extended to parse `p:sp` elements: shape ID, anchor, txBody → a:p → a:r → a:t text content, plus a:rPr for all formatting properties.
+- **Bug fix**: `WriteStartElement(a,"b")`/`WriteEndElement()` were on same line without braces — `WriteEndElement()` always executed (even when condition false), causing `InvalidOperationException: No open element to close`. Fixed by wrapping in `{ }`.
+- **6 round-trip tests**: single-run text, multi-run (bold formatting), multiple paragraphs, anchor preservation, slide size, combined text box + picture.
+
+### Slide size
+
+- **Fields**: `_slideCx`/`_slideCy` (default 9,144,000 × 6,858,000 EMU).
+- **Public API**: `getSlideCx()`, `getSlideCy()`, `setSlideSize()`.
+- **Write**: `WritePresentation()` uses instance fields instead of hardcoded defaults.
+- **Read**: `ParseSlideSize()` reads `p:sldSz` cx/cy from presentation.xml on load.
+
+### Test count
+
+- Core: **212** (195 existing + 6 pptx round-trip + 11 xlsx round-trip)
+- Formula: **10**
+- Interop: **31**
+- **Total: 253**

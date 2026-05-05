@@ -285,6 +285,125 @@ public class XMLSlideShowTests
         Assert.Equal(10_800_000, shape.getRotationAttribute());
     }
 
+    // ----- text box round-trip tests -----
+
+    [Fact]
+    public void RoundTrip_TextPreserved_SingleRun()
+    {
+        using var prs = new XMLSlideShow();
+        var slide = prs.createSlide();
+        var textBox = slide.createTextBox();
+        textBox.setAnchor(100_000, 200_000, 914_400, 685_800);
+        var para = textBox.addParagraph();
+        para.addRun("Hello PPTX");
+
+        using var stream = WriteToStream(prs);
+        using var prs2 = new XMLSlideShow(stream);
+
+        var slide2 = prs2.getSlides()[0];
+        Assert.Single(slide2.getAutoShapes());
+        var tb2 = slide2.getAutoShapes()[0];
+        Assert.Single(tb2.Paragraphs);
+        Assert.Single(tb2.Paragraphs[0].Runs);
+        Assert.Equal("Hello PPTX", tb2.Paragraphs[0].Runs[0].Text);
+    }
+
+    [Fact]
+    public void RoundTrip_TextPreserved_MultiRun()
+    {
+        using var prs = new XMLSlideShow();
+        var slide = prs.createSlide();
+        var textBox = slide.createTextBox();
+        textBox.setAnchor(0, 0, 914_400, 685_800);
+        var para = textBox.addParagraph();
+        para.addRun("Bold ").Bold = true;
+        para.addRun("Normal");
+
+        using var stream = WriteToStream(prs);
+        using var prs2 = new XMLSlideShow(stream);
+
+        var slide2 = prs2.getSlides()[0];
+        var tb2 = slide2.getAutoShapes()[0];
+        Assert.Equal(2, tb2.Paragraphs[0].Runs.Count);
+        Assert.True(tb2.Paragraphs[0].Runs[0].Bold);
+        Assert.Equal("Bold ", tb2.Paragraphs[0].Runs[0].Text);
+        Assert.Equal("Normal", tb2.Paragraphs[0].Runs[1].Text);
+    }
+
+    [Fact]
+    public void RoundTrip_MultipleParagraphs_Preserved()
+    {
+        using var prs = new XMLSlideShow();
+        var slide = prs.createSlide();
+        var textBox = slide.createTextBox();
+        textBox.setAnchor(0, 0, 914_400, 685_800);
+        textBox.addParagraph().addRun("First paragraph");
+        textBox.addParagraph().addRun("Second paragraph");
+
+        using var stream = WriteToStream(prs);
+        using var prs2 = new XMLSlideShow(stream);
+
+        var tb2 = prs2.getSlides()[0].getAutoShapes()[0];
+        Assert.Equal(2, tb2.Paragraphs.Count);
+        Assert.Equal("First paragraph", tb2.Paragraphs[0].Runs[0].Text);
+        Assert.Equal("Second paragraph", tb2.Paragraphs[1].Runs[0].Text);
+    }
+
+    [Fact]
+    public void RoundTrip_AutoShapeAnchor_Preserved()
+    {
+        using var prs = new XMLSlideShow();
+        var slide = prs.createSlide();
+        var textBox = slide.createTextBox();
+        textBox.setAnchor(500_000, 1_000_000, 2_000_000, 3_000_000);
+        textBox.addParagraph().addRun("test");
+
+        using var stream = WriteToStream(prs);
+        using var prs2 = new XMLSlideShow(stream);
+
+        var tb2 = prs2.getSlides()[0].getAutoShapes()[0];
+        Assert.Equal(500_000L, tb2.getAnchorX());
+        Assert.Equal(1_000_000L, tb2.getAnchorY());
+        Assert.Equal(2_000_000L, tb2.getAnchorCx());
+        Assert.Equal(3_000_000L, tb2.getAnchorCy());
+    }
+
+    [Fact]
+    public void RoundTrip_SlideSize_Preserved()
+    {
+        long customCx = 6_858_000L;
+        long customCy = 5_143_500L;
+        using var prs = new XMLSlideShow();
+        prs.setSlideSize(customCx, customCy);
+        prs.createSlide();
+
+        using var stream = WriteToStream(prs);
+        using var prs2 = new XMLSlideShow(stream);
+
+        Assert.Equal(customCx, prs2.getSlideCx());
+        Assert.Equal(customCy, prs2.getSlideCy());
+    }
+
+    [Fact]
+    public void RoundTrip_TextBoxAndPicture_Combined()
+    {
+        var image = LoadTestImage();
+        using var prs = new XMLSlideShow();
+        var slide = prs.createSlide();
+        var picIdx = prs.addPicture(image, XSLFPictureData.PICTURE_TYPE_JPEG);
+        prs.createPicture(slide, picIdx).setAnchor(0, 0, 914_400, 685_800);
+        var tb = slide.createTextBox();
+        tb.setAnchor(100_000, 100_000, 500_000, 300_000);
+        tb.addParagraph().addRun("Hello");
+
+        using var stream = WriteToStream(prs);
+        using var prs2 = new XMLSlideShow(stream);
+
+        Assert.Single(prs2.getSlides()[0].getShapes());
+        Assert.Single(prs2.getSlides()[0].getAutoShapes());
+        Assert.Equal("Hello", prs2.getSlides()[0].getAutoShapes()[0].Paragraphs[0].Runs[0].Text);
+    }
+
     // ----- helpers -----
 
     private static XSLFPictureShape MakeShape()

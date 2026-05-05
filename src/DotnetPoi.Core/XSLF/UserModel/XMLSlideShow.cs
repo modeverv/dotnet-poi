@@ -116,6 +116,8 @@ public sealed class XMLSlideShow : IDisposable
 
     private readonly List<XSLFSlide>       _slides   = new();
     private readonly List<XSLFPictureData> _pictures = new();
+    private long _slideCx = DefaultSlideCx;
+    private long _slideCy = DefaultSlideCy;
 
     // pptm support: opaque VBA binary preserved byte-for-byte.
     private byte[]? _vbaProjectBin;
@@ -165,6 +167,15 @@ public sealed class XMLSlideShow : IDisposable
 
     public IReadOnlyList<XSLFSlide>       getSlides()      => _slides;
     public IReadOnlyList<XSLFPictureData> getPictureData() => _pictures;
+
+    public long getSlideCx() => _slideCx;
+    public long getSlideCy() => _slideCy;
+
+    public void setSlideSize(long cx, long cy)
+    {
+        _slideCx = cx;
+        _slideCy = cy;
+    }
 
     public void write(Stream stream)
     {
@@ -292,8 +303,8 @@ public sealed class XMLSlideShow : IDisposable
         w.WriteEndElement();
 
         w.WriteStartElement("p", "sldSz");
-        w.WriteAttributeString("cx", DefaultSlideCx.ToString(CultureInfo.InvariantCulture));
-        w.WriteAttributeString("cy", DefaultSlideCy.ToString(CultureInfo.InvariantCulture));
+        w.WriteAttributeString("cx", _slideCx.ToString(CultureInfo.InvariantCulture));
+        w.WriteAttributeString("cy", _slideCy.ToString(CultureInfo.InvariantCulture));
         w.WriteEndElement();
 
         w.WriteStartElement("p", "notesSz");
@@ -429,6 +440,9 @@ public sealed class XMLSlideShow : IDisposable
         foreach (var shape in slide.getShapes())
             WritePicShape(w, shape);
 
+        foreach (var autoShape in slide.getAutoShapes())
+            WriteAutoShape(w, autoShape);
+
         w.WriteEndElement(); // p:spTree
         w.WriteEndElement(); // p:cSld
 
@@ -480,6 +494,92 @@ public sealed class XMLSlideShow : IDisposable
         w.WriteEndElement(); // p:spPr
 
         w.WriteEndElement(); // p:pic
+    }
+
+    private static void WriteAutoShape(PoiXmlWriter w, XSLFAutoShape shape)
+    {
+        var id = shape.ShapeId.ToString(CultureInfo.InvariantCulture);
+        var cx = shape.AnchorCx.ToString(CultureInfo.InvariantCulture);
+        var cy = shape.AnchorCy.ToString(CultureInfo.InvariantCulture);
+        var x  = shape.AnchorX.ToString(CultureInfo.InvariantCulture);
+        var y  = shape.AnchorY.ToString(CultureInfo.InvariantCulture);
+
+        w.WriteStartElement("p", "sp");
+
+        // nvSpPr
+        w.WriteStartElement("p", "nvSpPr");
+        w.WriteStartElement("p", "cNvPr");
+        w.WriteAttributeString("id", id); w.WriteAttributeString("name", $"TextBox {id}");
+        w.WriteEndElement();
+        w.WriteStartElement("p", "cNvSpPr"); w.WriteAttributeString("txBox", "1"); w.WriteEndElement();
+        w.WriteStartElement("p", "nvPr"); w.WriteEndElement();
+        w.WriteEndElement(); // nvSpPr
+
+        // spPr
+        w.WriteStartElement("p", "spPr");
+        w.WriteStartElement("a", "xfrm");
+        if (shape.RotationAttribute != 0) w.WriteAttributeString("rot", shape.RotationAttribute.ToString(CultureInfo.InvariantCulture));
+        if (shape.FlipH)                  w.WriteAttributeString("flipH", "1");
+        if (shape.FlipV)                  w.WriteAttributeString("flipV", "1");
+        WriteAOff(w, shape.AnchorX, shape.AnchorY);
+        WriteAExt(w, shape.AnchorCx, shape.AnchorCy);
+        w.WriteEndElement(); // a:xfrm
+        w.WriteStartElement("a", "prstGeom"); w.WriteAttributeString("prst", "rect");
+        w.WriteStartElement("a", "avLst"); w.WriteEndElement();
+        w.WriteEndElement();
+        w.WriteEndElement(); // p:spPr
+
+        // txBody
+        w.WriteStartElement("p", "txBody");
+        w.WriteStartElement("a", "bodyPr"); w.WriteEndElement();
+        w.WriteStartElement("a", "lstStyle"); w.WriteEndElement();
+        foreach (var para in shape.Paragraphs)
+        {
+            w.WriteStartElement("a", "p");
+            foreach (var run in para.Runs)
+            {
+                w.WriteStartElement("a", "r");
+                bool hasRPr = run.Bold || run.Italic || run.Underline || run.Strikethrough
+                    || run.FontSize > 0 || run.FontName is not null || run.Color is not null;
+                if (hasRPr)
+                {
+                    w.WriteStartElement("a", "rPr");
+                    if (run.Bold)        { w.WriteStartElement("a", "b"); w.WriteEndElement(); }
+                    if (run.Italic)      { w.WriteStartElement("a", "i"); w.WriteEndElement(); }
+                    if (run.Underline)   { w.WriteStartElement("a", "u"); w.WriteEndElement(); }
+                    if (run.Strikethrough) { w.WriteStartElement("a", "strike"); w.WriteEndElement(); }
+                    if (run.FontSize > 0)
+                    {
+                        w.WriteStartElement("a", "sz");
+                        w.WriteAttributeString("val", ((int)(run.FontSize * 100)).ToString(CultureInfo.InvariantCulture));
+                        w.WriteEndElement();
+                    }
+                    if (run.FontName is not null)
+                    {
+                        w.WriteStartElement("a", "latin");
+                        w.WriteAttributeString("typeface", run.FontName);
+                        w.WriteEndElement();
+                    }
+                    if (run.Color is not null)
+                    {
+                        w.WriteStartElement("a", "solidFill");
+                        w.WriteStartElement("a", "srgbClr");
+                        w.WriteAttributeString("val", run.Color);
+                        w.WriteEndElement();
+                        w.WriteEndElement();
+                    }
+                    w.WriteEndElement(); // rPr
+                }
+                w.WriteStartElement("a", "t");
+                w.WriteString(run.Text);
+                w.WriteEndElement(); // t
+                w.WriteEndElement(); // r
+            }
+            w.WriteEndElement(); // p
+        }
+        w.WriteEndElement(); // txBody
+
+        w.WriteEndElement(); // p:sp
     }
 
     private static void WriteSlideRels(PoiXmlWriter w, XSLFSlide slide)
@@ -618,6 +718,9 @@ public sealed class XMLSlideShow : IDisposable
             _slides.Add(slide);
         }
 
+        // Read slide size from presentation.xml
+        ParseSlideSize(archive);
+
         // pptm: preserve vbaProject.bin verbatim
         var vba = archive.GetEntry("ppt/vbaProject.bin");
         if (vba != null)
@@ -735,6 +838,7 @@ public sealed class XMLSlideShow : IDisposable
         using var s      = entry.Open();
         using var reader = XmlReader.Create(s);
 
+        // Picture state
         bool inPic = false;
         string? blipEmbed = null;
         long x = 0, y = 0, cx = 0, cy = 0;
@@ -742,10 +846,21 @@ public sealed class XMLSlideShow : IDisposable
         bool flipH = false, flipV = false;
         int shapeId = 0;
 
+        // Auto shape (text box) state
+        bool inSp = false;
+        bool inTxBody = false;
+        bool inAP = false;
+        bool inAR = false;
+        bool inARPr = false;
+        XSLFAutoShape? currentAutoShape = null;
+        XSLFTextParagraph? currentParagraph = null;
+        XSLFTextRun? currentRun = null;
+
         while (reader.Read())
         {
             if (reader.NodeType == XmlNodeType.Element)
             {
+                // --- picture elements ---
                 if (reader.NamespaceURI == NsP && reader.LocalName == "pic")
                 {
                     inPic = true; blipEmbed = null; x = y = cx = cy = 0; rot = 0; flipH = flipV = false; shapeId = 0;
@@ -753,16 +868,12 @@ public sealed class XMLSlideShow : IDisposable
                 if (inPic)
                 {
                     if (reader.NamespaceURI == NsP && reader.LocalName == "cNvPr")
-                    {
                         if (int.TryParse(reader.GetAttribute("id"), out var sid)) shapeId = sid;
-                    }
                     if (reader.NamespaceURI == NsA && reader.LocalName == "blip")
-                    {
                         blipEmbed = reader.GetAttribute("embed", NsR);
-                    }
                     if (reader.NamespaceURI == NsA && reader.LocalName == "xfrm")
                     {
-                        if (int.TryParse(reader.GetAttribute("rot"),   out var r)) rot   = r;
+                        if (int.TryParse(reader.GetAttribute("rot"), out var r)) rot = r;
                         flipH = reader.GetAttribute("flipH") == "1";
                         flipV = reader.GetAttribute("flipV") == "1";
                     }
@@ -776,20 +887,163 @@ public sealed class XMLSlideShow : IDisposable
                         if (long.TryParse(reader.GetAttribute("cx"), out var ecx)) cx = ecx;
                         if (long.TryParse(reader.GetAttribute("cy"), out var ecy)) cy = ecy;
                     }
+                    continue;
+                }
+
+                // --- auto shape (text box) elements ---
+                if (reader.NamespaceURI == NsP && reader.LocalName == "sp")
+                {
+                    inSp = true; inTxBody = false; inAP = false; inAR = false;
+                    currentAutoShape = new XSLFAutoShape(0);
+                    x = y = cx = cy = 0; rot = 0; flipH = flipV = false; shapeId = 0;
+                    currentParagraph = null; currentRun = null;
+                    continue;
+                }
+                if (inSp)
+                {
+                    if (reader.NamespaceURI == NsP && reader.LocalName == "cNvPr" && !inTxBody)
+                    {
+                        if (int.TryParse(reader.GetAttribute("id"), out var sid)) shapeId = sid;
+                        continue;
+                    }
+                    if (reader.NamespaceURI == NsA && reader.LocalName == "xfrm" && !inTxBody)
+                    {
+                        if (int.TryParse(reader.GetAttribute("rot"), out var r)) rot = r;
+                        flipH = reader.GetAttribute("flipH") == "1";
+                        flipV = reader.GetAttribute("flipV") == "1";
+                        continue;
+                    }
+                    if (reader.NamespaceURI == NsA && reader.LocalName == "off" && !inTxBody)
+                    {
+                        if (long.TryParse(reader.GetAttribute("x"), out var ox)) x = ox;
+                        if (long.TryParse(reader.GetAttribute("y"), out var oy)) y = oy;
+                        continue;
+                    }
+                    if (reader.NamespaceURI == NsA && reader.LocalName == "ext" && !inTxBody && cx == 0 && cy == 0)
+                    {
+                        if (long.TryParse(reader.GetAttribute("cx"), out var ecx)) cx = ecx;
+                        if (long.TryParse(reader.GetAttribute("cy"), out var ecy)) cy = ecy;
+                        continue;
+                    }
+                    if (reader.NamespaceURI == NsP && reader.LocalName == "txBody")
+                    {
+                        inTxBody = true;
+                        continue;
+                    }
+                    if (inTxBody && reader.NamespaceURI == NsA && reader.LocalName == "p")
+                    {
+                        inAP = true;
+                        currentParagraph = new XSLFTextParagraph();
+                        continue;
+                    }
+                    if (inAP && reader.NamespaceURI == NsA && reader.LocalName == "r")
+                    {
+                        inAR = true;
+                        currentRun = new XSLFTextRun();
+                        continue;
+                    }
+                    if (inAR && reader.NamespaceURI == NsA && reader.LocalName == "t")
+                    {
+                        var text = reader.ReadString();
+                        if (currentRun is not null) currentRun.Text = text;
+                        continue;
+                    }
+                    // rPr element inside a:r
+                    if (inAR && reader.NamespaceURI == NsA && reader.LocalName == "rPr")
+                    {
+                        inARPr = true;
+                        continue;
+                    }
+                    // rPr child elements
+                    if (inARPr)
+                    {
+                        if (reader.NamespaceURI == NsA && reader.LocalName == "b")
+                            currentRun!.Bold = true;
+                        else if (reader.NamespaceURI == NsA && reader.LocalName == "i")
+                            currentRun!.Italic = true;
+                        else if (reader.NamespaceURI == NsA && reader.LocalName == "u")
+                            currentRun!.Underline = true;
+                        else if (reader.NamespaceURI == NsA && reader.LocalName == "strike")
+                            currentRun!.Strikethrough = true;
+                        else if (reader.NamespaceURI == NsA && reader.LocalName == "sz")
+                        {
+                            var val = reader.GetAttribute("val");
+                            if (val is not null && double.TryParse(val, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sz))
+                                currentRun!.FontSize = sz / 100.0;
+                        }
+                        else if (reader.NamespaceURI == NsA && reader.LocalName == "latin")
+                        {
+                            var tf = reader.GetAttribute("typeface");
+                            if (tf is not null) currentRun!.FontName = tf;
+                        }
+                        else if (reader.NamespaceURI == NsA && reader.LocalName == "srgbClr")
+                        {
+                            var cv = reader.GetAttribute("val");
+                            if (cv is not null) currentRun!.Color = cv;
+                        }
+                        continue;
+                    }
                 }
             }
-            else if (reader.NodeType == XmlNodeType.EndElement
-                     && reader.NamespaceURI == NsP && reader.LocalName == "pic" && inPic)
+            else if (reader.NodeType == XmlNodeType.EndElement)
             {
-                inPic = false;
-                if (blipEmbed is not null && mediaByRid.TryGetValue(blipEmbed, out var picData))
+                // --- picture end ---
+                if (reader.NamespaceURI == NsP && reader.LocalName == "pic" && inPic)
                 {
-                    var shape = new XSLFPictureShape(picData, blipEmbed, shapeId);
-                    shape.setAnchor(x, y, cx, cy);
-                    shape.SetRotationAttribute(rot);
-                    shape.setFlipHorizontal(flipH);
-                    shape.setFlipVertical(flipV);
-                    slide.AttachShape(shape);
+                    inPic = false;
+                    if (blipEmbed is not null && mediaByRid.TryGetValue(blipEmbed, out var picData))
+                    {
+                        var shape = new XSLFPictureShape(picData, blipEmbed, shapeId);
+                        shape.setAnchor(x, y, cx, cy);
+                        shape.SetRotationAttribute(rot);
+                        shape.setFlipHorizontal(flipH);
+                        shape.setFlipVertical(flipV);
+                        slide.AttachShape(shape);
+                    }
+                    continue;
+                }
+
+                // --- auto shape end ---
+                if (reader.NamespaceURI == NsP && reader.LocalName == "sp" && inSp)
+                {
+                    inSp = false;
+                    if (currentAutoShape is not null)
+                    {
+                        currentAutoShape.setAnchor(x, y, cx, cy);
+                        currentAutoShape.SetRotationAttribute(rot);
+                        currentAutoShape.setFlipHorizontal(flipH);
+                        currentAutoShape.setFlipVertical(flipV);
+                        slide.AttachAutoShape(currentAutoShape);
+                    }
+                    currentAutoShape = null; currentParagraph = null; currentRun = null;
+                    continue;
+                }
+                if (inSp && inTxBody && reader.NamespaceURI == NsP && reader.LocalName == "txBody")
+                {
+                    inTxBody = false;
+                    continue;
+                }
+                if (inAP && reader.NamespaceURI == NsA && reader.LocalName == "p")
+                {
+                    inAP = false;
+                    if (currentParagraph is not null && currentAutoShape is not null)
+                        currentAutoShape.AddParagraph(currentParagraph);
+                    currentParagraph = null; currentRun = null;
+                    continue;
+                }
+                if (inAR && reader.NamespaceURI == NsA && reader.LocalName == "r")
+                {
+                    inAR = false;
+                    inARPr = false;
+                    if (currentRun is not null && currentParagraph is not null)
+                        currentParagraph.AddRun(currentRun);
+                    currentRun = null;
+                    continue;
+                }
+                if (inARPr && reader.NamespaceURI == NsA && reader.LocalName == "rPr")
+                {
+                    inARPr = false;
+                    continue;
                 }
             }
         }
@@ -800,5 +1054,26 @@ public sealed class XMLSlideShow : IDisposable
         var dir  = Path.GetDirectoryName(partPath)?.Replace('\\', '/') ?? string.Empty;
         var file = Path.GetFileName(partPath);
         return $"{dir}/_rels/{file}.rels";
+    }
+
+    private void ParseSlideSize(ZipArchive archive)
+    {
+        var entry = archive.GetEntry("ppt/presentation.xml");
+        if (entry is null) return;
+        using var s      = entry.Open();
+        using var reader = XmlReader.Create(s);
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.Element && reader.NamespaceURI == NsP && reader.LocalName == "sldSz")
+            {
+                var cxAttr = reader.GetAttribute("cx");
+                var cyAttr = reader.GetAttribute("cy");
+                if (cxAttr is not null && long.TryParse(cxAttr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var cx))
+                    _slideCx = cx;
+                if (cyAttr is not null && long.TryParse(cyAttr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var cy))
+                    _slideCy = cy;
+                return;
+            }
+        }
     }
 }

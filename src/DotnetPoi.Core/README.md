@@ -19,8 +19,8 @@
 |---|---|---|
 | `DotnetPoi.XSSF.UserModel` | `XSSFWorkbook`, `XSSFSheet`, `XSSFRow`, `XSSFCell`, `XSSFCellStyle`, `XSSFFont`, `XSSFDataFormat`, `XSSFDrawing`, `XSSFPicture`, ... | xlsx (Excel 2007+) |
 | `DotnetPoi.HSSF.UserModel` | `HSSFWorkbook`, `HSSFSheet`, `HSSFRow`, `HSSFCell`, `HSSFCellStyle`, `HSSFFont`, ... | xls (Excel 97-2003) |
-| `DotnetPoi.XWPF.UserModel` | `XWPFDocument`, `XWPFParagraph`, `XWPFRun`, `XWPFPicture`, `XWPFPictureData` | docx (Word 2007+) |
-| `DotnetPoi.XSLF.UserModel` | `XMLSlideShow`, `XSLFSlide`, `XSLFPictureShape`, `XSLFPictureData` | pptx (PowerPoint 2007+) |
+| `DotnetPoi.XWPF.UserModel` | `XWPFDocument`, `XWPFParagraph`, `XWPFRun`, `XWPFPicture`, `XWPFPictureData`, `XWPFTable`, `XWPFTableRow`, `XWPFTableCell` | docx (Word 2007+) |
+| `DotnetPoi.XSLF.UserModel` | `XMLSlideShow`, `XSLFSlide`, `XSLFPictureShape`, `XSLFPictureData`, `XSLFAutoShape`, `XSLFTextParagraph`, `XSLFTextRun` | pptx (PowerPoint 2007+) |
 | `DotnetPoi.HWPF.UserModel` | `HWPFDocument` (read-only MVP) | doc (Word 97-2003) |
 | `DotnetPoi.HSLF.UserModel` | `HSLFSlideShow` (read-only MVP) | ppt (PowerPoint 97-2003) |
 | `DotnetPoi.POIFS.FileSystem` | In-repo OLE2 compound document reader/writer (CFB) | OLE2 container |
