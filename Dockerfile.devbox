@@ -8,9 +8,11 @@ ARG USER_GID=1000
 
 USER root
 
+# Java 21 + Maven
 COPY --from=javatools /opt/java/openjdk /opt/java/openjdk
 COPY --from=javatools /usr/share/maven /usr/share/maven
 
+# Rust
 COPY --from=rusttools /usr/local/cargo /usr/local/cargo
 COPY --from=rusttools /usr/local/rustup /usr/local/rustup
 
@@ -37,6 +39,7 @@ RUN groupadd --gid ${USER_GID} ${USERNAME} \
 USER ${USERNAME}
 WORKDIR /home/${USERNAME}
 
+# Non-root npm global install
 RUN mkdir -p ~/.npm-global/bin \
     && npm config set prefix '~/.npm-global' \
     && npm install -g @vegamo/deepcode-cli

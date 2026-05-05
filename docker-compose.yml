@@ -16,19 +16,24 @@ services:
       DOTNET_CLI_HOME: /tmp/dotnet
       MAVEN_CONFIG: /home/dev/.m2
       NUGET_PACKAGES: /home/dev/.nuget/packages
-      CARGO_HOME: /home/dev/.cargo
-      RUSTUP_HOME: /home/dev/.rustup
+      CARGO_HOME: /usr/local/cargo
+      RUSTUP_HOME: /usr/local/rustup
+      JAVA_HOME: /opt/java/openjdk
+      MAVEN_HOME: /usr/share/maven
+      NPM_CONFIG_PREFIX: /home/dev/.npm-global
+      PATH: /opt/java/openjdk/bin:/usr/share/maven/bin:/usr/local/cargo/bin:/home/dev/.npm-global/bin:$PATH
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
     volumes:
-      - ./:/workspace
+      - .:/workspace
       - devbox-home:/home/dev
       - nuget-packages:/home/dev/.nuget/packages
       - maven-repo:/home/dev/.m2
       - npm-cache:/home/dev/.npm
+      - npm-global:/home/dev/.npm-global
       - pip-cache:/home/dev/.cache/pip
-      - cargo-home:/home/dev/.cargo
-      - rustup-home:/home/dev/.rustup
+      - cargo-home:/usr/local/cargo/registry
+      - rustup-home:/usr/local/rustup
       - go-pkg:/go/pkg
     cap_drop:
       - ALL
@@ -44,13 +49,13 @@ services:
 networks:
   sandbox_net:
     driver: bridge
-    internal: false
 
 volumes:
   devbox-home:
   nuget-packages:
   maven-repo:
   npm-cache:
+  npm-global:
   pip-cache:
   cargo-home:
   rustup-home:
