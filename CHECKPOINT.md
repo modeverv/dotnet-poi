@@ -1,5 +1,132 @@
 # CHECKPOINT
 
+## 2026-05-05 12:xx JST - Project restructured: Core + Formula
+
+- Current task: `src/` 配下の全プロジェクトを **DotnetPoi.Core** と **DotnetPoi.Formula** の 2 プロジェクトに統合し、それぞれ独立した NuGet としてビルド可能にした。
+- Scope: コミットしない。
+
+### やったこと
+
+**プロジェクト構成変更:**
+
+- 旧 8 プロジェクト (SS, POIFS, XSSF, HSSF, HWPF, XWPF, XSLF, HSLF) の `.csproj` を削除。
+- 代わりに `src/DotnetPoi.Core/DotnetPoi.Core.csproj` を作成。
+  - `<Compile Include="...">` で旧プロジェクトの全 `.cs` ファイルを単一アセンブリ `DotnetPoi.Core.dll` にコンパイル。
+  - 名前空間は従来通り（`DotnetPoi.XSSF.UserModel` などは変更なし）。
+
+**NuGet パッケージ設計:**
+
+```
+DotnetPoi.Core     → 全フォーマット実装 (XSSF, HSSF, XWPF, XSLF, POIFS, HWPF, HSLF + SS インターフェース)
+DotnetPoi.Formula  → 数式評価器のみ (DotnetPoi.Core に依存)
+```
+
+- `DotnetPoi.Formula` のインストールで `createFormulaEvaluator()` が自動有効化。
+- `DotnetPoi.Formula` 未インストール時は `NotSupportedException` をスロー。
+
+**XSSFCreationHelper の拡張:**
+
+- `RegisterFormulaEvaluatorFactory()` 静的メソッドでファクトリ登録。
+- `createFormulaEvaluator()` は遅延探索機能つき: ランタイムに `DotnetPoi.Formula` アセンブリが存在すれば静的に自動検出。
+- `TryAutoRegisterFactory()` が `Type.GetType()` + `RuntimeHelpers.RunClassConstructor()` で発見・起動。
+
+**依存グラフ (最終形):**
+
+```
+src/DotnetPoi.Core/    (1 アセンブリ = 全実装)
+src/DotnetPoi.Formula/ (Core に依存)
+```
+
+**テスト結果 (全 229 tests 正常):**
+- Core.Tests: 188/188
+- Formula.Tests: 10/10
+- Interop.Tests: 31/31
+
+**移行後のディレクトリ構成:**
+
+```
+src/
+├── DotnetPoi.Core/       # NuGet: DotnetPoi.Core
+│   ├── SS/               # インターフェース・enum・XML writer
+│   ├── POIFS/            # OLE2 file system
+│   ├── XSSF/             # xlsx format
+│   ├── HSSF/             # xls format
+│   ├── HWPF/             # doc format
+│   ├── XWPF/             # docx format
+│   ├── XSLF/             # pptx format
+│   └── HSLF/             # ppt format
+└── DotnetPoi.Formula/     # NuGet: DotnetPoi.Formula
+
+tests/
+├── DotnetPoi.Core.Tests/     # 全フォーマットのテスト (188 tests)
+├── DotnetPoi.Formula.Tests/  # 数式評価器のテスト (10 tests)
+├── DotnetPoi.Interop.Tests/  # Java POI との相互運用テスト (31 tests)
+└── test-files/               # 共有テストデータファイル
+```
+
+**全 11 の Example プロジェクト:** 正常ビルド確認済み。
+
+### 移行ガイド (ユーザー向け)
+
+```xml
+<!-- 通常の使用 (Core のみ) -->
+<PackageReference Include="DotnetPoi.Core" Version="..." />
+
+<!-- 数式評価も使う場合 (Formula を追加) -->
+<PackageReference Include="DotnetPoi.Core" Version="..." />
+<PackageReference Include="DotnetPoi.Formula" Version="..." />
+```
+
+## 2026-05-05 12:xx JST - Formula evaluator split into DotnetPoi.Formula
+
+- Current task: 数式評価器を DotnetPoi.Formula プロジェクトに分離し、DotnetPoi.Core（XSSF/HSSF 等）と独立した NuGet としてビルド可能にした。
+- Scope: コミットしない。
+
+### やったこと
+
+**ICell インターフェース拡張（DotnetPoi.SS）:**
+
+- `void setCachedFormulaResult(CellValue value)` を ICell に追加。
+- HSSFCell にスタブ実装、XSSFCell に移譲実装（既存の internal SetFormulaCachedValue から呼出）。
+
+**DotnetPoi.Formula 新規プロジェクト作成:**
+
+- `src/DotnetPoi.Formula/DotnetPoi.Formula.csproj` — DotnetPoi.SS のみに依存。
+- `FormulaEvaluator` クラス（旧 `XSSFFormulaEvaluator`）を `DotnetPoi.Formula` 名前空間に配置。
+- すべての具象 XSSF 型依存（`XSSFWorkbook`, `XSSFCell`, `XSSFSheet`）を SS インターフェース（`IWorkbook`, `ICell`, `ISheet`）に置換。
+- `evaluateAll()` はインターフェースメソッド（`getNumberOfSheets()/getSheetAt()`, `getLastRowNum()/getRow()`, `getLastCellNum()/getCell()`）で実装。
+
+**DotnetPoi.XSSF:**
+
+- `DotnetPoi.Formula` へのプロジェクト参照を追加。
+- `XSSFFormulaEvaluator.cs` を削除（`DotnetPoi.Formula` に移動）。
+- `XSSFCreationHelper.createFormulaEvaluator()` が `FormulaEvaluator` を返すよう更新。
+
+**依存グラフ:**
+
+```
+DotnetPoi.SS  ← DotnetPoi.Formula  ← DotnetPoi.XSSF
+                (NuGet: DotnetPoi.Formula)
+                                        ↓
+                                    DotnetPoi.POIFS
+```
+
+**テストプロジェクト新規作成:**
+
+- `tests/DotnetPoi.Formula.Tests/DotnetPoi.Formula.Tests.csproj`
+  - 参照: `DotnetPoi.Formula` + `DotnetPoi.XSSF`（ワークブック作成に使用）
+- `FormulaEvaluatorTests.cs` — 10 tests:
+  - SUM/AVERAGE/MIN/MAX/COUNT/CONCATENATE 評価
+  - 四則演算、文字列結合、ブール式
+  - ゼロ除算エラー、自己参照エラー
+  - レンジ参照、`evaluateInCell`、インターフェース経由の生成
+
+### Verification
+
+- `dotnet build src/DotnetPoi.*/` — 全9プロジェクト正常ビルド（0 errors, 0 warnings）。
+- `dotnet test tests/DotnetPoi.Formula.Tests/...` — Passed! 10/10.
+- `dotnet test tests/DotnetPoi.XSSF.Tests/...` — Passed! 32/32（回帰なし）。
+
 ## 2026-05-05 11:xx JST - Phase 7 xlsx fill/border/alignment read
 
 - Current task: xlsx fill/border/alignment 読み取り実装。

@@ -7,6 +7,6 @@
         <LangVersion>latest</LangVersion>
     </PropertyGroup>
     <ItemGroup>
-        <ProjectReference Include="../../src/DotnetPoi.XSSF/DotnetPoi.XSSF.csproj"/>
+        <ProjectReference Include="../../src/DotnetPoi.Core/DotnetPoi.Core.csproj"/>
     </ItemGroup>
 </Project>

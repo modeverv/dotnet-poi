@@ -10,7 +10,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="../../src/DotnetPoi.XSLF/DotnetPoi.XSLF.csproj" />
+        <ProjectReference Include="../../src/DotnetPoi.Core/DotnetPoi.Core.csproj" />
     </ItemGroup>
 
 </Project>
