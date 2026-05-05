@@ -218,7 +218,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private void WriteContentTypes(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("Types");
         w.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/content-types");
 
@@ -248,7 +247,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private static void WriteRootRelationships(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("Relationships");
         w.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         WriteRelationship(w, "rId1", "ppt/presentation.xml", RelTypeOfficeDoc);
@@ -257,7 +255,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private void WritePresentation(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("p", "presentation");
         w.WriteAttributeString("xmlns:p", NsP);
         w.WriteAttributeString("xmlns:a", NsA);
@@ -296,7 +293,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private void WritePresentationRels(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("Relationships");
         w.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         // Fixed rels: rId1–rId5 (match SlideRelIdOffset = 6, so slides start at rId6)
@@ -315,7 +311,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private static void WritePresProps(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("p", "presentationPr");
         w.WriteAttributeString("xmlns:a", NsA);
         w.WriteAttributeString("xmlns:r", NsR);
@@ -325,7 +320,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private static void WriteTableStyles(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("a", "tblStyleLst");
         w.WriteAttributeString("xmlns:a", NsA);
         w.WriteAttributeString("def", "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}");
@@ -334,7 +328,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private static void WriteSlideMasterStub(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("p", "sldMaster");
         w.WriteAttributeString("xmlns:p", NsP);
         w.WriteAttributeString("xmlns:a", NsA);
@@ -364,7 +357,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private static void WriteSlideMasterRels(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("Relationships");
         w.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         WriteRelationship(w, "rId1", "../slideLayouts/slideLayout1.xml", RelTypeSlideLayout);
@@ -374,7 +366,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private static void WriteSlideLayoutStub(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("p", "sldLayout");
         w.WriteAttributeString("xmlns:p", NsP);
         w.WriteAttributeString("xmlns:a", NsA);
@@ -391,7 +382,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private static void WriteSlideLayoutRels(PoiXmlWriter w)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("Relationships");
         w.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         WriteRelationship(w, "rId1", "../slideMasters/slideMaster1.xml", RelTypeSlideMaster);
@@ -400,7 +390,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private static void WriteSlide(PoiXmlWriter w, XSLFSlide slide)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("p", "sld");
         w.WriteAttributeString("xmlns:p", NsP);
         w.WriteAttributeString("xmlns:a", NsA);
@@ -482,7 +471,6 @@ public sealed class XMLSlideShow : IDisposable
 
     private static void WriteSlideRels(PoiXmlWriter w, XSLFSlide slide)
     {
-        w.WriteStartDocument("UTF-8", standalone: true);
         w.WriteStartElement("Relationships");
         w.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         WriteRelationship(w, "rId1", "../slideLayouts/slideLayout1.xml", RelTypeSlideLayout);
@@ -581,7 +569,7 @@ public sealed class XMLSlideShow : IDisposable
         var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
         using var entryStream = entry.Open();
         using var textWriter  = new StreamWriter(entryStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        using var writer      = new PoiXmlWriter(textWriter);
+        using var writer      = PoiXmlWriterFactory.CreateForOoxmlPackagePart(textWriter, name);
         write(writer);
     }
 

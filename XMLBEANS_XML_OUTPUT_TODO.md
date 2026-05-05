@@ -200,8 +200,13 @@ Do not generalize fixture-specific workbook content into `XSSFWorkbook`. If an u
 - [x] Add first Java fixture generator case from a selected POI round-trip scenario.
 - [x] Generate compact fixtures for selected cases.
 - [x] Record current XMLBeans/POI fixture observations in this file.
-- [ ] Add C# semantic read/round-trip test for the generated fixture.
-- [ ] Extract any low-level XML lexical findings into focused `PoiXmlWriter` tests.
+- [x] Add C# semantic read/round-trip test for the generated fixture.
+  - Added `tests/DotnetPoi.Interop.Tests/cs/PoiIntegrationFixtureTests.cs` with 11 tests covering
+    shared-strings-basic, shared-strings-escaping, styles-formatting, comments-write-read,
+    and xlsm-vba-preserve (including byte-for-byte VBA round-trip).
+- [x] Extract any low-level XML lexical findings into focused `PoiXmlWriter` tests.
+  - Items 7–9 complete: `PoiXmlWriterNamespaceTests.cs` and `PoiXmlWriterAttributeOrderTests.cs` added.
+  - No new lexical divergences found; semantic tests passed without additional `PoiXmlWriter` slices.
 - [ ] Repeat one scenario at a time.
 
 ## Open Questions

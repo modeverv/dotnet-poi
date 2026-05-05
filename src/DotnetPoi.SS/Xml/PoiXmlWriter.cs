@@ -5,6 +5,12 @@ using System.Text;
 
 namespace DotnetPoi.SS.Xml;
 
+public enum PoiXmlDeclarationProfile
+{
+    XmlBeansSpreadsheetPart,
+    OpcPackagePart
+}
+
 public sealed class PoiXmlWriter : IDisposable
 {
     private readonly TextWriter _writer;
@@ -15,6 +21,22 @@ public sealed class PoiXmlWriter : IDisposable
     public PoiXmlWriter(TextWriter writer)
     {
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
+    }
+
+    public void WriteStartDocument(PoiXmlDeclarationProfile profile)
+    {
+        switch (profile)
+        {
+            case PoiXmlDeclarationProfile.XmlBeansSpreadsheetPart:
+                WriteStartDocument("UTF-8", standalone: false);
+                _writer.Write('\n');
+                break;
+            case PoiXmlDeclarationProfile.OpcPackagePart:
+                WriteStartDocument("UTF-8", standalone: true);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(profile), profile, null);
+        }
     }
 
     public void WriteStartDocument(string encoding, bool standalone)
@@ -168,15 +190,13 @@ public sealed class PoiXmlWriter : IDisposable
                 case '<':
                     builder.Append("&lt;");
                     break;
-                case '>':
-                    builder.Append("&gt;");
-                    break;
                 case '"' when forAttribute:
                     builder.Append("&quot;");
                     break;
-                case '\'' when forAttribute:
-                    builder.Append("&apos;");
-                    break;
+                // '>' in text content: XMLBeans/POI observation shows > is literal in element text.
+                // System.Xml.XmlWriter produces &gt; here — this is the one proven divergence we fix.
+                // In attribute values (double-quoted), > is not required to be escaped by the XML spec,
+                // and POI output for attributes is consistent with leaving it literal as well.
                 default:
                     builder.Append(ch);
                     break;

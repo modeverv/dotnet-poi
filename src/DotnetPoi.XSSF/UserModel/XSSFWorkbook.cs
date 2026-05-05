@@ -380,7 +380,7 @@ public sealed class XSSFWorkbook : IWorkbook
         var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
         using var entryStream = entry.Open();
         using var textWriter = new StreamWriter(entryStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        using var writer = new PoiXmlWriter(textWriter);
+        using var writer = PoiXmlWriterFactory.CreateForOoxmlPackagePart(textWriter, name);
         write(writer);
     }
 
@@ -1146,7 +1146,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private void WriteContentTypes(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("Types");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/content-types");
         WriteDefault(writer, "rels", "application/vnd.openxmlformats-package.relationships+xml");
@@ -1179,7 +1178,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private static void WriteRootRelationships(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("Relationships");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         WriteRelationship(writer, "rId1", "xl/workbook.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument");
@@ -1190,7 +1188,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private static void WriteSheetRelationships(PoiXmlWriter writer, XSSFSheet sheet)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("Relationships");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         WriteRelationship(writer, "rId1", $"../drawings/drawing{sheet.Drawing!.DrawingIndex}.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing");
@@ -1199,7 +1196,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private void WriteDrawingRelationships(PoiXmlWriter writer, XSSFDrawing drawing)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("Relationships");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         foreach (var picture in drawing.Pictures)
@@ -1212,8 +1208,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private void WriteDrawing(PoiXmlWriter writer, XSSFDrawing drawing)
     {
-        writer.WriteStartDocument("UTF-8", standalone: false);
-        writer.WriteString("\n");
         writer.WriteStartElement("xdr", "wsDr");
         writer.WriteAttributeString("xmlns:xdr", "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing");
         writer.WriteAttributeString("xmlns:a", "http://schemas.openxmlformats.org/drawingml/2006/main");
@@ -1300,8 +1294,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private static void WriteAppProperties(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: false);
-        writer.WriteString("\n");
         writer.WriteStartElement("Properties");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties");
         writer.WriteStartElement("Application");
@@ -1413,7 +1405,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private static void WriteCoreProperties(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("cp", "coreProperties");
         writer.WriteAttributeString("xmlns:cp", "http://schemas.openxmlformats.org/package/2006/metadata/core-properties");
         writer.WriteAttributeString("xmlns:dc", "http://purl.org/dc/elements/1.1/");
@@ -1431,8 +1422,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private void WriteWorkbook(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: false);
-        writer.WriteString("\n");
         writer.WriteStartElement("workbook");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
         writer.WriteAttributeString("xmlns:r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships");
@@ -1466,7 +1455,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private void WriteWorkbookRelationships(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("Relationships");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         WriteRelationship(writer, "rId1", "sharedStrings.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings");
@@ -1486,8 +1474,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private void WriteStyles(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: false);
-        writer.WriteString("\n");
         writer.WriteStartElement("styleSheet");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
         writer.WriteStartElement("numFmts");
@@ -1553,8 +1539,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private void WriteSharedStrings(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: false);
-        writer.WriteString("\n");
         writer.WriteStartElement("sst");
         writer.WriteAttributeString("count", CountStringCells().ToString(CultureInfo.InvariantCulture));
         writer.WriteAttributeString("uniqueCount", _sharedStrings.Count.ToString(CultureInfo.InvariantCulture));
@@ -1586,8 +1570,6 @@ public sealed class XSSFWorkbook : IWorkbook
 
     private void WriteWorksheet(PoiXmlWriter writer, XSSFSheet sheet)
     {
-        writer.WriteStartDocument("UTF-8", standalone: false);
-        writer.WriteString("\n");
         writer.WriteStartElement("worksheet");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
         writer.WriteAttributeString("xmlns:r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships");

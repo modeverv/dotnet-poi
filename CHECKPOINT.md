@@ -1,5 +1,178 @@
 # CHECKPOINT
 
+## 2026-05-05 07:xx JST - Namespace, attribute order, and semantic XSSF tests (items 7-12)
+
+- Current task: implement `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order items 7-12.
+- Scope boundary from user: follow AGENTS.md, update `CHECKPOINT.md` while working, and do not commit.
+
+### Items 7 & 8 — Namespace tests and implementation
+
+New file: `tests/DotnetPoi.SS.Tests/Xml/PoiXmlWriterNamespaceTests.cs` (8 tests)
+
+Tests added:
+- Default namespace declaration (`xmlns="..."`) on root element
+- `xmlns:r` relationship prefix — both the `WriteAttributeString("xmlns:r", ...)` and prefix overload
+- Full spreadsheet workbook root pattern: default ns + `xmlns:r`
+- Drawing root pattern: `xmlns:xdr`, `xmlns:a`, `xmlns:r` (in POI order)
+- No synthetic `main:` prefix: elements written without prefix don't acquire `main:`
+- Prefixed elements use caller-supplied prefix, not a synthetic one
+- No duplicate namespace declarations when caller writes once
+
+Implementation (item 8): **no production code changes needed**. `PoiXmlWriter` already passes through namespace declarations as plain attributes and does not sort, hoist, or deduplicate them. The tests serve as the specification.
+
+### Item 9 — Attribute order tests
+
+New file: `tests/DotnetPoi.SS.Tests/Xml/PoiXmlWriterAttributeOrderTests.cs` (5 tests)
+
+Tests added:
+- Page margins in POI order (`left`, `right`, `top`, `bottom`, `header`, `footer`) — not alphabetical
+- Reverse-alphabetical order (`z`, `a`, `m`) — proves no sorting
+- `.rels` relationship `Id`, `Type`, `Target` order
+- Two sibling elements each with independent attribute order
+- Namespace declarations also follow caller order (xdr before a before r)
+
+Implementation: **no production code changes needed**. The writer already preserves caller attribute order.
+
+### Items 10-12 — Semantic XSSF tests using POI integration fixtures
+
+New file: `tests/DotnetPoi.Interop.Tests/cs/PoiIntegrationFixtureTests.cs` (11 tests)
+
+Tests read from `tests/DotnetPoi.Interop.Tests/fixtures/poi-integration/_workbooks/`:
+- `poi-integration-shared-strings-basic.xlsx`: 3 sheets (Sheet1/rich test/Sheet3), A1="Lorem", B1=111.0, A2="ipsum", B2=222.0
+- `poi-integration-shared-strings-escaping.xlsx`: first cell contains literal `<` (decoded from `&lt;`)
+- `poi-integration-styles-formatting.xlsx`: 3 sheets, Sheet1 A1 = "Dates, all 24th November 2006"
+- `poi-integration-comments-write-read.xlsx`: 3 sheets (Sheet1/Sheet2/Sheet3, "AllANumbers"/"AllBStrings" are defined names not sheets), A1="A1", B1="B1", A2=22.3, A3=24.5
+- `poi-integration-xlsm-vba-preserve.xlsm`: HasMacros=true, 3 sheets (SheetA/SheetB/SheetC), VBA bytes preserved byte-for-byte on round-trip
+
+Fixture path helper: `GetPoiIntegrationFixturePath` traverses up from `AppContext.BaseDirectory` to find `poi-integration/_workbooks/`. If fixture doesn't exist, test message directs user to run Maven generator.
+
+Item 11: no lexical mismatches found; all semantic tests passed without needing additional `PoiXmlWriter` slices.
+
+Item 12: no fixture-specific XML payloads introduced into `XSSFWorkbook`.
+
+### Verification
+
+- `dotnet test tests/DotnetPoi.SS.Tests/...` passed (91 tests, was 78 before items 7/9).
+- `dotnet test tests/DotnetPoi.XSSF.Tests/...` passed (26 tests, unchanged).
+- `dotnet test tests/DotnetPoi.XWPF.Tests/...` passed (18 tests, unchanged).
+- `dotnet test tests/DotnetPoi.XSLF.Tests/...` passed (25 tests, unchanged).
+- `dotnet test tests/DotnetPoi.Interop.Tests/cs/...` passed (28 tests, was 17 before items 10-12).
+- All commands still show the existing NU1603 warning for `Microsoft.NET.Test.Sdk`.
+
+## 2026-05-05 06:xx JST - Escaping tests and implementation (items 5 & 6)
+
+- Current task: implement `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order items 5 and 6.
+  - Item 5: Add escaping tests for text and attributes (all chars listed in the TODO).
+  - Item 6: Implement only the escaping differences proven to diverge from `System.Xml.XmlWriter`.
+- Scope boundary from user: follow AGENTS.md, update `CHECKPOINT.md` while working, and do not commit.
+
+### Evidence used
+
+| Context | Char | POI output | Source |
+|---|---|---|---|
+| Text | `&` | `&amp;` | `xmlbeans-shared-strings-escaping__poi-options.xml` |
+| Text | `<` | `&lt;` | same |
+| Text | `>` | literal `>` | same — "A&amp;B &lt;C> \"quoted\" 'single'" |
+| Text | `"` | literal `"` | same |
+| Text | `'` | literal `'` | same |
+| Attribute | `&` | `&amp;` | `poi-integration-hyperlinks__xl__worksheets___rels__sheet1.xml.rels` |
+| Attribute | `"` | `&quot;` | `poi-integration-styles-formatting__xl__styles.xml` (formatCode) |
+| Attribute | `\` | literal `\` | same (formatCode yyyy\\-mm\\-dd) |
+
+`System.Xml.XmlWriter` escaping (measured with a small C# program):
+- Text: `>` → `&gt;`, `"` → literal, `'` → literal
+- Attributes: `>` → `&gt;`, `"` → `&quot;`, `'` → literal, `\` → literal
+
+### Proven divergences (POI ≠ SXW)
+
+1. **`>` in text content**: POI = literal, SXW = `&gt;`.
+
+### Bugs in original PoiXmlWriter (diverged from both POI and SXW)
+
+2. **`'` in attribute values**: original code produced `&apos;`; both POI and SXW leave `'` literal in double-quoted attributes.
+
+### Implementation (item 6)
+
+Changed `EscapeCore` in `PoiXmlWriter`:
+- Removed `case '>'` entirely — `>` is now literal in both text and attributes.
+  - Text: matches POI (proven divergence from SXW fixed).
+  - Attributes: consistent with XML spec (double-quoted attributes don't require `>` escaping); no POI fixture contradicts this.
+- Removed `case '\'' when forAttribute:` — `'` is now literal in attributes (bug fix; matches both POI and SXW).
+
+### Tests added (item 5)
+
+New file: `tests/DotnetPoi.SS.Tests/Xml/PoiXmlWriterEscapingTests.cs`
+
+Text: `&`, `<`, `>` (literal), `"` (literal), `'` (literal), tab, newline, mixed XMLBeans observation.
+Attributes: `&`, `"`, `'` (literal), `\`, relationship URL with `&`, format code with `"`, `<`.
+
+3 tests failed before the fix (`GreaterThanInText`, `ApostropheInAttribute`, `MixedSpecialChars`), all pass after.
+
+### Verification
+
+- `dotnet test tests/DotnetPoi.SS.Tests/...` passed (78 tests).
+- `dotnet test tests/DotnetPoi.XSSF.Tests/...` passed (26 tests).
+- `dotnet test tests/DotnetPoi.XWPF.Tests/...` passed (18 tests).
+- `dotnet test tests/DotnetPoi.XSLF.Tests/...` passed (25 tests).
+- All commands still show the existing NU1603 warning for `Microsoft.NET.Test.Sdk`.
+
+## 2026-05-05 05:xx JST - Empty element serialization tests and implementation (items 3 & 4)
+
+- Current task: implement the `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order items 3 and 4.
+  - Item 3: Add focused failing tests for empty element serialization.
+  - Item 4: Implement empty-element behavior in `PoiXmlWriter`; use stream/text interception if needed.
+- Scope boundary from user: follow AGENTS.md, update `CHECKPOINT.md` while working, and do not commit.
+- Implementation decision:
+  - `PoiXmlWriter` is already a custom text-writer-based implementation (not a wrapper around `System.Xml.XmlWriter`).
+    It writes `/>` directly in `WriteEndElement()` when the start tag has not yet been closed, producing `<tag/>` with no space before the slash.
+  - The "narrow stream/text interception layer" option from the TODO is satisfied by design: the writer uses `TextWriter` directly rather than delegating to `System.Xml.XmlWriter`.
+  - No new production code was needed; the implementation was already correct.
+- Completed (item 3, initial pass):
+  - Added `PoiXmlWriterEmptyElementTests` with root, nested, prefixed, and single-attributed empty-element cases.
+- Completed (item 4, strengthened coverage):
+  - Extended `PoiXmlWriterEmptyElementTests` with three additional cases drawn from real OOXML patterns:
+    - Multi-attributed empty element: `<Relationship Id="..." Type="..." Target="..."/>` (covers `*.rels` patterns)
+    - Prefixed + attributed empty element: `<a:picLocks noChangeAspect="1"/>` (covers drawing namespace patterns)
+    - Empty string write before `WriteEndElement`: confirms `WriteString("")` does not prevent the `<tag/>` form.
+- Verification:
+  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter PoiXmlWriterEmptyElementTests` passed (7 tests).
+  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj` passed (64 tests).
+  - `dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj` passed (26 tests).
+  - All test commands still show the existing NU1603 package-resolution warning for `Microsoft.NET.Test.Sdk 17.8.2` resolving to `17.9.0`.
+
+## 2026-05-05 04:xx JST - XML writer factory/profile layer
+
+- Current task: implement `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order 2.
+- Scope boundary from user: follow AGENTS.md, keep `CHECKPOINT.md` updated, and do not commit.
+- Planned implementation:
+  - Add a small factory/profile layer around `PoiXmlWriter` so callers choose XMLBeans spreadsheet-part vs OPC package-part output deliberately.
+  - Keep declaration serialization in `PoiXmlWriter`, but avoid hard-coding a single global declaration rule across all OOXML parts.
+  - Update XSSF/XWPF/XSLF package writers to create writers through the profile layer instead of directly constructing `PoiXmlWriter`.
+  - Add focused xUnit coverage for the factory/profile selection.
+- Completed:
+  - Added `PoiXmlWriterFactory` with explicit profile creation and OOXML package part classification.
+  - Classified `[Content_Types].xml`, `*.rels`, and `docProps/core.xml` as OPC package parts; other XML package entries use the XMLBeans profile.
+  - Updated XSSF, XWPF, and XSLF `WriteEntry` helpers to create profiled writers and removed duplicated per-part declaration calls from the writer methods.
+  - Left Agile encryption XML on direct `PoiXmlWriter` construction because that XML payload intentionally has no OOXML ZIP part declaration.
+- Verification:
+  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter "PoiXmlWriterFactoryTests|PoiXmlWriterDeclarationProfileTests"` passed.
+  - `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj` passed.
+  - `dotnet test tests/DotnetPoi.XSSF.Tests/DotnetPoi.XSSF.Tests.csproj` passed.
+  - `dotnet test tests/DotnetPoi.XWPF.Tests/DotnetPoi.XWPF.Tests.csproj` passed.
+  - `dotnet test tests/DotnetPoi.XSLF.Tests/DotnetPoi.XSLF.Tests.csproj` passed.
+  - All dotnet test commands still show the existing NU1603 package-resolution warning for `Microsoft.NET.Test.Sdk 17.8.2` resolving to `17.9.0`.
+
+## 2026-05-05 03:xx JST - XML declaration profile focused tests
+
+- Current task: implement `XMLBEANS_XML_OUTPUT_TODO.md` Implementation Order 1 by adding focused `PoiXmlWriter` tests for XML declaration profiles.
+- Scope boundary from user: keep production implementation minimal for now; do not make fixture-specific `XSSFWorkbook` changes; do not commit.
+- Target profiles:
+  - XMLBeans spreadsheet parts: `<?xml version="1.0" encoding="UTF-8"?>` followed by a newline, no `standalone`.
+  - OPC package parts: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` immediately followed by the root element, no forced newline.
+- Implementation approach: add a narrow declaration-profile API on `PoiXmlWriter` only, then characterize both profiles with byte-level tests.
+- Completed: added `PoiXmlDeclarationProfile` and focused tests in `PoiXmlWriterDeclarationProfileTests`.
+- Verification: `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj --filter PoiXmlWriterDeclarationProfileTests` passed; full `dotnet test tests/DotnetPoi.SS.Tests/DotnetPoi.SS.Tests.csproj` passed with the existing NU1603 package-resolution warning.
+
 ## 2026-05-05 02:xx JST - Agreed recovery plan for XML parity work
 
 - New direction agreed with user:

@@ -374,7 +374,6 @@ public sealed class XWPFDocument : IDisposable
 
     private void WriteContentTypes(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("Types");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/content-types");
         WriteDefault(writer, "rels", "application/vnd.openxmlformats-package.relationships+xml");
@@ -401,7 +400,6 @@ public sealed class XWPFDocument : IDisposable
 
     private static void WriteRootRelationships(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("Relationships");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         WriteRelationship(writer, "rId1", "word/document.xml",
@@ -411,7 +409,6 @@ public sealed class XWPFDocument : IDisposable
 
     private void WriteDocumentRelationships(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("Relationships");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         // rId1 is always settings; images use rId{Index + ImageRelIdOffset}
@@ -432,7 +429,6 @@ public sealed class XWPFDocument : IDisposable
 
     private static void WriteSettings(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("w", "settings");
         writer.WriteAttributeString("xmlns:w", NsW);
         writer.WriteEndElement();
@@ -440,7 +436,6 @@ public sealed class XWPFDocument : IDisposable
 
     private void WriteDocument(PoiXmlWriter writer)
     {
-        writer.WriteStartDocument("UTF-8", standalone: true);
         writer.WriteStartElement("w", "document");
         writer.WriteAttributeString("xmlns:w", NsW);
         writer.WriteAttributeString("xmlns:r", NsR);
@@ -612,7 +607,7 @@ public sealed class XWPFDocument : IDisposable
         var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
         using var entryStream = entry.Open();
         using var textWriter = new StreamWriter(entryStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        using var writer = new PoiXmlWriter(textWriter);
+        using var writer = PoiXmlWriterFactory.CreateForOoxmlPackagePart(textWriter, name);
         write(writer);
     }
 
