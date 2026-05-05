@@ -328,6 +328,58 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    public void Write_DocmWithParagraphsAndVba_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase-docm-interop.docm");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        byte[] vbaBytes = ExtractZipEntry("example.docm", "word/vbaProject.bin");
+
+        using var doc = new XWPFDocument();
+        var para1 = doc.createParagraph();
+        var run1 = para1.createRun();
+        run1.setText("from dotnet-poi docm");
+        run1.setBold(true);
+
+        var para2 = doc.createParagraph();
+        var run2 = para2.createRun();
+        run2.setText("second paragraph");
+        run2.setItalic(true);
+
+        doc.setVBAProject(vbaBytes);
+
+        using var stream = File.Create(fixturePath);
+        doc.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_PptmWithSlideAndVba_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase-pptm-interop.pptm");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        byte[] vbaBytes = ExtractZipEntry("example.pptm", "ppt/vbaProject.bin");
+
+        using var prs = new XMLSlideShow();
+        var slide = prs.createSlide();
+        var picIdx = prs.addPicture(LoadTestImage(), XSLFPictureData.PICTURE_TYPE_JPEG);
+        var shape = prs.createPicture(slide, picIdx);
+        shape.setAnchor(0, 0, XMLSlideShow.DefaultSlideCx, XMLSlideShow.DefaultSlideCy);
+        prs.setVBAProject(vbaBytes);
+
+        using var stream = File.Create(fixturePath);
+        prs.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
     public void Write_XlsmWithCellsAndVba_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-xlsm-interop.xlsm");
@@ -358,6 +410,17 @@ public class WriteForPoiTests
 
         Assert.True(File.Exists(fixturePath));
         Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    private static byte[] ExtractZipEntry(string zipFileName, string entryName)
+    {
+        using var zip = new System.IO.Compression.ZipArchive(File.OpenRead(zipFileName), System.IO.Compression.ZipArchiveMode.Read);
+        var entry = zip.GetEntry(entryName)
+            ?? throw new InvalidDataException($"{zipFileName} has no entry {entryName}");
+        using var s = entry.Open();
+        using var ms = new MemoryStream();
+        s.CopyTo(ms);
+        return ms.ToArray();
     }
 
     private static string GetFixturePath(string fileName)

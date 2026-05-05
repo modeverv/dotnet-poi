@@ -1,5 +1,56 @@
 # CHECKPOINT
 
+## 2026-05-05 09:xx JST - docm/pptm interop + XWPF round-trip
+
+- Current task: docm/pptm Java interop, XWPF round-trip テスト追加。
+- Scope boundary: コミットしない。
+
+### docm interop
+
+C#: `Write_DocmWithParagraphsAndVba_CreatesFixtureForPoi`
+- `example.docm` の `word/vbaProject.bin` を抽出し `XWPFDocument` に埋め込み
+- "from dotnet-poi docm"（bold）と "second paragraph"（italic）の 2 段落
+- `phase-docm-interop.docm` に書き出し
+
+Java: `readPhaseDocmInterop`
+- content type に "macroEnabled" を含む
+- 2 段落：テキスト + bold/italic 属性を確認
+- VBA パート（application/vnd.ms-office.vbaProject）が存在
+
+注: POI Java の `XWPFDocument` / `XMLSlideShow` に `isMacroEnabled()` メソッドはない。`getPackagePart().getContentType()` でコンテンツタイプ確認に切り替え。
+
+### pptm interop
+
+C#: `Write_PptmWithSlideAndVba_CreatesFixtureForPoi`
+- `example.pptm` の `ppt/vbaProject.bin` を抽出し `XMLSlideShow` に埋め込み
+- 画像入り 1 スライド構成
+- `phase-pptm-interop.pptm` に書き出し
+
+Java: `readPhasePptmInterop`
+- content type に "macroEnabled" を含む
+- スライド数 1、shape 1（XSLFPictureShape）
+- VBA パート存在
+
+### XWPF round-trip
+
+既存 `Read_WrittenDocument_RestoresTextAndPicture` に bold 属性確認を追加（不足していた）。
+
+新テスト `RoundTrip_MultipleParagraphs_TextAndFormattingRestored`：
+- 3 段落（bold/italic/複数ラン）を書いて読み返す
+- テキスト、bold、italic、ラン分割が全て復元されることを確認
+
+### ファイル変更
+
+- `tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj`: `example.docm`, `example.pptm` を content item 追加
+- `WriteForPoiTests.cs`: `ExtractZipEntry` ヘルパー追加、docm/pptm テスト追加
+- `ReadFromDotnetTest.java`: docm/pptm テスト追加、`assertNotNull` import 済み
+- `XWPFDocumentTests.cs`: round-trip テスト 1 件追加 + 既存テストに bold 確認追記
+
+### Verification
+
+- C# 全スイート通過（XWPF: 19、Interop: 31、他変化なし）。
+- Java `ReadFromDotnetTest` 16テスト通過（+2）。
+
 ## 2026-05-05 08:xx JST - Phase 7 assessment, formula evaluator dropped, xlsm interop
 
 - Current task: write Phase 7 current-state assessment into AGENTS.md, drop formula evaluator, implement xlsm interop.

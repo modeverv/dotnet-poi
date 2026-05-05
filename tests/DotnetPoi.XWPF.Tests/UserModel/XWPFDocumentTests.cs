@@ -226,9 +226,60 @@ public class XWPFDocumentTests
         Assert.Single(loaded.getParagraphs());
         var loadedPara = loaded.getParagraphs()[0];
         Assert.Equal("test text", loadedPara.getText());
+        // Bold attribute on the text run must survive round-trip.
+        Assert.True(loadedPara.getRuns()[0].isBold());
         Assert.Single(loaded.getAllPictures());
         Assert.Equal(XWPFPictureData.PICTURE_TYPE_JPEG, loaded.getAllPictures()[0].getPictureType());
         Assert.Equal(imageBytes, loaded.getAllPictures()[0].getData());
+    }
+
+    [Fact]
+    public void RoundTrip_MultipleParagraphs_TextAndFormattingRestored()
+    {
+        using var original = new XWPFDocument();
+
+        var p1 = original.createParagraph();
+        var r1 = p1.createRun();
+        r1.setText("bold text");
+        r1.setBold(true);
+
+        var p2 = original.createParagraph();
+        var r2 = p2.createRun();
+        r2.setText("italic text");
+        r2.setItalic(true);
+
+        var p3 = original.createParagraph();
+        var r3a = p3.createRun();
+        r3a.setText("plain ");
+        var r3b = p3.createRun();
+        r3b.setText("bold");
+        r3b.setBold(true);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+
+        stream.Position = 0;
+        using var loaded = new XWPFDocument(stream);
+
+        Assert.Equal(3, loaded.getParagraphs().Count);
+
+        var lp1 = loaded.getParagraphs()[0];
+        Assert.Equal("bold text", lp1.getText());
+        Assert.True(lp1.getRuns()[0].isBold());
+        Assert.False(lp1.getRuns()[0].isItalic());
+
+        var lp2 = loaded.getParagraphs()[1];
+        Assert.Equal("italic text", lp2.getText());
+        Assert.False(lp2.getRuns()[0].isBold());
+        Assert.True(lp2.getRuns()[0].isItalic());
+
+        var lp3 = loaded.getParagraphs()[2];
+        Assert.Equal("plain bold", lp3.getText());
+        Assert.Equal(2, lp3.getRuns().Count);
+        Assert.Equal("plain ", lp3.getRuns()[0].getText(0));
+        Assert.False(lp3.getRuns()[0].isBold());
+        Assert.Equal("bold", lp3.getRuns()[1].getText(0));
+        Assert.True(lp3.getRuns()[1].isBold());
     }
 
     private static string ReadEntry(ZipArchive archive, string name)

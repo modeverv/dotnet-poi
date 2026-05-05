@@ -341,7 +341,7 @@ Do not add these as fixture-specific constants — only fix when a concrete inte
 
 - [x] Round-trip without macro modification: `vbaProject.bin` and macro content types survive byte-for-byte.
 - [x] Workbook/document edits do not disturb macro parts.
-- [ ] Interop: dotnet-poi writes xlsm/docm/pptm → Java POI reads and verifies values. *(xlsm in progress)*
+- [x] Interop: dotnet-poi writes xlsm/docm/pptm → Java POI reads and verifies values.
 
 #### step 6 doc / HWPF
 
@@ -862,7 +862,7 @@ POIFS を「フル実装」と見なすための最低到達ライン（HWPF/HSL
 
 - [x] マクロを変更しない round-trip で `vbaProject.bin` とマクロ content type を byte-for-byte に保持する。
 - [x] workbook/document の編集が macro part や unrelated package part を乱さないことを確認する。
-- [ ] Interop: dotnet-poi が xlsm/docm/pptm を書く → Java POI が読んで値を確認する。*(xlsm 実装中)*
+- [x] Interop: dotnet-poi が xlsm/docm/pptm を書く → Java POI が読んで値を確認する。
 
 #### step 6 doc / HWPF
 

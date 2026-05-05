@@ -325,6 +325,61 @@ public class ReadFromDotnetTest {
     }
 
     @Test
+    void readPhaseDocmInterop() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-docm-interop.docm");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XWPFDocument doc = new XWPFDocument(input)) {
+
+            // Macro-enabled: main part content type must contain "macroEnabled".
+            assertTrue(doc.getPackagePart().getContentType().contains("macroEnabled"),
+                "docm content type should contain macroEnabled");
+
+            java.util.List<XWPFParagraph> paragraphs = doc.getParagraphs();
+            assertTrue(paragraphs.size() >= 2, "should have at least 2 paragraphs");
+
+            XWPFRun run1 = paragraphs.get(0).getRuns().get(0);
+            assertEquals("from dotnet-poi docm", run1.getText(0));
+            assertTrue(run1.isBold(), "first run should be bold");
+
+            XWPFRun run2 = paragraphs.get(1).getRuns().get(0);
+            assertEquals("second paragraph", run2.getText(0));
+            assertTrue(run2.isItalic(), "second run should be italic");
+
+            // VBA project must be present.
+            java.util.List<org.apache.poi.openxml4j.opc.PackagePart> vbaParts =
+                doc.getPackage().getPartsByContentType("application/vnd.ms-office.vbaProject");
+            assertFalse(vbaParts.isEmpty(), "word/vbaProject.bin should be in the package");
+        }
+    }
+
+    @Test
+    void readPhasePptmInterop() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-pptm-interop.pptm");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XMLSlideShow prs = new XMLSlideShow(input)) {
+
+            // Macro-enabled: main part content type must contain "macroEnabled".
+            assertTrue(prs.getPackagePart().getContentType().contains("macroEnabled"),
+                "pptm content type should contain macroEnabled");
+            assertEquals(1, prs.getSlides().size(), "should have 1 slide");
+
+            XSLFSlide slide = prs.getSlides().get(0);
+            assertEquals(1, slide.getShapes().size(), "slide should have 1 shape (picture)");
+            assertTrue(slide.getShapes().get(0) instanceof XSLFPictureShape,
+                "shape should be XSLFPictureShape");
+
+            // VBA project must be present.
+            java.util.List<org.apache.poi.openxml4j.opc.PackagePart> vbaParts =
+                prs.getPackage().getPartsByContentType("application/vnd.ms-office.vbaProject");
+            assertFalse(vbaParts.isEmpty(), "ppt/vbaProject.bin should be in the package");
+        }
+    }
+
+    @Test
     void readPhaseXlsmInterop() throws IOException {
         Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-xlsm-interop.xlsm");
         assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");

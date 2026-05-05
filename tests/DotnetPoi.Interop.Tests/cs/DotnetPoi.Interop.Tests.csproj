@@ -27,6 +27,8 @@
     <ItemGroup>
         <Content Include="../../../tests/test-files/image.jpg" CopyToOutputDirectory="PreserveNewest" Link="image.jpg" />
         <Content Include="../../../tests/test-files/example.xlsm" CopyToOutputDirectory="PreserveNewest" Link="example.xlsm" />
+        <Content Include="../../../tests/test-files/example.docm" CopyToOutputDirectory="PreserveNewest" Link="example.docm" />
+        <Content Include="../../../tests/test-files/example.pptm" CopyToOutputDirectory="PreserveNewest" Link="example.pptm" />
     </ItemGroup>
 
 </Project>
