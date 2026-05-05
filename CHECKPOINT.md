@@ -934,3 +934,23 @@ New model classes with write-only support (existing files round-trip via unknown
 - **C# `ReadPoiGeneratedTests.Read_PptxWithTextBoxes_GeneratedByPoi()`**: Reads fixture, verifies shape type, paragraph count (3 including POI default), and text content.
 - Fixture: `fixtures/from-poi/phase-pptx-comprehensive.pptx`
 - Note: POI 5.5.1's `XSLFTextRun.isBold()` and `CTTextCharacterProperties.isSetB()` return false for loaded PPTX even when `<a:b/>` is present. Formatting verification relies on C# round-trip tests.
+
+---
+
+## 2026-05-15 JST — 優先順位決定（TODO frozen）
+
+### 決定事項
+
+グラフ（チャート）は実装コストが極めて大きい（30種のチャート型、DrawingML スキーマ、多ファイル構成）ため後回し。代わりに以下を順次実装する。
+
+| 順位 | 項目 | フォーマット | 目安 |
+|---|---|---|---|
+| 1 | **セル保護 / ブック保護** | xlsx | 半日〜1日 |
+| 2 | **フィールド（TOC/ページ番号/差し込み印刷）** | docx | 2〜3日 |
+| 3 | **オートフィルター** | xlsx | 1〜2日 |
+| 🔵 | グラフ作成 | xlsx, pptx | 後回し |
+
+### 備考
+
+- 数式評価（DotnetPoi.Formula）は「テンプレート填充 → 保存 → Excel で開く」のワークフローが成立するため、評価エンジンなしでも実用範囲内と判断し優先度を下げる。
+- グラフは既存ファイルの不明パーツ保存によりラウンドトリップのみ対応。新規作成の需要が出たら改めて検討。
