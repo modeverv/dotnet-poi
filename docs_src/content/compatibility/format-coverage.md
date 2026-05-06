@@ -44,7 +44,7 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Annotations | footnotes, endnotes | 🔵 | `word/footnotes.xml` / `word/endnotes.xml` round-trip preserved |
 | Fields | TOC, page numbers, mail merge | ✅ | Write/read/round-trip |
 | SDT | content controls (block-level and inline) | 🔵 | Block-level `w:sdt` in `w:body` and inline `w:sdt` inside `w:p` preserved via raw XML capture/re-emission. Text boxes (`w:txbxContent`) deeply nested inside DrawingML and not yet covered. |
-| Styles | paragraph/character/table styles | ❌ | Direct formatting only; `word/styles.xml` 🔵 preserved but style refs in document.xml lost on model rewrite |
+| Styles | paragraph style reference (pStyle) | ✅ | `setStyle()`/`getStyleID()` API, round-trip verified. `word/styles.xml` 🔵 preserved + default styles auto-generated. Character/table styles ❌ |
 | Track Changes | revision marks | ❌ | |
 | Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries` |
 | Other | docm macro preservation | ✅ | VBA bytes preserved |

@@ -101,7 +101,7 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | 〃 | footnotes/endnotes | 🔵 | Existing parts round-trip via `_preservedEntries`; API creation/editing not modeled. |
 | Fields | TOC, page numbers, mail merge-style fields | ✅ | Write/read/round-trip covered. |
 | Content Controls | SDT (structured document tags) | 🔵 | Block-level and inline SDT preserved via raw XML capture/re-emission. |
-| Styles | paragraph, character, and table styles | ❌ | Direct formatting is supported; style model parity is not. |
+| Styles | paragraph style reference (pStyle) | ✅ | `setStyle()`/`getStyleID()` API, round-trip verified. Character/table styles ❌. `word/styles.xml` 🔵 preserved + default styles auto-generated for new docs. |
 | Track Changes | insertions/deletions/moves | ❌ | |
 | Other | docm macro preservation | ✅ | VBA byte preservation. |
 | 〃 | unknown part preservation | ✅ | `_preservedEntries` mechanism implemented. |

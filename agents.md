@@ -503,17 +503,17 @@ Goal: make interop checks explicit before declaring a format slice “done”.
    - blip パース → XWPFPicture 生成 → media/ + rels 整合性維持 ✅
 4. ✅ **Table cell merge / borders** — 完了（raw XML preservation で既存文書のセル結合・罫線・`rPr` 子要素（`w:shd` 等）を保持。run-level + paragraph-level の rPr preservation 対応済。API からの新規作成は未対応）
 5. ❌ Review / references（comments, footnotes, endnotes, bookmarks, tracked changes）
-6. ❌ Styles（**6-3 まで対応すれば十分**。6-4以降は具体的な需要が出てから）
-    - 6-1. ❌ **スタイル名の read/write**（最軽量・今すぐ価値が出る）
+6. ✅ Styles（6-1〜6-3 完了。6-4以降は需要が出てから）
+    - 6-1. ✅ **スタイル名の read/write**（最軽量・今すぐ価値が出る）
         - `XWPFParagraph.setStyle(styleId)` → `<w:pStyle w:val="..."/>` を書くだけ
         - `XWPFParagraph.getStyleID()` → `<w:pStyle>` を読むだけ
         - テンプレート由来の `word/styles.xml` が既にあれば Word 側が解決するので、参照を書くだけで動く
         - 壊れるリスク: なし
-    - 6-2. ❌ **`word/styles.xml` のパース**（styleId ↔ name マッピング）
+    - 6-2. ✅ **`word/styles.xml` のパース**（styleId ↔ name マッピング）
         - `XWPFStyles` 相当のモデルを持ち、styleId → 表示名・basedOn・type を読み取る
         - `XWPFDocument.getStyles().getStyle(styleId)` 相当の API
         - 壊れるリスク: なし（読み取り専用ならリスクゼロ）
-    - 6-3. ❌ **新規文書へのデフォルトスタイル書き込み**
+    - 6-3. ✅ **新規文書へのデフォルトスタイル書き込み**
         - 新規 `XWPFDocument` 作成時に最小限の `word/styles.xml` を生成する（Normal / Heading1〜3 程度）
         - 書き方を誤ると Word が「修復しますか」ダイアログを出す可能性がある（データ消失はない）
         - POI の `XWPFDocument` が生成する `word/styles.xml` を fixture として使い、それに合わせる

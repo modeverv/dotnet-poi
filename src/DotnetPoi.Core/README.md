@@ -188,7 +188,7 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, not edi
 | **Images** | text boxes (`w:txbxContent`) | ❌ |
 | **Review** | comments, footnotes, endnotes | 🔵 | Existing parts round-trip via `_preservedEntries` |
 | **Fields** | TOC, page numbers, mail merge fields | ✅ |
-| **Styles** | paragraph/character/table styles | ❌ (direct formatting only) |
+| **Styles** | paragraph style reference (pStyle) | ✅ | `setStyle()`/`getStyleID()` API, round-trip verified. Character/table styles ❌. `word/styles.xml` 🔵 preserved + default styles auto-generated. |
 | **Other** | macro-enabled (docm) | ✅ |
 | **Other** | content controls (SDT) | 🔵 | Block-level and inline SDT preserved via raw XML capture/re-emission |
 | 〃 | tracked changes (ins/del/move) | ❌ | |

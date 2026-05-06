@@ -65,7 +65,7 @@
 | 〃 | **脚注・文末脚注** | 🔵 不明パーツ保存のみ | `word/footnotes.xml` / `word/endnotes.xml` は round-trip 保持されるが API モデルなし |
 | **フィールド** | **TOC（目次）/ ページ番号 / 差し込み印刷** | ✅ | write/read/round-trip 完了 |
 | **SDT** | **コンテンツコントロール** | 🔵 | ブロックレベル `w:sdt`（bodyの直下）もインライン `w:sdt`（段落内）も raw XML 補完で round-trip 維持。テキストボックス（`w:txbxContent`）は DrawingML の深いネスト内にあり未対応 |
-| **スタイル** | **段落スタイル / 文字スタイル / テーブルスタイル** | ❌ | 直接書式のみ対応。Style定義ファイル(`word/styles.xml`)は🔵保持されるが、document.xml内のスタイル参照はモデル書き換えで消失 |
+| **スタイル** | **段落スタイル（pStyle参照）** | ✅ | `setStyle()`/`getStyleID()` API、round-trip 確認済。文字/テーブルスタイルは ❌。`word/styles.xml` は🔵保持＋新規文書にデフォルトスタイル自動生成 |
 | **変更履歴** | **トラックチェンジ** | ❌ | |
 | **その他** | マクロ有効（docm） | ✅ | VBA バイト保存 |
 | 〃 | 未知パーツ保存 | ✅ | _preservedEntries 機構実装済 |
