@@ -1,5 +1,55 @@
 # CHECKPOINT
 
+## 2026-05-06 17:16 JST - Add Phase 10 docx completion and Phase 11 manual verification
+
+- Current task: `agents.md` に Phase 10 として docx の欠損動作実装方針、Phase 11 として手動 Office / LibreOffice 検証運用を追記する。
+- Scope: `agents.md` と `CHECKPOINT.md` の文書更新。コミットしない。
+
+### やったこと
+
+- `agents.md` に `Phase 10 — docx/XWPF Practical Completion` を追加。
+  - Sections/page model、Styles、Images、Tables、Text boxes/content controls、Review/references を優先項目として整理。
+  - docx/docm を Word/LibreOffice で修復ダイアログなしに open/save/reopen できること、既存未対応要素を軽編集で壊さないことを完了条件にした。
+- `agents.md` に `Phase 11 — Manual Office / LibreOffice Verification` を追加。
+  - macOS Office、Windows Office COM、Linux LibreOffice UNO/VNC を release 前 manual verification suite として扱う方針を明記。
+  - xlsx/xlsm、docx/docm、pptx/pptm の対象観点と、screenshot/session.log/summary/checklist の evidence 運用を明記。
+  - GUI/Office 依存のため毎 PR の必須 CI ではなく、リリース前の手元検証として扱う境界を明記。
+
+### Verification
+
+- `sed -n '390,560p' agents.md` で追加位置と内容を確認。
+- 文書更新のみ。テストは未実行。
+
+## 2026-05-06 17:00 JST - Clarify pptx simple editing support in README
+
+- Current task: ユーザー確認「pptxも簡単な編集の読み書きも結構できてるのでは？」に対し、README の pptx/XSLF 表現を確認。
+- Scope: README と CHECKPOINT の更新。コミットしない。
+
+### やったこと
+
+- `README.md` の pptx/XSLF セクション冒頭に、簡単な presentation creation/editing は usable であることを明記。
+- create/read slides、text boxes、formatted runs、pictures、rotation、tables、slide size、Java POI interop の範囲を明示。
+- charts/SmartArt/notes/media/layouts/masters/themes/animations/grouped shapes は主に round-trip preservation であり、editable object model ではないという境界も併記。
+
+### Verification
+
+- `tests/DotnetPoi.Core.Tests/XSLF/UserModel/XMLSlideShowTests.cs` の XSLF round-trip テスト名を確認。
+- README/CHECKPOINT の文書更新のみ。テストは未実行。
+
+## 2026-05-06 16:57 JST - Clarify xlsx support level in README
+
+- Current task: ユーザー確認「xlsxについてはかなりのサポートを持っている状態になったのでは？」に対し、README の表現が実態を伝えているか確認。
+- Scope: README と CHECKPOINT の更新。コミットしない。
+
+### やったこと
+
+- `README.md` の Status 冒頭に、現状もっとも成熟している形式が xlsx/XSSF であることを明記。
+- common workbook creation/read/edit/style/layout/images/formula text/macro preservation/Java POI interop は広く対応済み、advanced workbook features は一部 preservation-only である、という温度感にした。
+
+### Verification
+
+- README/CHECKPOINT の文書更新のみ。テストは未実行。
+
 ## 2026-05-06 xx:xx JST - Refresh README status and structure
 
 - Current task: ルート `README.md` の Status を `NOW.md` ベースの現在カバレッジに差し替え、古い Phase -1/0 などの詳細履歴を README から除去し、プロジェクト構造を最新化する。
@@ -1249,3 +1299,104 @@ Notes:
 | `docs_src/content/compatibility/format-coverage.md` | 同 ❌→🔵 |
 | `docs/` | 再生成 (35 HTML) |
 | `CHECKPOINT.md` | このエントリ |
+
+---
+
+## 2026-05-06 JST — xlsx オートシェイプの raw XML 保存対応
+
+### やったこと
+
+**背景:** xlsx の `xl/drawings/drawingN.xml` 内の `xdr:twoCellAnchor` 要素のうち、`xdr:pic`（画像）以外の要素（`xdr:sp`=オートシェイプ, `xdr:grpSp`=グループ, `xdr:cxnSp`=コネクタ, `xdr:graphicFrame`=グラフ枠）は読み込み時に捨てられていた。
+
+**実装:**
+
+1. **`XSSFDrawing.cs`** — `_preservedRawAnchors` List + `getPreservedRawAnchors()` / `addPreservedRawAnchor()` を追加
+2. **`XSSFWorkbook.cs` `ReadDrawing`:**
+   - `ReadOuterXml()` で各 `twoCellAnchor` を raw XML として取得
+   - `xdr:pic` を含む場合 → `ParsePictureAnchor()` でモデル再構築
+   - `xdr:pic` を含まない場合 → `drawing.addPreservedRawAnchor()` で raw 保存
+3. **`XSSFWorkbook.cs` `ParsePictureAnchor()`** — 新しい静的ヘルパーメソッド。既存の state-machine と同等の anchor/relId/rotation 抽出を行い `drawing.createPicture()` を呼ぶ
+4. **`XSSFWorkbook.cs` `WriteDrawing`:**
+   - モデルの Picture anchor を書いた後、`drawing.PreservedRawAnchors` を `WriteRaw` で再出力
+5. **`DotnetPoi.Core.csproj`** — `InternalsVisibleTo` を `DotnetPoi.Core.Tests` と `DotnetPoi.Interop.Tests` に追加
+
+**テスト追加:**
+- `PreservationVerificationTests.Xlsx_RoundTrip_AutoShapesAndPicturesPreserved` — `poi/test-data/spreadsheet/47504.xlsx`（`xdr:sp` を含むファイル）を使用:
+  - 読み込み時に preserved anchors に `xdr:sp` が含まれていることを確認 ✅
+  - 書き出し後の drawing.xml に `xdr:sp` が含まれていることを確認 ✅
+- Core.Tests: 234 → **235**
+
+**ドキュメント更新:**
+| ファイル | 変更 |
+|---------|------|
+| `README.md` | xlsx Drawings: auto-shapes ❌→🔵, バッジ 299→300, Core.Tests 234→235, Total 299→300 |
+| `NOW.md` | 図形描画 ❌→🔵, テスト数 234→235, 299→300 |
+| `agents.md` | Core tests (234)→(235) |
+| `docs_src/content/compatibility/format-coverage.md` | auto-shapes ❌→🔵 |
+| `CHECKPOINT.md` | このエントリ |
+
+### Verification
+
+- `dotnet build src/DotnetPoi.Core/` — 0 errors ✅
+- `dotnet test tests/DotnetPoi.Core.Tests/` — **Passed! 235 passed, 0 failed** ✅
+- `dotnet test tests/DotnetPoi.Formula.Tests/` — 10 passed ✅
+- `dotnet test tests/DotnetPoi.Interop.Tests/` — 55 passed, 4 skipped ✅
+- **全 C# 300 tests passing**
+
+---
+
+## 2026-05-06 JST — docx ヘッダー・フッターの raw XML 保存対応
+
+### やったこと
+
+**背景:** ヘッダーやフッターに画像や書式が含まれている場合（例: `headerPic.docx` の `a:blip` 画像参照）、モデルが `setHeaderText()` / `setFooterText()` で生成する最小限のテキストのみの XML に置き換えられ、リッチコンテンツが失われていた。
+
+**実装:** `XWPFDocument.cs` — `_preservedEntries` 機構を利用し、API 経由で変更されていないヘッダー・フッターは元の raw XML をそのまま保持:
+
+1. **`_headerModified` / `_footerModified` フラグ追加** — デフォルト `false`。`setHeaderText()` / `setFooterText()` で `true` に設定
+2. **`write()` の条件分岐** — `_headerModified` / `_footerModified` が `true` の場合のみモデル生成 XML で上書き。`false` の場合は `_preservedEntries` の生バイトが使われる
+3. **`GetModelEntryNames()` から除外** — `word/header1.xml` / `word/footer1.xml` を削除し、`_preservedEntries` で保持されるように変更
+
+**テスト追加:**
+- `PreservationVerificationTests.Docx_HeaderFooter_RawXmlPreserved` — `poi/test-data/document/headerPic.docx`（画像入りヘッダー）を使用:
+  - 読み込み時に `word/header1.xml` が ZIP に存在することを確認 ✅
+  - 書き出し後も `word/header1.xml` と `word/media/image1.jpeg` が保持されることを確認 ✅
+  - 出力の header XML に `a:blip`（画像参照）が含まれていることを確認 ✅
+- Core.Tests: 235 → **236**
+- **全 C# 301 tests passing** ✅
+
+## 2026-05-06 JST - docx SDT (content controls) raw XML preservation
+
+- Task: item 4 from priority list — docx SDT/テキストボックスを document.xml の未知要素保存でカバー
+- Scope: XWPFDocument.cs のみ。テキストボックス（w:txbxContent）は DrawingML シェイプ内にネストしているため未対応。
+
+### Implementation
+
+`XWPFDocument.cs` の `ReadDocument()` に、`w:body` 直下の未知子要素（`p/tbl/sectPr/body` 以外）を `ReadOuterXml()` で捕捉し、`_preservedRawBodyElements` リストに保存するロジックを追加。
+`WriteDocument()` では `tbl` 書き出し後、`sectPr` 前に `_preservedRawBodyElements` を `WriteRaw()` で再出力。
+
+### 発見事項
+
+- `52449.docx` の SDT はすべてインラインSDT（`w:p` 内にネスト）。ブロックレベルSDT（`w:body` 直下）は無し。
+- インラインSDTは depth 3（bodyDepth+2）にあるため、現在の捕捉条件（depth == bodyDepth+1）ではヒットしない。
+- `60316.docx` にブロックレベルSDTが3件あることを確認し、こちらでテスト実施。
+- `txbxContent` は `wps:txbx` → `wps:wsp` → DrawingML 内に深くネストしており、現状の body直下捕捉では保存不可。
+
+### Test: `Docx_BlockLevelSdt_Preserved`
+
+- Test file: `document/60316.docx` (3 block-level SDT elements)
+- `dotnet test --filter Docx_BlockLevelSdt_Preserved` → ✅ Passed
+- Verifies output document.xml contains at least 2 `<w:sdt` elements
+
+### Status updates
+
+- `README.md`: content controls ❌ → 🔵 (block-level). Tracked changes row kept as ❌. Badge 301→302. Core.Tests 236→237. Total 301→302.
+- `NOW.md`: SDT ❌ → 🔵. Item 12 updated (SDT removed from low-priority list). Core.Tests 236→237. Total 301→302.
+- `agents.md`: Core.Tests count 236→237. docx Phase 7 row updated with SDT preserve 🔵.
+- `format-coverage.md`: SDT ❌ → 🔵 with block-level note.
+- `CHECKPOINT.md`: This entry.
+
+### Test count
+
+- Core.Tests: 236 → **237**
+- **全 C# 302 tests passing** ✅

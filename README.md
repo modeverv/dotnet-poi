@@ -11,7 +11,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 [![NuGet Formula Downloads](https://img.shields.io/nuget/dt/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-beta-orange)
-![Tests](https://img.shields.io/badge/tests-299%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-302%20passing-brightgreen)
 
 ## NuGet Package Strategy
 
@@ -53,6 +53,8 @@ dotnet-poi ships as **two separate NuGet packages** with a clear separation of c
 
 Current status: **beta** — `DotnetPoi.Core` v0.1.0 and `DotnetPoi.Formula` v0.1.0 are published on [NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core).
 
+The strongest format today is **xlsx / XSSF**. It has broad support for common workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. Some advanced workbook features are still preservation-only rather than editable API models, but ordinary `.xlsx` workflows are well beyond the original bootstrap stage.
+
 Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not modeled for creation or editing / ❌ not implemented / — not applicable.
 
 ### Format Coverage
@@ -68,7 +70,7 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | Layout | merged cells, column width, row height, hidden rows/columns, freeze panes, print settings | ✅ | |
 | Drawings | images, anchors, rotation, hyperlinks | ✅ | |
 | Drawings | charts, comments | 🔵 | Existing package parts are preserved during round-trip; new creation/editing is not modeled. |
-| Drawings | auto-shapes | ❌ | |
+| Drawings | auto-shapes | 🔵 | Unknown `xdr:twoCellAnchor` children (auto-shapes, connectors, group shapes) are preserved verbatim via raw XML capture/re-emission in drawing.xml. |
 | Data | data validation, conditional formatting, auto filter | ✅ | |
 | Data | pivot tables | ⚠️ | Programmatic creation exists; editing existing pivots is not modeled, but round-trip preservation is supported. |
 | Strings | shared strings, rich text runs | ✅ | `XSSFRichTextString` and `<rPr>` support are present. |
@@ -84,7 +86,7 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | Paragraphs | alignment, indents, spacing, bullet/numbered lists | ✅ | OOXML numbering is implemented. |
 | Tables | create/read tables, rows, cells | ✅ | Round-trip covered. |
 | Tables | cell merge and table borders | ❌ | |
-| Sections | page setup, headers, footers | ✅ | |
+| Sections | page setup, headers, footers | ✅ | Rich content (images, formatting) in headers/footers preserved via `_preservedEntries` when not modified via API. |
 | Sections | columns | ❌ | |
 | Links | external hyperlinks | ✅ | |
 | Images | inline images and rotation | ✅ | |
@@ -93,10 +95,13 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | Fields | TOC, page numbers, mail merge-style fields | ✅ | Write/read/round-trip covered. |
 | Styles | paragraph, character, and table styles | ❌ | Direct formatting is supported; style model parity is not. |
 | Other | docm macro preservation, unknown part preservation | ✅ | |
-| Other | content controls, tracked changes | ❌ | |
+| Other | content controls (block-level SDT) | 🔵 | Block-level `w:sdt` in `w:body` preserved via raw XML capture/re-emission. Inline SDT (inside `w:p`) not covered. |
+| Other | tracked changes (ins/del/move) | ❌ | |
 | Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries`. |
 
 #### pptx / XSLF (~40%)
+
+Simple presentation creation and editing is usable: create/read slides, text boxes, formatted runs, pictures, rotation, tables, and slide size are covered, with Java POI interop tests for basic generated presentations. More advanced PowerPoint features such as charts, SmartArt, notes, media, layouts, masters, themes, animations, and grouped shapes are mostly preserved during round-trip rather than exposed as editable object models.
 
 | Category | Feature | Status | Notes |
 |---|---|---|---|
@@ -146,10 +151,10 @@ Tracked in [NOW.md](./NOW.md):
 
 | Project | Tests | Notes |
 |---|---:|---|
-| Core.Tests | 234 | +3 POI test-file preservation verification tests. |
+| Core.Tests | 237 | +3 POI test-file preservation verification tests, +1 xlsx auto-shape, +1 docx header/footer preservation, +1 docx SDT preservation. |
 | Formula.Tests | 10 | Minimal formula package coverage. |
 | Interop.Tests (C#) | 55 | Bidirectional Java/.NET fixtures and preservation tests. |
-| **Total (C#)** | **299** | |
+| **Total (C#)** | **302** | |
 | Java POI side (Maven) | 44 | Java fixture generation/readback tests. |
 
 ---

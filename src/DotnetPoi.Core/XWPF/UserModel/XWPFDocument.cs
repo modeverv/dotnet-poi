@@ -71,12 +71,18 @@ public sealed class XWPFDocument : IDisposable
     private string? _footerText;
     private int _headerCount;
     private int _footerCount;
+    private bool _headerModified;
+    private bool _footerModified;
 
     // Unknown part preservation: ZIP entries not understood by the model are stored
     // byte-for-byte and re-emitted during write, ensuring layouts, themes, styles,
     // docProps, and other unmodeled parts survive round-trip.
     private readonly Dictionary<string, byte[]> _preservedEntries
         = new(StringComparer.OrdinalIgnoreCase);
+
+    // Raw XML preservation for unknown direct children of w:body in document.xml
+    // (SDT / content controls, altChunk, bookmarks, track changes, etc.).
+    internal readonly List<string> _preservedRawBodyElements = new();
 
     public XWPFDocument() { }
 
@@ -152,6 +158,7 @@ public sealed class XWPFDocument : IDisposable
     {
         _headerText = text;
         _headerCount = text.Length > 0 ? 1 : 0;
+        _headerModified = true;
     }
 
     /// <summary>Get default header text.</summary>
@@ -162,6 +169,7 @@ public sealed class XWPFDocument : IDisposable
     {
         _footerText = text;
         _footerCount = text.Length > 0 ? 1 : 0;
+        _footerModified = true;
     }
 
     /// <summary>Get default footer text.</summary>
@@ -189,10 +197,10 @@ public sealed class XWPFDocument : IDisposable
         WriteEntry(archive, "word/settings.xml", WriteSettings);
         if (_numInstances.Count > 0)
             WriteEntry(archive, "word/numbering.xml", WriteNumbering);
-        // headers and footers
-        if (_headerCount > 0)
+        // headers and footers — write model content only if modified via API, otherwise preserved bytes are used
+        if (_headerCount > 0 && _headerModified)
             WriteEntry(archive, "word/header1.xml", WriteHeader);
-        if (_footerCount > 0)
+        if (_footerCount > 0 && _footerModified)
             WriteEntry(archive, "word/footer1.xml", WriteFooter);
         foreach (var pic in _pictures)
         {
@@ -311,10 +319,6 @@ public sealed class XWPFDocument : IDisposable
         };
         if (_numInstances.Count > 0)
             known.Add("word/numbering.xml");
-        if (_headerCount > 0)
-            known.Add("word/header1.xml");
-        if (_footerCount > 0)
-            known.Add("word/footer1.xml");
         if (_vbaProjectBin != null)
         {
             known.Add("word/vbaProject.bin");
@@ -497,8 +501,46 @@ public sealed class XWPFDocument : IDisposable
         int xfrmRot = 0;
         bool inInline = false;
 
-        while (reader.Read())
+        // Raw XML preservation state
+        int bodyDepth = -1;
+        bool skipRead = false;
+
+        while (skipRead || reader.Read())
         {
+            skipRead = false;
+
+            if (reader.NodeType == XmlNodeType.Element)
+            {
+                // Track w:body entry to know when we're inside body
+                if (reader.NamespaceURI == NsW && reader.LocalName == "body")
+                {
+                    bodyDepth = reader.Depth;
+                    continue;
+                }
+
+                // Capture unknown direct children of w:body that the model doesn't handle
+                // (SDT/content controls, altChunk, bookmarks, track changes, etc.)
+                if (bodyDepth >= 0 && reader.Depth == bodyDepth + 1)
+                {
+                    if (reader.NamespaceURI == NsW)
+                    {
+                        if (reader.LocalName is not ("p" or "tbl" or "sectPr" or "body"))
+                        {
+                            _preservedRawBodyElements.Add(reader.ReadOuterXml());
+                            skipRead = true;
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        // Non-W namespace direct body child (e.g., mc:AlternateContent)
+                        _preservedRawBodyElements.Add(reader.ReadOuterXml());
+                        skipRead = true;
+                        continue;
+                    }
+                }
+            }
+
             if (reader.NodeType == XmlNodeType.Element)
             {
                 switch (reader.NamespaceURI)
@@ -760,6 +802,9 @@ public sealed class XWPFDocument : IDisposable
                             case "tc":
                                 currentTableCell = null;
                                 break;
+                            case "body":
+                                bodyDepth = -1;
+                                break;
                         }
                         break;
                     case NsWp:
@@ -1018,6 +1063,11 @@ public sealed class XWPFDocument : IDisposable
         foreach (var table in _tables)
         {
             WriteTable(writer, table);
+        }
+        // Re-emit unknown body children (SDT, altChunk, bookmarks, etc.) verbatim
+        foreach (var raw in _preservedRawBodyElements)
+        {
+            writer.WriteRaw(raw);
         }
         writer.WriteStartElement("w", "sectPr");
         // pgSz: page size + orientation

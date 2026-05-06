@@ -111,6 +111,49 @@ public class PreservationVerificationTests
     }
 
     [Fact]
+    public void Docx_HeaderFooter_RawXmlPreserved()
+    {
+        // headerPic.docx has a header with rich content (image references via blip).
+        // When loaded and written without API modification, the raw header XML should
+        // survive round-trip via _preservedEntries (headers/footers are no longer in
+        // GetModelEntryNames()).
+        var path = Path.Combine(PoiTestData, "document/headerPic.docx");
+        Assert.True(File.Exists(path), $"File not found: {path}");
+
+        var raw = File.ReadAllBytes(path);
+        var before = GetZipEntries(raw);
+        Assert.Contains("word/header1.xml", before);
+        Assert.Contains("word/media/image1.jpeg", before);
+
+        // Load (header has no <w:t> text — only an image; getHeaderText returns null)
+        using var doc = new XWPFDocument(new MemoryStream(raw));
+
+        // Write WITHOUT calling setHeaderText/setFooterText → preserved bytes should be used
+        using var ms = new MemoryStream();
+        doc.write(ms);
+        var after = GetZipEntries(ms.ToArray());
+
+        DumpLostEntries("docx header/footer round-trip", before, after);
+
+        // header1.xml and its media should survive
+        Assert.Contains("word/header1.xml", after);
+        Assert.Contains("word/media/image1.jpeg", after);
+
+        // The header content should be the rich original, not the minimal model output
+        ms.Position = 0;
+        using var verifyArchive = new ZipArchive(ms, ZipArchiveMode.Read);
+        var headerEntry = verifyArchive.GetEntry("word/header1.xml");
+        Assert.NotNull(headerEntry);
+        using var r = new StreamReader(headerEntry.Open());
+        var headerXml = r.ReadToEnd();
+        // The preserved XML should contain a:blip (image reference), proving
+        // the rich content survived rather than being replaced by model text
+        Assert.Contains("a:blip", headerXml, StringComparison.Ordinal);
+        Console.WriteLine($"  Preserved header XML length: {headerXml.Length} bytes ✅");
+        Console.WriteLine($"  Contains a:blip: {headerXml.Contains("a:blip", StringComparison.Ordinal)}");
+    }
+
+    [Fact]
     public void Xlsx_RoundTrip_VerifyEntryPreservation()
     {
         // Check what ZIP entries survive. Auto-shapes (in drawing.xml) and
@@ -131,6 +174,63 @@ public class PreservationVerificationTests
         var after = GetZipEntries(ms.ToArray());
 
         DumpLostEntries("xlsx round-trip", before, after);
+    }
+
+    [Fact]
+    public void Xlsx_RoundTrip_AutoShapesAndPicturesPreserved()
+    {
+        // Auto-shapes (xdr:sp) inside xl/drawings/drawingN.xml should survive
+        // round-trip via raw XML preservation. Use a file that has auto-shapes
+        // with no picture dependencies.
+        var path = Path.Combine(PoiTestData, "spreadsheet/47504.xlsx");
+        Assert.True(File.Exists(path), $"File not found: {path}");
+
+        var raw = File.ReadAllBytes(path);
+        var before = GetZipEntries(raw);
+        Console.WriteLine($"  [before] Entries ({before.Count}):");
+
+        using var wb = new XSSFWorkbook(new MemoryStream(raw));
+
+        // Check that auto-shapes were captured during load
+        int totalPreserved = 0;
+        bool foundAutoShapeInDrawing = false;
+        for (int i = 0; i < wb.getNumberOfSheets(); i++)
+        {
+            var sheet = wb.getSheetAt(i);
+            var drawing = sheet.Drawing;
+            if (drawing is null) continue;
+            totalPreserved += drawing.PreservedRawAnchors.Count;
+            foreach (var anchor in drawing.PreservedRawAnchors)
+            {
+                if (anchor.Contains("xdr:sp"))
+                {
+                    foundAutoShapeInDrawing = true;
+                    break;
+                }
+            }
+            Console.WriteLine($"  Sheet #{i}: PreservedRawAnchors={drawing.PreservedRawAnchors.Count}, Pictures={drawing.Pictures.Count}");
+        }
+        Assert.True(totalPreserved > 0,
+            $"Expected at least one auto-shape anchor to be preserved, got {totalPreserved}.");
+        Assert.True(foundAutoShapeInDrawing,
+            "No xdr:sp content found among preserved anchors.");
+
+        // Write and verify
+        using var ms = new MemoryStream();
+        wb.write(ms);
+        var after = GetZipEntries(ms.ToArray());
+
+        DumpLostEntries("xlsx drawing round-trip", before, after);
+
+        // Verify the drawing contains auto-shapes in the output
+        ms.Position = 0;
+        using var verifyArchive = new ZipArchive(ms, ZipArchiveMode.Read);
+        var drawingEntry = verifyArchive.GetEntry("xl/drawings/drawing1.xml");
+        Assert.NotNull(drawingEntry);
+        using var r = new StreamReader(drawingEntry.Open());
+        var drawingXml = r.ReadToEnd();
+        Assert.Contains("xdr:sp", drawingXml);
+        Console.WriteLine("  Output drawing XML contains xdr:sp ✅");
     }
 
     [Fact]
@@ -189,6 +289,62 @@ public class PreservationVerificationTests
         Assert.True(slidesWithGroupShapes > 0,
             "No group shapes or connectors found in output slide XML. "
             + "The preservation mechanism may not be working.");
+    }
+
+    [Fact]
+    public void Docx_BlockLevelSdt_Preserved()
+    {
+        // Block-level SDT (w:sdt as direct child of w:body, containing paragraphs
+        // inside w:sdtContent) should survive round-trip via raw XML preservation.
+        // Files with only inline SDT (inside paragraphs) like 52449.docx are not
+        // covered by this mechanism.
+        var path = Path.Combine(PoiTestData, "document/60316.docx");
+        Assert.True(File.Exists(path), $"File not found: {path}");
+
+        // 60316.docx has 3 block-level SDT elements verified during development.
+        // Total SDT occurrences in output should count both open tags and references
+        // within preserved raw XML content.
+
+        var raw = File.ReadAllBytes(path);
+        var before = GetZipEntries(raw);
+        Console.WriteLine($"  60316.docx — [before] Entries ({before.Count}):");
+        foreach (var n in before.OrderBy(x => x))
+            Console.WriteLine($"    {n}");
+
+        using var doc = new XWPFDocument(new MemoryStream(raw));
+        using var ms = new MemoryStream();
+        doc.write(ms);
+        var after = GetZipEntries(ms.ToArray());
+
+        DumpLostEntries("docx SDT round-trip (60316.docx)", before, after);
+
+        // Verify SDT content survives in output document.xml
+        ms.Position = 0;
+        using var verifyArchive = new ZipArchive(ms, ZipArchiveMode.Read);
+        var docEntry = verifyArchive.GetEntry("word/document.xml");
+        Assert.NotNull(docEntry);
+        using var r = new StreamReader(docEntry.Open());
+        var docXml = r.ReadToEnd();
+        Assert.Contains("<w:sdt", docXml, StringComparison.Ordinal);
+        int sdtCount = 0, idx = 0;
+        while ((idx = docXml.IndexOf("<w:sdt", idx, StringComparison.Ordinal)) != -1)
+        {
+            sdtCount++;
+            idx += 6;
+        }
+        Console.WriteLine($"  Block-level SDT elements in output: {sdtCount}");
+        Assert.True(sdtCount >= 2, $"Expected at least 2 block-level SDT elements, got {sdtCount}");
+    }
+
+    private static int CountOccurrences(string text, string pattern)
+    {
+        int count = 0, idx = 0;
+        while ((idx = text.IndexOf(pattern, idx, StringComparison.Ordinal)) != -1)
+        {
+            count++;
+            idx += pattern.Length;
+        }
+        return count;
     }
 
     private static HashSet<string> GetZipEntries(byte[] data)

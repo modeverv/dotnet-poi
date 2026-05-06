@@ -36,7 +36,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests (234) — all formats (+3 preservation verification)
+│   ├── DotnetPoi.Core.Tests/       # Core tests (237) — all formats (+6: pptx group shapes, xlsx auto-shapes, docx header/footer, docx SDT preservation)
 │   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
 │   ├── DotnetPoi.Interop.Tests/   # Bidirectional compatibility tests
 │   │   ├── java/                #   Maven project (Apache POI dependency)
@@ -319,7 +319,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 |---|---|---|---|
 | 1 | xlsx/XSSF | ~78% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; rich text (per-character formatting) ✅; pivot tables (programmatic create + unknown parts preserve) ✅; auto filter ✅; sheet/workbook protection ✅; active sheet/active cell API ✅ (activeSheet round-trip, activeCell in-memory only); no formula evaluation; charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
-| 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅; styles/comments/footnotes/endnotes/OLE round-trip preserve 🔵 |
+| 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅; styles/comments/footnotes/endnotes/OLE round-trip preserve 🔵; block-level SDT/content controls preserve 🔵 |
 | 4 | pptx/XSLF | ~40% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; unknown part preservation ✅; tables (p:graphicFrame/a:tbl) write/read ✅; non-image media (video/audio) round-trip preserve ✅; 18 round-trip tests |
 | 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
 | 6 | doc/HWPF | ~5% | read-only stub only |
@@ -444,6 +444,92 @@ Goal: make interop checks explicit before declaring a format slice “done”.
 5. 再現可能なスクリプトまたは静的サイトジェネレーターで HTML を `docs/` に生成する。
 6. 生成された HTML を spot-check してから docs slice 完了とみなす。
 
+### Phase 10 — docx/XWPF Practical Completion
+
+目標: `.docx` / `.docm` を新しい Office 形式として実用的に生成・軽編集・round-trip できる状態へ引き上げる。Word の完全な編集エンジンを目指すのではなく、業務文書・帳票・テンプレート填充・既存ファイルの軽編集で壊れにくい XWPF を目指す。
+
+このフェーズは **docx の欠損している実用動作を埋める** ためのフェーズ。Apache POI の XWPF 実装とテストを必ず参照し、独自仕様に寄せない。
+
+優先順位:
+
+1. **Sections / page model**
+   - page size、orientation、margins、columns、section breaks、header/footer variants（first/even/default）を POI 互換 API に寄せて実装する。
+   - 既存ヘッダー/フッターの rich content は、API 経由で変更しない限り raw XML / `_preservedEntries` で壊さない。
+
+2. **Styles**
+   - paragraph styles、character styles、table styles、built-in styles（Normal/Heading/Title 等）の読み書きを実装する。
+   - direct formatting と style-based formatting の境界を明確にし、style inheritance は POI の挙動を確認して段階的に実装する。
+   - 手書き style 一覧ではなく、`word/styles.xml` と POI の XWPFStyles 相当モデルを基準にする。
+
+3. **Images**
+   - inline images のサイズ・形式・relationship・読み書きを安定化する。
+   - floating/anchored images、wrap、position、rotation、header/footer 内画像を段階的に扱う。
+   - API でモデル化していない DrawingML は round-trip preservation を優先する。
+
+4. **Tables**
+   - cell merge、row/column/cell width、borders、shading、vertical alignment、cell margins、table layout、table styles を実装する。
+   - 帳票用途を重視し、生成後に Word で開いて崩れにくいことを検証する。
+
+5. **Text boxes and content controls**
+   - Word text boxes (`w:txbxContent`) 内テキストの read / preserve / write 方針を決める。
+   - block-level SDT だけでなく inline SDT の保持を拡張する。
+   - API モデル化できない場合も、軽編集時に消さない preservation を優先する。
+
+6. **Review and references**
+   - comments、footnotes、endnotes、bookmarks、cross-references、tracked changes は、まず existing parts / relationships / inline references を壊さないことを優先する。
+   - API-level creation/editing は POI 互換で小さく追加する。
+
+完了条件:
+
+- dotnet-poi で生成した docx を Word / LibreOffice で開いて、修復ダイアログなしで表示・保存・再オープンできる。
+- 既存 docx/docm を読み込み、本文の軽微な編集をして保存しても、未対応の styles/comments/footnotes/endnotes/images/OLE/content controls 等を壊さない。
+- C# round-trip tests、Java POI interop tests、preservation tests を追加する。
+- Phase 11 の manual verification 対象に docx/docm を追加し、リリース前に実アプリで確認できるようにする。
+
+### Phase 11 — Manual Office / LibreOffice Verification
+
+目標: 自動テストでは拾いにくい「実 Office アプリで開けるか」「修復ダイアログが出ないか」「保存し直しても壊れないか」を、リリース前の手元検証として運用する。
+
+このフェーズは CI の代替ではない。通常の gate は `dotnet test`、Java POI interop、preservation tests、examples verification とし、Phase 11 は **release 前 manual verification suite** として扱う。GUI と Office インストールに依存するため、毎 PR の必須 CI にしない。
+
+対象環境:
+
+- **macOS**: Microsoft Excel / Word / PowerPoint を AppleScript などで操作し、open / edit / save / reopen と screenshot を取る。
+- **Windows**: Microsoft Office COM automation（Excel COM、将来的に Word/PowerPoint COM）で open / edit / save / reopen、wrong password rejection、screenshot、summary を記録する。
+- **Linux**: LibreOffice UNO + VNC/noVNC で open / edit / save / reopen、screenshot、summary を記録する。
+
+対象形式:
+
+- xlsx / xlsm: 業務利用の中心。セル値、スタイル、画像、数式再計算、保護、マクロ保持、暗号化、既存ファイル軽編集を重点確認する。
+- docx / docm: Phase 10 の進捗に合わせて、段落、表、画像、sections、styles、headers/footers、fields、macro preservation、軽編集保存を確認する。
+- pptx / pptm: スライド、テキスト、画像、テーブル、回転、notes/charts/media/layouts/themes/group shapes の保持を確認する。
+
+標準フロー:
+
+1. `dotnet test`、interop tests、examples generation を先に通す。
+2. manual verification 用 fixture を `docs/manual-evidence/{macos,windows,linux}/workbooks` 等にコピーする。
+3. 実アプリで対象ファイルを開く。
+4. 軽微な編集を加える（例: xlsx は日本語シート追加、docx は本文段落追加、pptx はスライド/テキスト追加）。
+5. 保存して閉じる。
+6. 再オープンして、追加内容と既存内容が保持されることを確認する。
+7. 修復ダイアログ、内容削除、マクロ/リンク/保護関連の意図しない警告が出ないことを記録する。
+8. screenshot、`session.log`、`summary.md`、`manual-test-checklist.md` を保存する。
+
+証跡ルール:
+
+- 実行日時、OS、Office/LibreOffice バージョン、対象ファイル、結果 PASS/FAIL、メモを記録する。
+- screenshot は evidence として保存する。目視が必要な失敗は screenshot と log の両方を残す。
+- password / macro / encryption の検証では、正しい password で開けることと代表ケースで wrong password が拒否されることを確認する。
+- 手動検証スクリプトは `tmp/` 等で試験運用してよいが、安定したら `docs/manual-evidence/` または `tools/manual-verification/` に整理する。
+
+完了条件:
+
+- リリース前に xlsx/xlsm の macOS Excel、Windows Excel、Linux LibreOffice の manual verification が PASS している。
+- docx/docm と pptx/pptm は、対応機能の成熟度に応じて Word/PowerPoint/LibreOffice Impress/Writer の確認を追加する。
+- 失敗した場合は、Office 実装依存の問題として `CHECKPOINT.md` に記録し、再現 fixture と証跡を残してから修正する。
+
+メモ:
+tmpディレクトリに参考にできるリソースを配置している。
 ---
 
 ## Porting Procedure (Per Class)
@@ -628,4 +714,3 @@ org.apache.poi.xssf.usermodel.XSSFWorkbook
 - [OOXML spec (ECMA-376)](https://www.ecma-international.org/publications-and-standards/standards/ecma-376/)
 - [BIFF8 spec (Microsoft)](https://docs.microsoft.com/en-us/openspecs/office_file_formats/ms-xls)
 - [OpenMCDF (CFB container reference, Phase 4+)](https://github.com/ironfede/openmcdf)
-

@@ -1348,17 +1348,36 @@ public sealed class XSSFWorkbook : IWorkbook
         }
 
         var drawing = sheet.createDrawingPatriarch();
-
-        // Parse twoCellAnchor elements to reconstruct XSSFPicture shapes
         using var drawingStream = drawingEntry.Open();
         using var reader = XmlReader.Create(drawingStream, new XmlReaderSettings { IgnoreWhitespace = false });
+
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "twoCellAnchor")
+            {
+                var anchorXml = reader.ReadOuterXml();
+                // Check if this anchor contains a picture element (xdr:pic)
+                if (anchorXml.Contains("xdr:pic"))
+                {
+                    ParsePictureAnchor(anchorXml, drawing, pictureIndexByRelId);
+                }
+                else
+                {
+                    drawing.addPreservedRawAnchor(anchorXml);
+                }
+            }
+        }
+    }
+
+    private static void ParsePictureAnchor(string anchorXml, XSSFDrawing drawing, Dictionary<string, int> pictureIndexByRelId)
+    {
+        using var reader = XmlReader.Create(new System.IO.StringReader(anchorXml), new XmlReaderSettings { IgnoreWhitespace = false });
 
         XSSFClientAnchor? currentAnchor = null;
         string? currentRelId = null;
         int currentShapeId = 0;
-        bool inFrom = false, inTo = false;
         int rotAttribute = 0;
-        // from/to marker accumulators
+        bool inFrom = false, inTo = false;
         int fCol = 0, fDx = 0, fRow = 0, fDy = 0;
         int tCol = 0, tDx = 0, tRow = 0, tDy = 0;
         string? markerField = null;
@@ -1399,10 +1418,7 @@ public sealed class XSSFWorkbook : IWorkbook
                     case "blip":
                         var embedAttr = reader.GetAttribute("embed");
                         if (embedAttr is null)
-                        {
-                            // try namespace-qualified attribute
                             embedAttr = GetAttributeByLocalName(reader, "embed");
-                        }
                         currentRelId = embedAttr;
                         break;
                     case "xfrm":
@@ -2135,6 +2151,11 @@ public sealed class XSSFWorkbook : IWorkbook
         foreach (var picture in drawing.Pictures)
         {
             WritePictureAnchor(writer, picture);
+        }
+        // Re-emit unknown twoCellAnchor elements (auto-shapes, charts, group shapes, connectors, etc.)
+        foreach (var raw in drawing.PreservedRawAnchors)
+        {
+            writer.WriteRaw(raw);
         }
         writer.WriteEndElement();
     }

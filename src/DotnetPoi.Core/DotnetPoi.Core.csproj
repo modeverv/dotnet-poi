@@ -9,6 +9,16 @@
         <RootNamespace>DotnetPoi</RootNamespace>
     </PropertyGroup>
 
+    <!-- Allow test assemblies to access internal APIs -->
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>DotnetPoi.Core.Tests</_Parameter1>
+        </AssemblyAttribute>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>DotnetPoi.Interop.Tests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
     <!-- ── NuGet package metadata ─────────────────────────────────────── -->
     <PropertyGroup>
         <PackageId>DotnetPoi.Core</PackageId>

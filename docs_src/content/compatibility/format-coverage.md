@@ -16,7 +16,7 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Layout | print settings (margins, paper size, orientation, headers) | ✅ | |
 | Drawings | images, anchors, rotation, hyperlinks | ✅ | |
 | Drawings | charts, comments | 🔵 | Preserved on round-trip, new creation not modeled |
-| Drawings | auto-shapes | ❌ | |
+| Drawings | auto-shapes, group shapes, connectors | 🔵 | Unknown `xdr:twoCellAnchor` children in drawing.xml preserved verbatim via raw XML capture/re-emission. Currently only `xdr:pic` is modeled; all other element types survive round-trip. |
 | Data | data validation, conditional formatting, auto filter | ✅ | |
 | Data | pivot tables | ⚠️ | Programmatic creation works; editing existing not modeled |
 | Strings | shared strings, rich text runs | ✅ | Per-character formatting via XSSFRichTextString |
@@ -34,7 +34,7 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Tables | create/read tables, rows, cells | ✅ | Round-trip verified |
 | Tables | cell merging, borders | ❌ | |
 | Sections | page size, margins, orientation | ✅ | |
-| Sections | headers and footers | ✅ | Round-trip verified |
+| Sections | headers and footers | ✅ | Round-trip verified. Rich content (images, formatting) preserved via `_preservedEntries` when not modified via API. |
 | Sections | columns | ❌ | |
 | Links | hyperlinks (external URLs) | ✅ | |
 | Images | inline images with rotation | ✅ | |
@@ -42,7 +42,7 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Annotations | comments | 🔵 | Existing parts round-trip via `_preservedEntries` |
 | Annotations | footnotes, endnotes | 🔵 | `word/footnotes.xml` / `word/endnotes.xml` round-trip preserved |
 | Fields | TOC, page numbers, mail merge | ✅ | Write/read/round-trip |
-| SDT | content controls | ❌ | |
+| SDT | content controls (block-level) | 🔵 | Block-level `w:sdt` in `w:body` preserved via raw XML capture/re-emission. Inline SDT (inside `w:p`) not covered. |
 | Styles | paragraph/character/table styles | ❌ | Direct formatting only; `word/styles.xml` 🔵 preserved but style refs in document.xml lost on model rewrite |
 | Track Changes | revision marks | ❌ | |
 | Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries` |
