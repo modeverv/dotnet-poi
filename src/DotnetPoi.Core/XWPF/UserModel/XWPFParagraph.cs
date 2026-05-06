@@ -47,6 +47,7 @@ public sealed class XWPFParagraph
     // Numbering
     private int? _numId;
     private int _ilvl;
+    private string? _styleId;
 
     internal XWPFParagraph(XWPFDocument document)
     {
@@ -131,6 +132,9 @@ public sealed class XWPFParagraph
     public int? getNumId() => _numId;
     public void setIlvl(int ilvl) => _ilvl = ilvl;
     public int getIlvl() => _ilvl;
+
+    public string? getStyleID() => _styleId;
+    public void setStyle(string? styleId) => _styleId = styleId;
 
     /// <summary>Convenience: set up a bullet list numbering.</summary>
     public void setBulletList()

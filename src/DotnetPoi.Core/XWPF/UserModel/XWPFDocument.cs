@@ -30,13 +30,16 @@ public sealed class XWPFDocument : IDisposable
     private const string RelTypeFooter = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer";
     private const string ContentTypeFooter = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml";
 
+    private const string RelTypeStyles = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+    private const string ContentTypeStyles = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml";
+
     /// <summary>True if this document was loaded from docm (has a vbaProject.bin).</summary>
     public bool HasMacros => _vbaProjectBin != null;
 
     public bool isMacroEnabled() => HasMacros;
 
-    // rId1 is always reserved for settings.xml; image rIds start at rId{Index + 1}.
-    private const int ImageRelIdOffset = 1;
+    // rId1 is always reserved for settings.xml; rId2 is for styles.xml; image rIds start at rId{Index + 2}.
+    private const int ImageRelIdOffset = 2;
 
     private readonly List<XWPFParagraph> _paragraphs = new();
     private readonly List<XWPFPictureData> _pictures = new();
@@ -108,6 +111,8 @@ public sealed class XWPFDocument : IDisposable
     // model state (pgSz, pgMar, cols, etc.) via ParseFinalSectPr().
     private readonly List<string> _preservedBodySectPr = new();
 
+    private XWPFStyles? _styles;
+
     public XWPFDocument() { }
 
     public XWPFDocument(Stream stream)
@@ -133,6 +138,8 @@ public sealed class XWPFDocument : IDisposable
     }
 
     public IReadOnlyList<XWPFTable> getTables() => _tables;
+
+    public XWPFStyles? getStyles() => _styles;
 
     public IReadOnlyList<XWPFPictureData> getAllPictures() => _pictures;
 
@@ -274,6 +281,7 @@ public sealed class XWPFDocument : IDisposable
         WriteEntry(archive, "word/settings.xml", WriteSettings);
         if (_numInstances.Count > 0)
             WriteEntry(archive, "word/numbering.xml", WriteNumbering);
+        WriteEntry(archive, "word/styles.xml", WriteStyles);
         // headers and footers — write model content only if modified via API, otherwise preserved bytes are used
         if (_headerModified)
         {
@@ -415,6 +423,7 @@ public sealed class XWPFDocument : IDisposable
         ReadDocument(archive);
         ReadVbaFiles(archive);
         ReadHeadersFooters(archive);
+        ReadStyles(archive);
         CollectPreservedEntries(archive);
     }
 
@@ -427,6 +436,7 @@ public sealed class XWPFDocument : IDisposable
             "word/document.xml",
             "word/_rels/document.xml.rels",
             "word/settings.xml",
+            "word/styles.xml",
         };
         if (_numInstances.Count > 0)
             known.Add("word/numbering.xml");
@@ -453,6 +463,17 @@ public sealed class XWPFDocument : IDisposable
             using var ms = new MemoryStream();
             s.CopyTo(ms);
             _preservedEntries[name] = ms.ToArray();
+        }
+    }
+
+    private void ReadStyles(ZipArchive archive)
+    {
+        var entry = archive.GetEntry("word/styles.xml");
+        if (entry is not null)
+        {
+            using var stream = entry.Open();
+            _styles = new XWPFStyles();
+            _styles.ReadStyles(stream);
         }
     }
 
@@ -760,6 +781,11 @@ public sealed class XWPFDocument : IDisposable
                                 var colorVal = reader.GetAttribute("w:val");
                                 if (colorVal is not null)
                                     currentRun?.setColor(colorVal);
+                                break;
+                            case "pStyle" when inPPr:
+                                var pStyleVal = reader.GetAttribute("w:val");
+                                if (pStyleVal is not null && currentParagraph is not null)
+                                    currentParagraph.setStyle(pStyleVal);
                                 break;
                             case "jc" when inPPr:
                                 var jcVal = reader.GetAttribute("w:val");
@@ -1423,6 +1449,7 @@ public sealed class XWPFDocument : IDisposable
         WriteOverride(writer, "/word/settings.xml", ContentTypeSettings);
         if (_numInstances.Count > 0)
             WriteOverride(writer, "/word/numbering.xml", ContentTypeNumbering);
+        WriteOverride(writer, "/word/styles.xml", ContentTypeStyles);
         {
             int hIdx = 1;
             foreach (var hText in new[] { _headerText, _headerFirstText, _headerEvenText })
@@ -1459,7 +1486,9 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
         // rId1: settings
         WriteRelationship(writer, "rId1", "settings.xml", RelTypeSettings);
-        // images: rId{pic.Index + 1}
+        // rId2: styles
+        WriteRelationship(writer, "rId2", "styles.xml", RelTypeStyles);
+        // images: rId{pic.Index + ImageRelIdOffset}
         foreach (var pic in _pictures)
         {
             WriteRelationship(writer, $"rId{pic.Index + ImageRelIdOffset}", $"media/{pic.getFileName()}",
@@ -1468,21 +1497,21 @@ public sealed class XWPFDocument : IDisposable
         // hyperlinks: after images, before numbering/vba
         for (int i = 0; i < _hyperlinkUrls.Count; i++)
         {
-            var relId = $"rId{_pictures.Count + 2 + i}";
+            var relId = $"rId{_pictures.Count + 3 + i}";
             WriteRelationship(writer, relId, _hyperlinkUrls[i], RelTypeHyperlink, "External");
         }
         int offset = _hyperlinkUrls.Count;
         // numbering
         if (_numInstances.Count > 0)
         {
-            var numRelId = $"rId{_pictures.Count + 2 + offset}";
+            var numRelId = $"rId{_pictures.Count + 3 + offset}";
             WriteRelationship(writer, numRelId, "numbering.xml", RelTypeNumbering);
             offset++;
         }
         // vbaProject
         if (_vbaProjectBin != null)
         {
-            var vbaRelId = $"rId{_pictures.Count + 2 + offset}";
+            var vbaRelId = $"rId{_pictures.Count + 3 + offset}";
             WriteRelationship(writer, vbaRelId, "vbaProject.bin", RelTypeVbaProject);
         }
         // headers (variants: default, first, even)
@@ -1492,7 +1521,7 @@ public sealed class XWPFDocument : IDisposable
             {
                 if (string.IsNullOrEmpty(hText)) continue;
                 offset++;
-                var relId = $"rId{_pictures.Count + 2 + offset - 1}";
+                var relId = $"rId{_pictures.Count + 3 + offset - 1}";
                 WriteRelationship(writer, relId, $"header{hFileIdx++}.xml", RelTypeHeader);
             }
         }
@@ -1503,7 +1532,7 @@ public sealed class XWPFDocument : IDisposable
             {
                 if (string.IsNullOrEmpty(fText)) continue;
                 offset++;
-                var relId = $"rId{_pictures.Count + 2 + offset - 1}";
+                var relId = $"rId{_pictures.Count + 3 + offset - 1}";
                 WriteRelationship(writer, relId, $"footer{fFileIdx++}.xml", RelTypeFooter);
             }
         }
@@ -1543,6 +1572,11 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteEndElement();
         writer.WriteEndElement();
         writer.WriteEndElement();
+    }
+
+    private void WriteStyles(PoiXmlWriter writer)
+    {
+        XWPFStyles.WriteDefaultStyles(writer);
     }
 
     private void WriteDocument(PoiXmlWriter writer)
@@ -1659,9 +1693,16 @@ public sealed class XWPFDocument : IDisposable
             || para.SpacingBefore != 0 || para.SpacingAfter != 0 || para.SpacingBetween != 0
             || para.NumId is not null
             || para.PreservedSectPr is not null
-            || para.HasPreservedRawPPrRPrChildren)
+            || para.HasPreservedRawPPrRPrChildren
+            || para.getStyleID() is not null)
         {
             writer.WriteStartElement("w", "pPr");
+            if (para.getStyleID() is not null)
+            {
+                writer.WriteStartElement("w", "pStyle");
+                writer.WriteAttributeString("w", "val", para.getStyleID());
+                writer.WriteEndElement();
+            }
             if (para.Alignment is not null)
             {
                 writer.WriteStartElement("w", "jc");
@@ -1934,7 +1975,7 @@ public sealed class XWPFDocument : IDisposable
                 {
                     int hyperlinkIndex = _hyperlinkUrls.IndexOf(run.HyperlinkUrl!);
                     run.HyperlinkRelId = hyperlinkIndex >= 0
-                        ? $"rId{_pictures.Count + 2 + hyperlinkIndex}"
+                        ? $"rId{_pictures.Count + 3 + hyperlinkIndex}"
                         : throw new InvalidOperationException("Hyperlink URL not registered.");
                 }
                 writer.WriteStartElement("w", "hyperlink");

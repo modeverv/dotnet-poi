@@ -108,8 +108,8 @@ public class XWPFDocumentTests
         var xml = ReadEntry(archive, "word/document.xml");
         Assert.Contains("<w:drawing>", xml);
         Assert.Contains("<wp:inline", xml);
-        // rId1 = settings.xml; image starts at rId2
-        Assert.Contains("r:embed=\"rId2\"", xml);
+        // rId1 = settings.xml; rId2 = styles.xml; image starts at rId3
+        Assert.Contains("r:embed=\"rId3\"", xml);
     }
 
     [Fact]

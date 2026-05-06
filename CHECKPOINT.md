@@ -17,6 +17,40 @@
 - Verified no changes needed in: `agents.md`, root `README.md`, `format-coverage.md`, `Formula/README.md`
 - New test numbers: Core.Tests=244, Formula.Tests=10, Interop.Tests(C#)=55, Total(C#)=309, Java POI=44
 
+## 2026-05-18 JST — Phase 10 item 6-1: pStyle read/write (style name)
+
+- Task: Implement paragraph style name read/write (`w:pStyle`) in `XWPFParagraph` and `XWPFDocument`.
+- Changes:
+  - `XWPFParagraph.cs` — Added `_styleId` private field; `getStyleID()` / `setStyle()` public methods.
+  - `XWPFDocument.cs` read path — Added `case "pStyle" when inPPr:` handler in XML parsing loop.
+  - `XWPFDocument.cs` write path — `WriteParagraph` now emits `<w:pStyle w:val="..."/>` inside `<w:pPr>` when style is set.
+- Build: 0 errors, 5 warnings (pre-existing nullable).
+- Next: 6-2 — `word/styles.xml` parsing (`XWPFStyles` model).
+
+## 2026-05-18 JST — Phase 10 item 6-2/6-3: styles.xml reading + default styles generation
+
+- Task: Implement `word/styles.xml` read/write and default styles generation for new documents.
+- Changes:
+  - **`XWPFStyles.cs`** (new class)
+    - `XWPFStyle` model with `StyleId`, `Name`, `Type`, `IsDefault`, `BasedOn` properties.
+    - `XWPFStyles.ReadStyles(Stream)` — parses `w:style` elements (name, basedOn, type, default flag).
+    - `XWPFStyles.WriteDefaultStyles(PoiXmlWriter)` — static method that generates a full styles.xml matching Apache POI output: docDefaults (11pt font, 1.15 line spacing), latent styles (267 count with exceptions for 20+ built-in styles), Normal, Heading 1/2/3 paragraph styles.
+    - Private helpers: `WriteLatentStyleException`, `WriteStyleEntry` (with configurable run/paragraph properties), `WriteRPrFontSize`.
+  - **`XWPFDocument.cs`** integration
+    - Added constants `RelTypeStyles` and `ContentTypeStyles`.
+    - Added `private XWPFStyles? _styles;` field and `getStyles()` public method.
+    - Added `ReadStyles(archive)` call in `Load()` — reads `word/styles.xml` if present.
+    - Added `WriteEntry(archive, "word/styles.xml", WriteStyles);` in `write()`.
+    - Added `WriteOverride(writer, "/word/styles.xml", ContentTypeStyles);` in `WriteContentTypes()`.
+    - Added relationship for styles (rId2) in `WriteDocumentRelationships()` — shifted image/hyperlink/numbering/VBA/header/footer rId base offsets by +1 (from `_pictures.Count + 2` to `_pictures.Count + 3`).
+    - Changed `ImageRelIdOffset` from 2 to 3, updated comment.
+    - Added `"word/styles.xml"` to `GetModelEntryNames()`.
+  - Created `WriteStyles()` method that delegates to `XWPFStyles.WriteDefaultStyles(writer)`.
+  - Fixed 4 tuple-element mismatch compilation errors in `WriteStyleEntry` calls.
+  - Fixed hyperlink rId offset from `+2` to `+3` in `WriteRun`.
+- Build: 0 errors, 5 warnings (pre-existing nullable).
+- Next: Phase 10 item 5 (Review/references) or item 6-4+.
+
 ## 2026-05-06 JST - Add OS-level manual verification wrappers
 
 - Current task: `tools/manual-verification` 直下に、`scripts/` 配下の実装ランナーを使う Linux / macOS / Windows 用テスト入口を追加する。
