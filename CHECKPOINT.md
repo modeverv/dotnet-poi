@@ -1182,3 +1182,36 @@ Notes:
 - **Interop C# WriteForPoi**: 4 passed (+4 new)
 - **全ビルド**: 0 errors
 - Java 側は Maven 環境で `mvn test` 実行時に対応テストが追加される
+
+---
+
+## 2026-05-06 JST — 全ファイルメンテナンス（preservation 確認結果反映 + カウント更新）
+
+### やったこと
+
+**POI test-data を使った preservation 実証テストを作成・実行:**
+
+- `PreservationVerificationTests.cs` — 3 tests:
+  - `Docx_StylesAndComments_Preserved` — 55966.docx (styles) + testComment.docx (comments) → 全 entry 保持 ✅
+  - `Xlsx_RoundTrip_VerifyEntryPreservation` — 123233_charts.xlsx (4 charts + drawing) → 全 entry 保持 ✅（Sheet の大文字小文字のみ正規化）
+  - `Pptx_RoundTrip_VerifyEntryPreservation` — 2411-Performance_Up.pptx (48 slides, 41 notes slides, 231 entries) → 全 entry 保持 ✅
+- パス解決のバグを修正（`Path.GetDirectoryName("/workspace")` が空文字列を返す問題）
+- Core.Tests に 3 tests 追加 → 231 → **234**
+
+**各ファイルの更新:**
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `NOW.md` | テスト数 231→234, 296→299。docx styles 注釈を「style定義ファイルは🔵保持」に更新。日付更新 |
+| `README.md` | バッジ 296→299, テスト表 231→234, 296→299 |
+| `agents.md` | Core tests (228)→(234)。docx progress 行に styles/comments/footnotes/endnotes/OLE 🔵 preserve 追記 |
+| `docs_src/content/compatibility/format-coverage.md` | xlsx: external data connections ❌→🔵; docx: comments/footnotes-endnotes ❌→🔵, styles 注釈更新, OLE embeddings 🔵行追加; pptx: notes slides ❌→🔵, video/audio ❌→🔵. **全6変更 + OLE追加** |
+| `tools/DotnetPoi.DocsGenerator/DotnetPoi.DocsGenerator.csproj` | TargetFramework net9.0→net8.0 (SDK互換) |
+| `docs/` | format-coverage.md更新を反映して再生成 (35 HTML files) |
+
+### 確認結果（preservation verification）
+
+- pptx 2411-Performance_Up.pptx: 231 entries **全部保持**（notes slides 41 + layouts/masters/theme/media/printerSettings）
+- xlsx 123233_charts.xlsx: 20 entries **全部保持**（charts 4 + drawing）
+- docx 55966.docx + testComment.docx: 全 entries **保持**（styles, comments, glossary）
+- ❌ 本当に失われる: auto-shapes (drawing.xml内の`<xdr:sp>`), sparklines (sheet.xml extLst), group shapes/connectors (slide.xml内), track changes/table borders/text boxes/SDT (document.xml内)

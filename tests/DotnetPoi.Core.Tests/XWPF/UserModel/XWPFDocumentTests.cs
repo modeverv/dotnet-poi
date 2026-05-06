@@ -656,6 +656,76 @@ public class XWPFDocumentTests
         Assert.Equal("Before field.  After field.1", loadedPara.getText());
     }
 
+    /// <summary>
+    /// comments (word/comments.xml), footnotes (word/footnotes.xml), endnotes
+    /// (word/endnotes.xml), OLE embeddings (word/embeddings/*) are separate
+    /// ZIP parts NOT in GetModelEntryNames() → should be 🔵 preserved.
+    /// (styles.xml preservation is already tested in RoundTrip_UnknownParts_Preserved.)
+    /// </summary>
+    [Fact]
+    public void RoundTrip_CommentAndFootnoteSeparateParts_Preserved()
+    {
+        using var original = new XWPFDocument();
+        original.createParagraph().createRun().setText("test");
+
+        byte[] raw;
+        using (var ms = new MemoryStream())
+        {
+            original.write(ms);
+            raw = ms.ToArray();
+        }
+
+        using var injectedStream = new MemoryStream();
+        using (var writerArchive = new ZipArchive(injectedStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            using (var readerArchive = new ZipArchive(new MemoryStream(raw), ZipArchiveMode.Read))
+            {
+                foreach (var entry in readerArchive.Entries)
+                {
+                    using var s = entry.Open();
+                    using var ms = new MemoryStream();
+                    s.CopyTo(ms);
+                    var ne = writerArchive.CreateEntry(entry.FullName);
+                    using var ws = ne.Open();
+                    ws.Write(ms.ToArray(), 0, (int)ms.Length);
+                }
+            }
+            // Inject comments, footnotes, endnotes, and an OLE embedding
+            var ce = writerArchive.CreateEntry("word/comments.xml");
+            using (var ws = ce.Open())
+                ws.Write(System.Text.Encoding.UTF8.GetBytes("<w:comments><w:comment /></w:comments>"));
+
+            var fe = writerArchive.CreateEntry("word/footnotes.xml");
+            using (var ws = fe.Open())
+                ws.Write(System.Text.Encoding.UTF8.GetBytes("<w:footnotes><w:footnote /></w:footnotes>"));
+
+            var ee = writerArchive.CreateEntry("word/endnotes.xml");
+            using (var ws = ee.Open())
+                ws.Write(System.Text.Encoding.UTF8.GetBytes("<w:endnotes><w:endnote /></w:endnotes>"));
+
+            var oe = writerArchive.CreateEntry("word/embeddings/oleObject.bin");
+            using (var ws = oe.Open())
+                ws.Write(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF });
+        }
+
+        injectedStream.Position = 0;
+        using var loaded = new XWPFDocument(injectedStream);
+
+        using var outStream = new MemoryStream();
+        loaded.write(outStream);
+        outStream.Position = 0;
+
+        using var verify = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var names = verify.Entries.Select(e => e.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("word/comments.xml", names);
+        Assert.Contains("word/footnotes.xml", names);
+        Assert.Contains("word/endnotes.xml", names);
+        Assert.Contains("word/embeddings/oleObject.bin", names);
+
+        using var r = new StreamReader(verify.GetEntry("word/comments.xml")!.Open());
+        Assert.Contains("<w:comments>", r.ReadToEnd());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

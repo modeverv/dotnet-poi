@@ -22,7 +22,8 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Strings | shared strings, rich text runs | ✅ | Per-character formatting via XSSFRichTextString |
 | Protection | workbook/sheet protection | ✅ | |
 | Macros | xlsm preservation | ✅ | VBA bytes preserved on round-trip |
-| Other | sparklines, external data connections | ❌ | |
+| Other | sparklines | ❌ | |
+| Other | external data connections | 🔵 | `xl/connections.xml` / `xl/externalLinks/*` round-trip via `_preservedEntries` |
 
 ## docx / XWPF (~65%)
 
@@ -38,14 +39,15 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Links | hyperlinks (external URLs) | ✅ | |
 | Images | inline images with rotation | ✅ | |
 | Images | text boxes (w:txbxContent) | ❌ | |
-| Annotations | comments | ❌ | |
-| Annotations | footnotes, endnotes | ❌ | |
+| Annotations | comments | 🔵 | Existing parts round-trip via `_preservedEntries` |
+| Annotations | footnotes, endnotes | 🔵 | `word/footnotes.xml` / `word/endnotes.xml` round-trip preserved |
 | Fields | TOC, page numbers, mail merge | ✅ | Write/read/round-trip |
 | SDT | content controls | ❌ | |
-| Styles | paragraph/character/table styles | ❌ | Direct formatting only; Normal/Heading styles not preserved |
+| Styles | paragraph/character/table styles | ❌ | Direct formatting only; `word/styles.xml` 🔵 preserved but style refs in document.xml lost on model rewrite |
 | Track Changes | revision marks | ❌ | |
+| Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries` |
 | Other | docm macro preservation | ✅ | VBA bytes preserved |
-| Other | unknown part preservation | ✅ | _preservedEntries mechanism |
+| Other | unknown part preservation | ✅ | `_preservedEntries` mechanism preserves non-model ZIP entries |
 
 ## pptx / XSLF (~40%)
 
@@ -53,14 +55,14 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 |---|---|---|---|
 | Slides | create/read slides | ✅ | |
 | Slides | slide size | ✅ | |
-| Slides | notes slides | ❌ | |
+| Slides | notes slides | 🔵 | `ppt/notesSlides/notesSlide*.xml` round-trip via `_preservedEntries` |
 | Text | text boxes (p:sp) create/read | ✅ | Round-trip verified |
 | Text | multiple paragraphs, run formatting | ✅ | bold, italic, underline, size, font, color |
 | Shapes | images with position, size, rotation | ✅ | Round-trip verified |
 | Shapes | tables (p:graphicFrame/a:tbl) | ✅ | Round-trip verified |
 | Shapes | grouping, connectors, lines | ❌ | |
 | Shapes | SmartArt, charts | 🔵 | Preserved as unknown parts |
-| Media | video/audio embedding | ❌ | |
+| Media | video/audio embedding | 🔵 | Non-image `ppt/media/*` round-trip via `_preservedEntries` |
 | Animation | animations, transitions | 🔵 | Preserved as unknown parts |
 | Theme | layout, master, theme | 🔵 | Not editable, preserved on round-trip |
 | Other | pptm macro preservation | ✅ | VBA bytes preserved |

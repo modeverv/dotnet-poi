@@ -36,7 +36,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests (228) — all formats
+│   ├── DotnetPoi.Core.Tests/       # Core tests (234) — all formats (+3 preservation verification)
 │   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
 │   ├── DotnetPoi.Interop.Tests/   # Bidirectional compatibility tests
 │   │   ├── java/                #   Maven project (Apache POI dependency)
@@ -319,7 +319,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 |---|---|---|---|
 | 1 | xlsx/XSSF | ~78% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; rich text (per-character formatting) ✅; pivot tables (programmatic create + unknown parts preserve) ✅; auto filter ✅; sheet/workbook protection ✅; active sheet/active cell API ✅ (activeSheet round-trip, activeCell in-memory only); no formula evaluation; charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
-| 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅ |
+| 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅; styles/comments/footnotes/endnotes/OLE round-trip preserve 🔵 |
 | 4 | pptx/XSLF | ~40% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; unknown part preservation ✅; tables (p:graphicFrame/a:tbl) write/read ✅; non-image media (video/audio) round-trip preserve ✅; 18 round-trip tests |
 | 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
 | 6 | doc/HWPF | ~5% | read-only stub only |

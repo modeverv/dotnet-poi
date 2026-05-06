@@ -11,7 +11,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 [![NuGet Formula Downloads](https://img.shields.io/nuget/dt/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-beta-orange)
-![Tests](https://img.shields.io/badge/tests-293%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-299%20passing-brightgreen)
 
 ## NuGet Package Strategy
 
@@ -73,7 +73,8 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | Data | pivot tables | ⚠️ | Programmatic creation exists; editing existing pivots is not modeled, but round-trip preservation is supported. |
 | Strings | shared strings, rich text runs | ✅ | `XSSFRichTextString` and `<rPr>` support are present. |
 | Other | workbook/sheet protection, xlsm macro preservation | ✅ | VBA bytes are preserved in macro-enabled round-trips. |
-| Other | sparklines, external data connections | ❌ | |
+| Other | sparklines | ❌ | |
+| Other | external data connections | 🔵 | `xl/connections.xml` and `xl/externalLinks/*` round-trip via `_preservedEntries`. |
 
 #### docx / XWPF (~65%)
 
@@ -88,24 +89,25 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | Links | external hyperlinks | ✅ | |
 | Images | inline images and rotation | ✅ | |
 | Images | Word text boxes (`w:txbxContent`) | ❌ | Text inside Word text boxes is not read. |
-| Review | comments, footnotes, endnotes | ❌ | |
+| Review | comments, footnotes, endnotes | 🔵 | Existing parts round-trip via `_preservedEntries`; API-level creation/editing is not modeled. |
 | Fields | TOC, page numbers, mail merge-style fields | ✅ | Write/read/round-trip covered. |
 | Styles | paragraph, character, and table styles | ❌ | Direct formatting is supported; style model parity is not. |
 | Other | docm macro preservation, unknown part preservation | ✅ | |
-| Other | content controls, tracked changes, OLE embeddings | ❌ | |
+| Other | content controls, tracked changes | ❌ | |
+| Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries`. |
 
 #### pptx / XSLF (~40%)
 
 | Category | Feature | Status | Notes |
 |---|---|---|---|
 | Slides | create/read slides, slide size | ✅ | |
-| Slides | notes slides | ❌ | |
+| Slides | notes slides | 🔵 | Existing notes slide parts round-trip via `_preservedEntries`; API-level creation/editing is not modeled. |
 | Text | text boxes, multiple paragraphs, run formatting | ✅ | Bold, italic, underline, strikeout, size, font, and color are covered. |
 | Shapes | pictures, anchors, size, rotation | ✅ | Round-trip covered. |
 | Shapes | tables | ✅ | `p:graphicFrame` / `a:tbl` write/read is implemented. |
 | Shapes | group shapes, connectors, most auto-shapes | ❌ | |
 | Shapes | SmartArt, charts | 🔵 | Existing parts are preserved, but not modeled. |
-| Media | video/audio embedding | ❌ | |
+| Media | video/audio embedding | 🔵 | Non-image `ppt/media/*` parts round-trip via `_preservedEntries`; API-level embedding is not modeled. |
 | Animation | animations and transitions | 🔵 | Preserved as unknown parts where present. |
 | Theme | layouts, masters, themes | 🔵 | Preserved, not editable. |
 | Other | pptm macro preservation, unknown part preservation | ✅ | |
@@ -132,11 +134,11 @@ Highest priority gaps:
 |---|---|---|---|
 | 1 | Formula evaluation | xlsx | Template fill → save → open in Excel works, but programmatic access to newly calculated results needs a real evaluator. |
 | 2 | Chart creation | xlsx, pptx | Existing charts can be preserved, but report/presentation generation often needs to create charts from data. |
-| 3 | Comment API model | xlsx, docx | Existing comments are expected to survive round-trip through unknown-part preservation, but API read/create/edit support is not implemented. |
+| 3 | Comment API model | xlsx, docx | Existing comments survive round-trip through `_preservedEntries`, but API-level read/create/edit support is not implemented. |
 | 4 | HSSF `.xls` depth | xls | Basic values exist, but full BIFF record, style, formula, and drawing support is still in progress. |
 | 5 | docx styles and text boxes | docx | Word documents commonly rely on styles and text boxes for layout and semantics. |
 
-Lower priority gaps include SmartArt, animations, transitions, `xls`/`doc`/`ppt` legacy depth, footnotes/endnotes, tracked changes, content controls, external data connections, and sparklines.
+Lower priority gaps include SmartArt, animations, transitions, `xls`/`doc`/`ppt` legacy depth, tracked changes, content controls, and sparklines.
 
 ### Test Coverage Snapshot
 
@@ -144,10 +146,10 @@ Tracked in [NOW.md](./NOW.md):
 
 | Project | Tests | Notes |
 |---|---:|---|
-| Core.Tests | 228 | Main format coverage, currently xlsx-heavy. |
+| Core.Tests | 234 | +3 POI test-file preservation verification tests. |
 | Formula.Tests | 10 | Minimal formula package coverage. |
 | Interop.Tests (C#) | 55 | Bidirectional Java/.NET fixtures and preservation tests. |
-| **Total (C#)** | **293** | |
+| **Total (C#)** | **299** | |
 | Java POI side (Maven) | 44 | Java fixture generation/readback tests. |
 
 ---

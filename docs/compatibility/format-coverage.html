@@ -106,7 +106,8 @@
 <tr><td>Strings</td><td>shared strings, rich text runs</td><td>✅</td><td>Per-character formatting via XSSFRichTextString</td></tr>
 <tr><td>Protection</td><td>workbook/sheet protection</td><td>✅</td></tr>
 <tr><td>Macros</td><td>xlsm preservation</td><td>✅</td><td>VBA bytes preserved on round-trip</td></tr>
-<tr><td>Other</td><td>sparklines, external data connections</td><td>❌</td></tr>
+<tr><td>Other</td><td>sparklines</td><td>❌</td></tr>
+<tr><td>Other</td><td>external data connections</td><td>&#128309;</td><td><code>xl/connections.xml</code> / <code>xl/externalLinks/*</code> round-trip via <code>_preservedEntries</code></td></tr>
 </tbody>
 </table>
 <h2>docx / XWPF (~65%)</h2>
@@ -123,14 +124,15 @@
 <tr><td>Links</td><td>hyperlinks (external URLs)</td><td>✅</td></tr>
 <tr><td>Images</td><td>inline images with rotation</td><td>✅</td></tr>
 <tr><td>Images</td><td>text boxes (w:txbxContent)</td><td>❌</td></tr>
-<tr><td>Annotations</td><td>comments</td><td>❌</td></tr>
-<tr><td>Annotations</td><td>footnotes, endnotes</td><td>❌</td></tr>
+<tr><td>Annotations</td><td>comments</td><td>&#128309;</td><td>Existing parts round-trip via <code>_preservedEntries</code></td></tr>
+<tr><td>Annotations</td><td>footnotes, endnotes</td><td>&#128309;</td><td><code>word/footnotes.xml</code> / <code>word/endnotes.xml</code> round-trip preserved</td></tr>
 <tr><td>Fields</td><td>TOC, page numbers, mail merge</td><td>✅</td><td>Write/read/round-trip</td></tr>
 <tr><td>SDT</td><td>content controls</td><td>❌</td></tr>
-<tr><td>Styles</td><td>paragraph/character/table styles</td><td>❌</td><td>Direct formatting only; Normal/Heading styles not preserved</td></tr>
+<tr><td>Styles</td><td>paragraph/character/table styles</td><td>❌</td><td>Direct formatting only; <code>word/styles.xml</code> &#128309; preserved but style refs in document.xml lost on model rewrite</td></tr>
 <tr><td>Track Changes</td><td>revision marks</td><td>❌</td></tr>
+<tr><td>Other</td><td>OLE embeddings</td><td>&#128309;</td><td><code>word/embeddings/*</code> round-trip via <code>_preservedEntries</code></td></tr>
 <tr><td>Other</td><td>docm macro preservation</td><td>✅</td><td>VBA bytes preserved</td></tr>
-<tr><td>Other</td><td>unknown part preservation</td><td>✅</td><td>_preservedEntries mechanism</td></tr>
+<tr><td>Other</td><td>unknown part preservation</td><td>✅</td><td><code>_preservedEntries</code> mechanism preserves non-model ZIP entries</td></tr>
 </tbody>
 </table>
 <h2>pptx / XSLF (~40%)</h2>
@@ -139,14 +141,14 @@
 <tbody>
 <tr><td>Slides</td><td>create/read slides</td><td>✅</td></tr>
 <tr><td>Slides</td><td>slide size</td><td>✅</td></tr>
-<tr><td>Slides</td><td>notes slides</td><td>❌</td></tr>
+<tr><td>Slides</td><td>notes slides</td><td>&#128309;</td><td><code>ppt/notesSlides/notesSlide*.xml</code> round-trip via <code>_preservedEntries</code></td></tr>
 <tr><td>Text</td><td>text boxes (p:sp) create/read</td><td>✅</td><td>Round-trip verified</td></tr>
 <tr><td>Text</td><td>multiple paragraphs, run formatting</td><td>✅</td><td>bold, italic, underline, size, font, color</td></tr>
 <tr><td>Shapes</td><td>images with position, size, rotation</td><td>✅</td><td>Round-trip verified</td></tr>
 <tr><td>Shapes</td><td>tables (p:graphicFrame/a:tbl)</td><td>✅</td><td>Round-trip verified</td></tr>
 <tr><td>Shapes</td><td>grouping, connectors, lines</td><td>❌</td></tr>
 <tr><td>Shapes</td><td>SmartArt, charts</td><td>&#128309;</td><td>Preserved as unknown parts</td></tr>
-<tr><td>Media</td><td>video/audio embedding</td><td>❌</td></tr>
+<tr><td>Media</td><td>video/audio embedding</td><td>&#128309;</td><td>Non-image <code>ppt/media/*</code> round-trip via <code>_preservedEntries</code></td></tr>
 <tr><td>Animation</td><td>animations, transitions</td><td>&#128309;</td><td>Preserved as unknown parts</td></tr>
 <tr><td>Theme</td><td>layout, master, theme</td><td>&#128309;</td><td>Not editable, preserved on round-trip</td></tr>
 <tr><td>Other</td><td>pptm macro preservation</td><td>✅</td><td>VBA bytes preserved</td></tr>

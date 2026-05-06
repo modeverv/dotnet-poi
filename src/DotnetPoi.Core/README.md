@@ -30,7 +30,7 @@ dotnet add package DotnetPoi.Core
 
 ## Documentation
 
-Full documentation is available at the **[dotnet-poi documentation site](https://modeverv.github.io/dotnet-poi/)** (generated from `docs_src/`):
+Full documentation is available at the **[dotnet-poi documentation site](https://modeverv.github.io/dotnet-poi/)** 
 
 | Section | Contents |
 |---|---|

@@ -1064,6 +1064,55 @@ public class XSSFWorkbookTests
         Assert.False(sheet.isSelected());
     }
 
+    /// <summary>
+    /// external data connections (xl/connections.xml) and external links
+    /// (xl/externalLinks/*) are separate ZIP parts NOT in GetModelEntryNames().
+    /// → should be 🔵 preserved via _preservedEntries.
+    /// </summary>
+    [Fact]
+    public void RoundTrip_ExternalConnections_Preserved()
+    {
+        byte[] xlsxBytes;
+        using (var original = new XSSFWorkbook())
+        {
+            original.createSheet("Data").createRow(0).createCell(0).setCellValue("Hello");
+            using var ms = new MemoryStream();
+            original.write(ms);
+            xlsxBytes = ms.ToArray();
+        }
+
+        using var injectedStream = new MemoryStream();
+        using (var srcArchive = new ZipArchive(new MemoryStream(xlsxBytes), ZipArchiveMode.Read))
+        using (var dstArchive = new ZipArchive(injectedStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var e in srcArchive.Entries)
+            {
+                var ne = dstArchive.CreateEntry(e.FullName, CompressionLevel.Optimal);
+                using var s = e.Open();
+                using var d = ne.Open();
+                s.CopyTo(d);
+            }
+            var conn = dstArchive.CreateEntry("xl/connections.xml", CompressionLevel.Optimal);
+            using (var sw = new StreamWriter(conn.Open()))
+                sw.Write("<connections><connection id=\"1\"/></connections>");
+            var ext = dstArchive.CreateEntry("xl/externalLinks/externalLink1.xml", CompressionLevel.Optimal);
+            using (var sw = new StreamWriter(ext.Open()))
+                sw.Write("<externalLink/>");
+        }
+
+        injectedStream.Position = 0;
+        using var loaded = new XSSFWorkbook(injectedStream);
+        using var outStream = new MemoryStream();
+        loaded.write(outStream);
+        outStream.Position = 0;
+
+        using var result = new ZipArchive(outStream, ZipArchiveMode.Read);
+        Assert.NotNull(result.GetEntry("xl/connections.xml"));
+        Assert.NotNull(result.GetEntry("xl/externalLinks/externalLink1.xml"));
+        using var r = new StreamReader(result.GetEntry("xl/connections.xml")!.Open());
+        Assert.Contains("<connections>", r.ReadToEnd());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

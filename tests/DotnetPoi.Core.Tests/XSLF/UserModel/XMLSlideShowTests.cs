@@ -533,6 +533,65 @@ public class XMLSlideShowTests
         Assert.Equal(1000000, loadedTable.getAnchorCy());
     }
 
+    /// <summary>
+    /// Notes slides (ppt/notesSlides/notesSlide1.xml) and non-image media
+    /// (video/audio in ppt/media/ not tracked in _pictures) are separate ZIP
+    /// parts NOT in GetModelEntryNames() → should be 🔵 preserved.
+    /// </summary>
+    [Fact]
+    public void RoundTrip_NotesSlides_Preserved()
+    {
+        using var original = new XMLSlideShow();
+        original.createSlide();
+
+        byte[] raw;
+        using (var ms = new MemoryStream())
+        {
+            original.write(ms);
+            raw = ms.ToArray();
+        }
+
+        using var injectedStream = new MemoryStream();
+        using (var writerArchive = new ZipArchive(injectedStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            using (var readerArchive = new ZipArchive(new MemoryStream(raw), ZipArchiveMode.Read))
+            {
+                foreach (var entry in readerArchive.Entries)
+                {
+                    using var s = entry.Open();
+                    using var ms = new MemoryStream();
+                    s.CopyTo(ms);
+                    var ne = writerArchive.CreateEntry(entry.FullName);
+                    using var ws = ne.Open();
+                    ws.Write(ms.ToArray(), 0, (int)ms.Length);
+                }
+            }
+            // Inject notes slide
+            var notesEntry = writerArchive.CreateEntry("ppt/notesSlides/notesSlide1.xml");
+            using (var ws = notesEntry.Open())
+                ws.Write(System.Text.Encoding.UTF8.GetBytes("<p:notes/>"));
+            // Inject a non-image media file (simulates video/audio)
+            var mediaEntry = writerArchive.CreateEntry("ppt/media/video1.mp4");
+            using (var ws = mediaEntry.Open())
+                ws.Write(new byte[] { 0x00, 0x01, 0x02 });
+        }
+
+        injectedStream.Position = 0;
+        using var loaded = new XMLSlideShow(injectedStream);
+        using var outStream = new MemoryStream();
+        loaded.write(outStream);
+        outStream.Position = 0;
+
+        using var verify = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var names = verify.Entries.Select(e => e.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("ppt/notesSlides/notesSlide1.xml", names);
+        Assert.Contains("ppt/media/video1.mp4", names);
+
+        using var r = new StreamReader(verify.GetEntry("ppt/notesSlides/notesSlide1.xml")!.Open());
+        var notesContent = r.ReadToEnd();
+        Assert.Contains("p:notes", notesContent, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static MemoryStream WriteToStream(XMLSlideShow prs)
     {
         var stream = new MemoryStream();
