@@ -69,6 +69,12 @@ public sealed class HSSFSheet : ISheet
     public void setAutoFilter(CellRangeAddress range) { }
     public CellRangeAddress? getAutoFilter() => null;
 
+    // Active cell / selection
+    public void setActiveCell(string cell) { }
+    public string? getActiveCell() => null;
+    public void setSelected(bool selected) { }
+    public bool isSelected() => false;
+
     IRow ISheet.createRow(int rownum) => createRow(rownum);
 
     IRow? ISheet.getRow(int rownum) => getRow(rownum);

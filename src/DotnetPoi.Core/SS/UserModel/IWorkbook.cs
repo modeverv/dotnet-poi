@@ -24,4 +24,9 @@ public interface IWorkbook : IDisposable
     // Workbook protection
     void protectWorkbook(bool protect);
     bool isWorkbookProtected();
+
+    // Active sheet / selected tab
+    void setActiveSheet(int index);
+    int getActiveSheetIndex();
+    void setSelectedTab(int index);
 }

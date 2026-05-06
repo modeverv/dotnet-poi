@@ -55,6 +55,9 @@ public sealed class XSSFWorkbook : IWorkbook
     // Workbook protection
     private bool _workbookProtected;
 
+    // Active sheet / selected tab tracking
+    private int _activeSheetIndex;
+
     private const string ContentTypeXlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
     private const string ContentTypeXlsm = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
     private const string ContentTypeVbaProject = "application/vnd.ms-office.vbaProject";
@@ -107,6 +110,21 @@ public sealed class XSSFWorkbook : IWorkbook
     public int getNumberOfSheets()
     {
         return _sheets.Count;
+    }
+
+    public void setActiveSheet(int index)
+    {
+        _activeSheetIndex = index;
+    }
+
+    public int getActiveSheetIndex()
+    {
+        return _activeSheetIndex;
+    }
+
+    public void setSelectedTab(int index)
+    {
+        _activeSheetIndex = index;
     }
 
     internal IReadOnlyList<XSSFSheet> Sheets => _sheets;
@@ -217,6 +235,12 @@ public sealed class XSSFWorkbook : IWorkbook
     void IWorkbook.protectWorkbook(bool protect) => protectWorkbook(protect);
 
     bool IWorkbook.isWorkbookProtected() => isWorkbookProtected();
+
+    void IWorkbook.setActiveSheet(int index) => setActiveSheet(index);
+
+    int IWorkbook.getActiveSheetIndex() => getActiveSheetIndex();
+
+    void IWorkbook.setSelectedTab(int index) => setSelectedTab(index);
 
     public void write(Stream stream)
     {

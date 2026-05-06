@@ -32,4 +32,10 @@ public interface ISheet
     // Auto filter
     void setAutoFilter(CellRangeAddress range);
     CellRangeAddress? getAutoFilter();
+
+    // Active cell / selection
+    void setActiveCell(string cellRef);
+    string? getActiveCell();
+    void setSelected(bool selected);
+    bool isSelected();
 }

@@ -197,6 +197,24 @@ public sealed class XSSFSheet : ISheet
 
     internal CellRangeAddress? AutoFilter => _autoFilter;
 
+    // Active cell / selection
+    private string? _activeCell;
+    private bool _selected;
+
+    public void setActiveCell(string cellRef)
+    {
+        _activeCell = cellRef ?? throw new ArgumentNullException(nameof(cellRef));
+    }
+
+    public string? getActiveCell() => _activeCell;
+
+    public void setSelected(bool selected)
+    {
+        _selected = selected;
+    }
+
+    public bool isSelected() => _selected;
+
     public IReadOnlyList<XSSFPivotTable> PivotTables => _pivotTables;
 
     /// <summary>
@@ -238,4 +256,12 @@ public sealed class XSSFSheet : ISheet
     IRow? ISheet.getRow(int rownum) => getRow(rownum);
 
     IWorkbook ISheet.getWorkbook() => getWorkbook();
+
+    void ISheet.setActiveCell(string cell) => setActiveCell(cell);
+
+    string? ISheet.getActiveCell() => getActiveCell();
+
+    void ISheet.setSelected(bool selected) => setSelected(selected);
+
+    bool ISheet.isSelected() => isSelected();
 }

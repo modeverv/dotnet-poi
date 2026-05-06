@@ -100,6 +100,11 @@ public sealed class HSSFWorkbook : IWorkbook
     public void protectWorkbook(bool protect) { }
     public bool isWorkbookProtected() => false;
 
+    // Active sheet / selected tab
+    public void setActiveSheet(int index) { }
+    public int getActiveSheetIndex() => 0;
+    public void setSelectedTab(int index) { }
+
     public void write(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);

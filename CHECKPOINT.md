@@ -1,5 +1,49 @@
 # CHECKPOINT
 
+## 2026-05-06 xx:xx JST - Refresh README status and structure
+
+- Current task: ルート `README.md` の Status を `NOW.md` ベースの現在カバレッジに差し替え、古い Phase -1/0 などの詳細履歴を README から除去し、プロジェクト構造を最新化する。
+- Scope: README と CHECKPOINT の更新。コミットしない。
+
+### やったこと
+
+- `README.md` の `## Status` 以下を、Phase 履歴ではなく `NOW.md` ベースの format coverage / practical gaps / test snapshot に差し替えた。
+- README から古い `Phase -1` / `Phase 0` / 個別 phase verification の長い記述を削除した。
+- Practical Gaps の comment 項目を、既存コメントは unknown-part preservation で round-trip 保持される想定だが API read/create/edit 未対応、という表現に修正した。
+- Runnable examples 一覧に `Phase4HssfXlsExample`、`Phase7CellTypesExample`、`Phase8CoreOnlyExample`、`UsageSamples` を追加した。
+- Repository Structure に `docs_src/`、`docs/`、`tools/DotnetPoi.DocsGenerator/`、`tools/XmlCheck/`、`tools/test.sh`、`NOW.md`、`README.jp.md` を反映した。
+- Repository Structure を現物の `find` 結果に合わせて再更新し、`.github/`、`src/` 配下の module directories、`tests/` fixtures、`examples/`、`docs_src/`、`docs/`、`tools/`、root files まで明示した。
+
+### Verification
+
+- `rg` で README 内の旧テストプロジェクト参照（`DotnetPoi.XSSF.Tests` など）や `Phase -1` / `Phase 0` の残存がないことを確認。
+- `git diff -- README.md CHECKPOINT.md` で差分確認。
+- テストは未実行。直前の確認では `dotnet test tests/DotnetPoi.Core.Tests/ --no-restore` が build で失敗:
+  - `HSSFSheet` missing `ISheet.setActiveCell/getActiveCell/setSelected/isSelected`
+  - `HSSFWorkbook` missing `IWorkbook.setActiveSheet/getActiveSheetIndex/setSelectedTab`
+
+## 2026-05-06 xx:xx JST - Move devbox files under tools/dev
+
+- Current task: `docker-compose.yml`、`.env.sample`、`Dockerfile.devbox` を `tools/dev/` に移動し、devbox が起動後も動き続けるように修正する。
+- Scope: devbox 設定ファイルと README 構成図の更新。コミットしない。
+
+### やったこと
+
+- `tools/dev/` を作成。
+- `docker-compose.yml` → `tools/dev/docker-compose.yml` に移動。
+- `.env.sample` → `tools/dev/.env.sample` に移動。
+- `Dockerfile.devbox` → `tools/dev/Dockerfile.devbox` に移動。
+- compose の build context / Dockerfile path / workspace volume を、`tools/dev/` 配置からリポジトリルートを指すように変更。
+- compose に `init: true` と `exec tail -f /dev/null` を追加し、設定生成後もコンテナが動き続けるようにした。
+- Dockerfile に `CMD ["tail", "-f", "/dev/null"]` を追加し、image 単体起動でも落ちないようにした。
+- `.env.sample` に `DEEPSEEK_BASE_URL` と `DEEPSEEK_MODEL` を追加。
+- README の Repository Structure を `tools/dev/` 配置に更新し、ルートの `docker-compose.yml` / `Dockerfile.devbox` 表記を削除。
+
+### Verification
+
+- `docker compose -f tools/dev/docker-compose.yml config` が成功し、build context と Dockerfile path がリポジトリルート基準で解決されることを確認。
+- Docker build/up はネットワーク・イメージ取得が必要になる可能性があるため未実行。
+
 ## 2026-05-05 13:xx JST - Add Phase 9 documentation generation guidance
 
 - Current task: POI ドキュメントを参考にしつつ、dotnet-poi 独自の Markdown + runnable examples + HTML 生成を進める方針を `agents.md` に Phase 9 として追加。
