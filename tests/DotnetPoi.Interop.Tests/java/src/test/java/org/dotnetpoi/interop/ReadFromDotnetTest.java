@@ -599,8 +599,8 @@ public class ReadFromDotnetTest {
             XSSFSheet xssfSheet = workbook.getSheet("Data");
             assertNotNull(xssfSheet);
 
-            org.apache.poi.ss.usermodel.AutoFilter autoFilter = xssfSheet.getAutoFilter();
-            assertNotNull(autoFilter);
+            // Use low-level API: getAutoFilter() was added in POI 5.6.0; POI 5.5.1 uses CTWorksheet
+            assertNotNull(xssfSheet.getCTWorksheet().getAutoFilter());
 
             // Verify cell values
             assertEquals("Category", xssfSheet.getRow(0).getCell(0).getStringCellValue());
@@ -620,9 +620,9 @@ public class ReadFromDotnetTest {
             XSSFSheet sheet = workbook.getSheet("Data");
             assertNotNull(sheet);
 
-            // Verify sheet is protected (POI 5.5.1: isSheetProtectionEnabled on XSSFSheet,
-            // OR check the protection policy is not null)
-            assertNotNull(sheet.getSheetProtection(), "sheet should have protection settings");
+            // Verify sheet is protected (POI 5.5.1: getProtection() returns SheetProtection via Sheet interface;
+            // getSheetProtection() was added in POI 5.6.0+)
+            assertNotNull(sheet.getProtection(), "sheet should have protection settings");
 
             assertEquals("protected cell", sheet.getRow(0).getCell(0).getStringCellValue());
         }
