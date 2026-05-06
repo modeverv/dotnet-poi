@@ -39,6 +39,28 @@ You can pass a custom output directory:
 dotnet run --project tools/manual-verification/DocumentGenerator/DocumentGenerator.csproj -- /tmp/dotnet-poi-manual-files
 ```
 
+## OS Test Entrypoints
+
+Run the OS-specific wrapper from the repository root. Each wrapper uses the implementation files under `tools/manual-verification/scripts/`.
+
+Linux / LibreOffice:
+
+```bash
+./test-linux.sh
+```
+
+macOS / Microsoft Office:
+
+```bash
+./test-macos.sh
+```
+
+Windows / Microsoft Office PowerShell:
+
+```powershell
+.\test-windows.ps1
+```
+
 ## Linux / LibreOffice
 
 Start the Linux LibreOffice desktop container:

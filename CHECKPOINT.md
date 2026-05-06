@@ -1,5 +1,50 @@
 # CHECKPOINT
 
+## 2026-05-18 JST — docx inRPr cross-paragraph leak fix (round-trip bug)
+
+- Task: Fix a bug where paragraphs added to documents with tracked changes (`delins.docx`) lost their runs after write/read round-trip.
+- Root cause: When `</w:rPr>` end elements were consumed by `ReadOuterXml()` during raw XML preservation (triggered by tracked changes like `<w:ins>`/`<w:del>`), the `inRPr` flag remained `true` when the next paragraph began. This caused the `case "r" when !inRPr` and `case "t" when currentRun is not null && !inRPr` handlers to be skipped, dropping all run text in subsequent paragraphs.
+- Fix: Added `inRPr = false;` to the `case "p"` EndElement handler in `XWPFDocument.cs`, ensuring the flag is always reset at paragraph boundaries regardless of whether `</w:rPr>` was properly processed.
+- Verification: Diagnostic confirmed P[25] (the "preserved" paragraph) now correctly has 1 run after round-trip (was 0). Core tests: 244 passing, 0 failed.
+
+## 2026-05-18 JST — Documentation maintenance (status updates + inRPr fix log)
+
+- Task: Update all documentation files to reflect current feature statuses after Phase 10 item 4 completion and the inRPr bug fix.
+- Changed files:
+  - `CHECKPOINT.md` — Added inRPr bug fix entry (above) and this maintenance entry
+  - `src/DotnetPoi.Core/README.md` — Updated 11 status rows and test counts (badge 228→244, Core 228→244, Total 293→309)
+  - `NOW.md` — Already up-to-date (test counts 244/309 correct, date 2026-05-18)
+- Verified no changes needed in: `agents.md`, root `README.md`, `format-coverage.md`, `Formula/README.md`
+- New test numbers: Core.Tests=244, Formula.Tests=10, Interop.Tests(C#)=55, Total(C#)=309, Java POI=44
+
+## 2026-05-06 JST - Add OS-level manual verification wrappers
+
+- Current task: `tools/manual-verification` 直下に、`scripts/` 配下の実装ランナーを使う Linux / macOS / Windows 用テスト入口を追加する。
+- Scope: `tools/manual-verification/test-linux.sh`, `test-macos.sh`, `test-windows.ps1`, README, CHECKPOINT。コミットしない。
+
+### やったこと
+
+- `tools/manual-verification/test-linux.sh` を追加。
+  - generated documents を再生成。
+  - `scripts/run-linux-manual-check.sh` を実行。
+  - `scripts/run-linux-evidence.sh` を実行。
+- `tools/manual-verification/test-macos.sh` を追加。
+  - generated documents を再生成。
+  - `scripts/run-macos-office-evidence.sh` を実行。
+- `tools/manual-verification/test-windows.ps1` を追加。
+  - generated documents を再生成。
+  - `scripts/run_windows_office_evidence.py` を実行。
+  - `-SkipGenerate` で生成を省略可能。
+- README に OS 別 entrypoint を追記。
+
+### Verification
+
+- `bash -n tools/manual-verification/test-linux.sh tools/manual-verification/test-macos.sh` 成功。
+- `tools/manual-verification/test-linux.sh` を Docker 権限ありで実行成功。
+  - manual open/store/reopen: 9 件 PASS。
+  - Linux evidence export: 9 件 PASS、`tools/manual-verification/evidence/v0.1.0-72907ab/INDEX.md` 生成。
+- `pwsh` はこの macOS 環境にないため PowerShell 構文チェックは未実施。Windows 上で `tools\manual-verification\test-windows.ps1` を実行して確認する。
+
 ## 2026-05-06 JST - Switch manual verification scripts to generated documents
 
 - Current task: macOS/Linux/Windows の手動検証スクリプトの対象を、`tools/manual-verification/generated-documents/` の生成済みファイルに切り替える。ユーザー確認で `.xls` 以外は開けたため `.xls` は matrix から除外。

@@ -1090,6 +1090,7 @@ public sealed class XWPFDocument : IDisposable
                                 currentParagraph = null;
                                 currentRun = null;
                                 inPPr = false;
+                                inRPr = false;
                                 paragraphDepth = -1;
                                 break;
                             case "hyperlink":

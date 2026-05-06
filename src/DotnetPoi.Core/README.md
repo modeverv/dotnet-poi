@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![.NET Standard](https://img.shields.io/badge/.NET%20Standard-2.0-%23820171)
 ![Platform](https://img.shields.io/badge/platform-.NET%20%7C%20.NET%20Framework%20%7C%20Mono%20%7C%20Unity-512BD4)
-![Tests](https://img.shields.io/badge/tests-228%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-244%20passing-brightgreen)
 
 **Faithful .NET port of Apache POI — read/write xlsx, docx, pptx, xls, doc, ppt with zero dependencies.**
 
@@ -161,7 +161,7 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, not edi
 | **Drawings** | hyperlinks | ✅ |
 | **Drawings** | charts | 🔵 preserved, not creatable |
 | **Drawings** | comments | 🔵 preserved, not creatable |
-| **Drawings** | auto-shapes | ❌ |
+| **Drawings** | auto-shapes | 🔵 | Unknown `xdr:twoCellAnchor` children preserved via raw XML capture/re-emission |
 | **Data** | data validation (input rules) | ✅ |
 | **Data** | conditional formatting | ✅ |
 | **Data** | auto filter | ✅ |
@@ -171,7 +171,7 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, not edi
 | **Other** | workbook/sheet protection | ✅ |
 | **Other** | macro-enabled (xlsm) | ✅ VBA bytes preserved |
 | **Other** | sparklines | ❌ |
-| **Other** | external data connections | ❌ |
+| **Other** | external data connections | 🔵 | `xl/connections.xml` / `xl/externalLinks/*` round-trip via `_preservedEntries` |
 
 ### docx / XWPF (~65%)
 
@@ -180,30 +180,32 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, not edi
 | **Paragraphs/runs** | text, font name/size/color, bold, italic, underline, strikethrough | ✅ |
 | **Paragraphs** | alignment, indents, spacing, bullet/numbered lists | ✅ |
 | **Tables** | create/read tables, rows, cells | ✅ |
-| **Tables** | cell merge, table borders | ❌ |
+| **Tables** | cell merging, borders | 🔵 | Round-trip preserved via raw XML capture/re-emission; API-level creation not modeled |
 | **Sections** | page setup, headers, footers | ✅ |
-| **Sections** | columns | ❌ |
+| **Sections** | columns | ✅ | `setColumns()` API, round-trip verified |
 | **Links** | external hyperlinks | ✅ |
 | **Images** | inline images + rotation | ✅ |
 | **Images** | text boxes (`w:txbxContent`) | ❌ |
-| **Review** | comments, footnotes, endnotes | ❌ |
+| **Review** | comments, footnotes, endnotes | 🔵 | Existing parts round-trip via `_preservedEntries` |
 | **Fields** | TOC, page numbers, mail merge fields | ✅ |
 | **Styles** | paragraph/character/table styles | ❌ (direct formatting only) |
 | **Other** | macro-enabled (docm) | ✅ |
-| **Other** | content controls, tracked changes, OLE | ❌ |
+| **Other** | content controls (SDT) | 🔵 | Block-level and inline SDT preserved via raw XML capture/re-emission |
+| 〃 | tracked changes (ins/del/move) | ❌ | |
+| 〃 | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries` |
 
 ### pptx / XSLF (~40%)
 
 | Category | Feature | Status |
 |---|---|---|
 | **Slides** | create/read, slide size | ✅ |
-| **Slides** | notes slides | ❌ |
+| **Slides** | notes slides | 🔵 | `ppt/notesSlides/*` round-trip via `_preservedEntries` |
 | **Text** | text boxes, multiple paragraphs, run formatting | ✅ |
 | **Shapes** | pictures (anchor, size, rotation) | ✅ |
 | **Shapes** | tables (`p:graphicFrame` / `a:tbl`) | ✅ |
-| **Shapes** | group shapes, connectors, most auto-shapes | ❌ |
+| **Shapes** | group shapes, connectors, lines | 🔵 | Unknown `p:spTree` children preserved via raw XML capture/re-emission |
 | **Shapes** | SmartArt, charts | 🔵 preserved, not modelled |
-| **Media** | video/audio | ❌ |
+| **Media** | video/audio embedding | 🔵 | Non-image `ppt/media/*` round-trip via `_preservedEntries` |
 | **Animation** | animations, transitions | 🔵 preserved, not modelled |
 | **Theme** | layouts, masters, themes | 🔵 preserved, not editable |
 | **Other** | macro-enabled (pptm) | ✅ |
@@ -240,10 +242,10 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, not edi
 
 | Project | Tests | Notes |
 |---|---|---|
-| Core.Tests | 228 | xlsx round-trip coverage, active sheet, auto filter, protection, fields |
+| Core.Tests | 244 | xlsx round-trip coverage, active sheet, auto filter, protection, fields, docx table/rPr preservation |
 | Formula.Tests | 10 | Minimal — evaluator is early stage |
 | Interop.Tests (C#) | 55 | Bidirectional Java/.NET fixtures + preservation tests |
-| **Total (C#)** | **293** | |
+| **Total (C#)** | **309** | |
 | Java POI side (Maven) | 44 | Fixture generation / readback |
 
 ---
