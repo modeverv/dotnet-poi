@@ -233,6 +233,100 @@ public class WriteForDotnetTest {
         assertTrue(Files.size(fixture) > 0);
     }
 
+    @Test
+    void writePhaseAutoFilterSheet() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase-autofilter.xlsx");
+        Files.createDirectories(fixture.getParent());
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Data");
+            sheet.createRow(0).createCell(0).setCellValue("Category");
+            sheet.createRow(0).createCell(1).setCellValue("Value");
+            sheet.createRow(1).createCell(0).setCellValue("Food");
+            sheet.createRow(1).createCell(1).setCellValue(100);
+            sheet.createRow(2).createCell(0).setCellValue("Travel");
+            sheet.createRow(2).createCell(1).setCellValue(200);
+            sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, 2, 0, 1));
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhaseProtectedSheet() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase-protection.xlsx");
+        Files.createDirectories(fixture.getParent());
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Data");
+            sheet.createRow(0).createCell(0).setCellValue("protected cell");
+            sheet.protectSheet("password");
+            workbook.lockStructure();
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhaseActiveSheet() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase-active-sheet.xlsx");
+        Files.createDirectories(fixture.getParent());
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            workbook.createSheet("First");
+            workbook.createSheet("Second");
+            workbook.createSheet("Third");
+            workbook.setActiveSheet(1);
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhaseDocxWithFields() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase-docx-fields.docx");
+        Files.createDirectories(fixture.getParent());
+
+        try (XWPFDocument doc = new XWPFDocument()) {
+            // Paragraph with PAGE field
+            XWPFParagraph p1 = doc.createParagraph();
+            p1.createRun().setText("Page ");
+            p1.getCTP().addNewFld().addNewInstrText().setStringValue(" PAGE ");
+
+            // Paragraph with TOC field
+            XWPFParagraph p2 = doc.createParagraph();
+            org.apache.poi.xwpf.usermodel.Field f2 = new org.apache.poi.xwpf.usermodel.Field();
+            p2.getCTP().addNewFld().addNewInstrText().setStringValue("TOC \\o \"1-3\" \\h \\z \\u");
+
+            // Paragraph with text + MERGEFIELD
+            XWPFParagraph p3 = doc.createParagraph();
+            p3.createRun().setText("Hello ");
+            p3.getCTP().addNewFld().addNewInstrText().setStringValue("MERGEFIELD CustomerName");
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                doc.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
     private static Path findRepoRoot() {
         Path current = Paths.get("").toAbsolutePath();
         while (current != null) {

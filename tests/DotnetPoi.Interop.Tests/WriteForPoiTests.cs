@@ -1,4 +1,5 @@
 using DotnetPoi.SS.UserModel;
+using DotnetPoi.SS.Util;
 using DotnetPoi.HSSF.UserModel;
 using DotnetPoi.XSLF.UserModel;
 using DotnetPoi.XSSF.UserModel;
@@ -560,6 +561,100 @@ public class WriteForPoiTests
 
         using var stream = File.Create(fixturePath);
         workbook.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_AutoFilterWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase-autofilter.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var wb = new XSSFWorkbook();
+        var sheet = wb.createSheet("Data");
+        sheet.createRow(0).createCell(0).setCellValue("Category");
+        sheet.createRow(0).createCell(1).setCellValue("Value");
+        sheet.createRow(1).createCell(0).setCellValue("Food");
+        sheet.createRow(1).createCell(1).setCellValue(100);
+        sheet.createRow(2).createCell(0).setCellValue("Travel");
+        sheet.createRow(2).createCell(1).setCellValue(200);
+        sheet.setAutoFilter(new CellRangeAddress(0, 2, 0, 1));
+
+        using var stream = File.Create(fixturePath);
+        wb.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_ProtectedWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase-protection.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var wb = new XSSFWorkbook();
+        var sheet = wb.createSheet("Data");
+        sheet.createRow(0).createCell(0).setCellValue("protected cell");
+        sheet.protectSheet(true);
+        wb.protectWorkbook(true);
+
+        using var stream = File.Create(fixturePath);
+        wb.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_ActiveSheetWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase-active-sheet.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var wb = new XSSFWorkbook();
+        wb.createSheet("First");
+        wb.createSheet("Second");
+        wb.createSheet("Third");
+        wb.setActiveSheet(1);
+
+        using var stream = File.Create(fixturePath);
+        wb.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_DocxWithFields_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase-docx-fields.docx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var doc = new XWPFDocument();
+
+        // Paragraph with PAGE field
+        var p1 = doc.createParagraph();
+        p1.createRun().setText("Page ");
+        p1.addField(" PAGE ");
+
+        // Paragraph with TOC field
+        var p2 = doc.createParagraph();
+        p2.addField("TOC \\o \"1-3\" \\h \\z \\u");
+
+        // Paragraph with text and a MERGEFIELD
+        var p3 = doc.createParagraph();
+        p3.createRun().setText("Hello ");
+        p3.addField("MERGEFIELD CustomerName");
+
+        using var stream = File.Create(fixturePath);
+        doc.write(stream);
 
         Assert.True(File.Exists(fixturePath));
         Assert.True(new FileInfo(fixturePath).Length > 0);

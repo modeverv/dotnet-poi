@@ -3,6 +3,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
+const string DefaultDescription = "Apache POI-compatible un-official .NET library for Office files, focused on faithful round-trip and Java POI interop.";
+
 var sourceRoot = args.Length > 0 ? Path.GetFullPath(args[0]) : Path.GetFullPath("docs_src");
 var outputRoot = args.Length > 1 ? Path.GetFullPath(args[1]) : Path.GetFullPath("docs");
 
@@ -40,13 +42,13 @@ return 0;
 static SiteConfig LoadSiteConfig(string path)
 {
     if (!File.Exists(path))
-        return new SiteConfig("dotnet-poi Documentation", "Usage-focused documentation.", []);
+        return new SiteConfig("dotnet-poi Documentation", DefaultDescription, []);
 
     var json = File.ReadAllText(path);
     return JsonSerializer.Deserialize<SiteConfig>(json, new JsonSerializerOptions
     {
         PropertyNameCaseInsensitive = true
-    }) ?? new SiteConfig("dotnet-poi Documentation", "Usage-focused documentation.", []);
+    }) ?? new SiteConfig("dotnet-poi Documentation", DefaultDescription, []);
 }
 
 static List<DocPage> LoadPages(string contentRoot, string outputRoot)

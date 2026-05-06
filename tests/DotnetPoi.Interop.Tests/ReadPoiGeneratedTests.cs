@@ -185,6 +185,89 @@ public class ReadPoiGeneratedTests
         Assert.Equal("Italic subtitle", paragraphs[2].getPlainText());
     }
 
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    public void Read_AutoFilterSheet_GeneratedByPoi()
+    {
+        var fixturePath = GetFixturePath("phase-autofilter.xlsx");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var workbook = new XSSFWorkbook(stream);
+
+        var sheet = workbook.getSheet("Data")!;
+        Assert.NotNull(sheet);
+
+        var autoFilter = sheet.getAutoFilter();
+        Assert.NotNull(autoFilter);
+        Assert.Equal(0, autoFilter.FirstRow);
+        Assert.Equal(2, autoFilter.LastRow);
+        Assert.Equal(0, autoFilter.FirstCol);
+        Assert.Equal(1, autoFilter.LastCol);
+
+        Assert.Equal("Category", sheet.getRow(0)!.getCell(0)!.getStringCellValue());
+        Assert.Equal(100.0, sheet.getRow(1)!.getCell(1)!.getNumericCellValue());
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    public void Read_ProtectedSheet_GeneratedByPoi()
+    {
+        var fixturePath = GetFixturePath("phase-protection.xlsx");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var workbook = new XSSFWorkbook(stream);
+
+        Assert.True(workbook.isWorkbookProtected());
+        var sheet = workbook.getSheet("Data")!;
+        Assert.True(sheet.isSheetProtected());
+        Assert.Equal("protected cell", sheet.getRow(0)!.getCell(0)!.getStringCellValue());
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    public void Read_ActiveSheet_GeneratedByPoi()
+    {
+        var fixturePath = GetFixturePath("phase-active-sheet.xlsx");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var workbook = new XSSFWorkbook(stream);
+
+        Assert.Equal(3, workbook.getNumberOfSheets());
+        Assert.Equal(1, workbook.getActiveSheetIndex());
+        Assert.NotNull(workbook.getSheetAt(1));
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    public void Read_DocxWithFields_GeneratedByPoi()
+    {
+        var fixturePath = GetFixturePath("phase-docx-fields.docx");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var doc = new XWPFDocument(stream);
+
+        var paragraphs = doc.getParagraphs();
+
+        // Paragraph 0: "Page " + PAGE field
+        var p0Fields = paragraphs[0].getFields();
+        Assert.NotEmpty(p0Fields);
+        Assert.Contains("PAGE", p0Fields[0].Instruction);
+
+        // Paragraph 1: TOC field
+        Assert.Single(paragraphs[1].getFields());
+        Assert.Contains("TOC", paragraphs[1].getFields()[0].Instruction);
+
+        // Paragraph 2: text + MERGEFIELD
+        Assert.Equal("Hello ", paragraphs[2].getRuns()[0].getText(0));
+        var p2Fields = paragraphs[2].getFields();
+        Assert.NotEmpty(p2Fields);
+        Assert.Contains("MERGEFIELD", p2Fields[0].Instruction);
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;

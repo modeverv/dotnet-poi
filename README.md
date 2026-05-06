@@ -140,11 +140,11 @@ Tracked in [NOW.md](./NOW.md):
 
 | Project | Tests | Notes |
 |---|---:|---|
-| Core.Tests | 226 | Main format coverage, currently xlsx-heavy. |
+| Core.Tests | 228 | Main format coverage, currently xlsx-heavy. |
 | Formula.Tests | 10 | Minimal formula package coverage. |
-| Interop.Tests (C#) | 51 | Bidirectional Java/.NET fixtures and preservation tests. |
-| **Total (C#)** | **287** | |
-| Java POI side (Maven) | 36 | Java fixture generation/readback tests. |
+| Interop.Tests (C#) | 55 | Bidirectional Java/.NET fixtures and preservation tests. |
+| **Total (C#)** | **293** | |
+| Java POI side (Maven) | 44 | Java fixture generation/readback tests. |
 
 ---
 

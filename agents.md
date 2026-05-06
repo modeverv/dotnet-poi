@@ -36,7 +36,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests (195) — all formats
+│   ├── DotnetPoi.Core.Tests/       # Core tests (228) — all formats
 │   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
 │   ├── DotnetPoi.Interop.Tests/   # Bidirectional compatibility tests
 │   │   ├── java/                #   Maven project (Apache POI dependency)
@@ -317,7 +317,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 
 | step | format | progress | notes |
 |---|---|---|---|
-| 1 | xlsx/XSSF | ~78% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; rich text (per-character formatting) ✅; pivot tables (programmatic create + unknown parts preserve) ✅; auto filter ✅; sheet/workbook protection ✅; no formula evaluation; charts deferred |
+| 1 | xlsx/XSSF | ~78% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; rich text (per-character formatting) ✅; pivot tables (programmatic create + unknown parts preserve) ✅; auto filter ✅; sheet/workbook protection ✅; active sheet/active cell API ✅ (activeSheet round-trip, activeCell in-memory only); no formula evaluation; charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
 | 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅ |
 | 4 | pptx/XSLF | ~40% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; unknown part preservation ✅; tables (p:graphicFrame/a:tbl) write/read ✅; non-image media (video/audio) round-trip preserve ✅; 18 round-trip tests |
@@ -338,7 +338,7 @@ Do not add these as fixture-specific constants — only fix when a concrete inte
 - [x] Layout: merged regions, row heights, column widths, hidden rows/columns, freeze panes, print settings. *(merge cells/col width/row height/print settings done; freeze panes/hidden pending)*
 - [x] Drawing: multiple images, anchors, rotation, hyperlinks. *(charts/comments/shapes not done)*
 - [~] Formulas: write formula text + cached value, read back. *(evaluation permanently deferred — see Phase 5)*
-- [ ] Rich text / shared strings coverage.
+- [x] Rich text / shared strings coverage.
 
 #### step 2 xls / HSSF
 
@@ -516,8 +516,7 @@ tests/DotnetPoi.Interop.Tests/
 │   └── src/test/java/
 │       ├── WriteForDotnetTest.java   # Direction A: POI writes fixtures
 │       └── ReadFromDotnetTest.java   # Direction B: POI reads C# output
-├── cs/
-│   ├── ReadPoiGeneratedTests.cs      # Direction A: C# reads POI fixtures
+├── ReadPoiGeneratedTests.cs      # Direction A: C# reads POI fixtures
 │   └── WriteForPoiTests.cs           # Direction B: C# writes fixtures
 └── fixtures/
     ├── from-poi/                # Java-generated files (read by C#)
@@ -534,10 +533,10 @@ steps:
 
   # Direction A: POI writes → C# reads
   - run: mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest
-  - run: dotnet test tests/DotnetPoi.Interop.Tests/cs/ --filter "Category=ReadFromPoi"
+  - run: dotnet test tests/DotnetPoi.Interop.Tests/ --filter "Category=ReadFromPoi"
 
   # Direction B: C# writes → POI reads
-  - run: dotnet test tests/DotnetPoi.Interop.Tests/cs/ --filter "Category=WriteForPoi"
+  - run: dotnet test tests/DotnetPoi.Interop.Tests/ --filter "Category=WriteForPoi"
   - run: mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
 ```
 

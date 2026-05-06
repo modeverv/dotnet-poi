@@ -1017,6 +1017,53 @@ public class XSSFWorkbookTests
         Assert.Equal(1, autoFilter.LastCol);
     }
 
+    [Fact]
+    public void RoundTrip_ActiveSheetIndex_Preserved()
+    {
+        using var original = new XSSFWorkbook();
+        original.createSheet("Sheet1");
+        original.createSheet("Sheet2");
+        original.createSheet("Sheet3");
+        original.setActiveSheet(1);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        // Verify in workbook XML
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var wbEntry = archive.GetEntry("xl/workbook.xml");
+        Assert.NotNull(wbEntry);
+        using var wbReader = new StreamReader(wbEntry.Open());
+        var wbXml = wbReader.ReadToEnd();
+        Assert.Contains("activeTab=\"1\"", wbXml);
+
+        // Reload and verify round-trip
+        stream.Position = 0;
+        using var loaded = new XSSFWorkbook(stream);
+        Assert.Equal(1, loaded.getActiveSheetIndex());
+    }
+
+    [Fact]
+    public void ActiveCellApi_WorksInMemory()
+    {
+        // setActiveCell / getActiveCell are in-memory APIs
+        using var wb = new XSSFWorkbook();
+        var sheet = wb.createSheet("Test");
+
+        sheet.setActiveCell("D5");
+        Assert.Equal("D5", sheet.getActiveCell());
+
+        sheet.setActiveCell("A1");
+        Assert.Equal("A1", sheet.getActiveCell());
+
+        sheet.setSelected(true);
+        Assert.True(sheet.isSelected());
+
+        sheet.setSelected(false);
+        Assert.False(sheet.isSelected());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

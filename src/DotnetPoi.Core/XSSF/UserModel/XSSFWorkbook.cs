@@ -530,6 +530,12 @@ public sealed class XSSFWorkbook : IWorkbook
             {
                 _workbookProtected = true;
             }
+            else if (reader.LocalName == "workbookView")
+            {
+                var tab = reader.GetAttribute("activeTab");
+                if (tab is not null && int.TryParse(tab, NumberStyles.Any, CultureInfo.InvariantCulture, out var idx))
+                    _activeSheetIndex = idx;
+            }
         }
     }
 
@@ -2379,7 +2385,7 @@ public sealed class XSSFWorkbook : IWorkbook
         }
         writer.WriteStartElement("bookViews");
         writer.WriteStartElement("workbookView");
-        writer.WriteAttributeString("activeTab", "0");
+        writer.WriteAttributeString("activeTab", _activeSheetIndex.ToString(CultureInfo.InvariantCulture));
         writer.WriteEndElement();
         writer.WriteEndElement();
         writer.WriteStartElement("sheets");

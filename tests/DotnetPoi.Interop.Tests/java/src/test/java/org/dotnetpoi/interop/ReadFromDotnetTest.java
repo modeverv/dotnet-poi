@@ -586,6 +586,75 @@ public class ReadFromDotnetTest {
         }
     }
 
+    @Test
+    void readPhaseAutoFilterSheet() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-autofilter.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XSSFWorkbook workbook = new XSSFWorkbook(input)) {
+
+            Sheet sheet = workbook.getSheet("Data");
+            assertNotNull(sheet);
+
+            org.apache.poi.ss.usermodel.AutoFilter autoFilter = sheet.getAutoFilter();
+            assertNotNull(autoFilter);
+
+            // Verify cell values
+            assertEquals("Category", sheet.getRow(0).getCell(0).getStringCellValue());
+            assertEquals(100.0, sheet.getRow(1).getCell(1).getNumericCellValue(), 0.0001);
+            assertEquals("Travel", sheet.getRow(2).getCell(0).getStringCellValue());
+        }
+    }
+
+    @Test
+    void readPhaseProtectedSheet() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-protection.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XSSFWorkbook workbook = new XSSFWorkbook(input)) {
+
+            assertTrue(workbook.isWriteProtected(), "workbook should be protected");
+
+            Sheet sheet = workbook.getSheet("Data");
+            assertNotNull(sheet);
+            assertEquals("protected cell", sheet.getRow(0).getCell(0).getStringCellValue());
+        }
+    }
+
+    @Test
+    void readPhaseActiveSheet() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-active-sheet.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XSSFWorkbook workbook = new XSSFWorkbook(input)) {
+
+            assertEquals(3, workbook.getNumberOfSheets());
+            assertEquals(1, workbook.getActiveSheetIndex());
+            assertEquals("Second", workbook.getSheetAt(1).getSheetName());
+        }
+    }
+
+    @Test
+    void readPhaseDocxFields() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-docx-fields.docx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XWPFDocument doc = new XWPFDocument(input)) {
+
+            var paragraphs = doc.getParagraphs();
+
+            // Paragraph 0: "Page " + PAGE field
+            assertTrue(paragraphs.get(0).getText().contains("Page"));
+
+            // Paragraph 2: "Hello " + MERGEFIELD
+            assertTrue(paragraphs.get(2).getText().contains("Hello"));
+        }
+    }
+
     private static Path findRepoRoot() {
         Path current = Paths.get("").toAbsolutePath();
         while (current != null) {

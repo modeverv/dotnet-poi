@@ -21,6 +21,7 @@
 | **レイアウト** | セル結合 / 列幅 / 行高 | ✅ | |
 | 〃 | 非表示行・列 | ✅ | |
 | 〃 | 固定ペイン（凍結枠） | ✅ | |
+| 〃 | アクティブシート・アクティブセル | ✅ | アクティブシートは round-trip 完了。アクティブセルは in-memory API のみ |
 | 〃 | 印刷設定（余白/用紙サイズ/縦横/ヘッダー・フッター） | ✅ | |
 | **図形** | 画像（複数/アンカー/回転） | ✅ | |
 | 〃 | ハイパーリンク | ✅ | |
@@ -37,7 +38,7 @@
 | 〃 | マクロ有効（xlsm） | ✅ | VBA バイト保存 + ラウンドトリップ確認済 |
 | 〃 | **スパークライン** | ❌ | |
 | 〃 | **外部データ接続** | ❌ | |
-| 〃 | テスト数 | **226** | 17 の round-trip テストを含む |
+| 〃 | テスト数 | **228** | 18 の round-trip テストを含む（active sheet round-trip + in-memory API 含む） |
 
 ---
 
@@ -151,12 +152,12 @@
 
 | プロジェクト | テスト数 | 備考 |
 |---|---|---|
-| Core.Tests | 226 | xlsx 中心に増加中 |
+| Core.Tests | 228 | xlsx 中心に増加中（active sheet round-trip 含む） |
 | Formula.Tests | 10 | 数式評価エンジンは未実装のため最小限 |
-| Interop.Tests (C#) | 51 | 双方向 interop fixture 検証 + preservation tests |
-| **Total (C#)** | **287** | |
-| Java POI 側 (Maven) | 36 tests | うち dotnet-poi 関連 16 tests |
+| Interop.Tests (C#) | 55 | 双方向 interop fixture 検証 + preservation tests（auto filter/protection/active sheet/docx fields 追加） |
+| **Total (C#)** | **293** | |
+| Java POI 側 (Maven) | 44 tests | うち dotnet-poi 関連 24 tests（auto filter/protection/active sheet/docx fields 追加） |
 
 ---
 
-*最終更新: 2026-05-16*
+*最終更新: 2026-05-18*

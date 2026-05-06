@@ -1,6 +1,6 @@
 {
   "title": "dotnet-poi Documentation",
-  "description": "Usage-focused documentation for working with Office files from .NET.",
+  "description": "Apache POI-compatible un-official .NET library for Office files, focused on faithful round-trip and Java POI interop.",
   "navigation": [
     {
       "title": "Getting Started",

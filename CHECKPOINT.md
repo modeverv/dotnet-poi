@@ -1120,3 +1120,65 @@ Notes:
 - Checked `src/DotnetPoi.Core/XSSF/UserModel/XSSFWorkbook.cs`: style XML write emits `applyAlignment="true"` and `<alignment horizontal="right" wrapText="true">` when set; read path parses `horizontal`, `vertical`, `wrapText`, `indent`, and `textRotation`.
 - Existing test coverage: `RoundTrip_StyledCell_AlignmentRestored` covers center/top/wrapText/indent/rotation, but there is no focused assertion specifically for `HorizontalAlignment.Right`.
 - Note: HSSF (`.xls`) style alignment/wrap APIs are still stubs returning defaults / throwing `NotImplementedException`; this status check is for xlsx/XSSF only.
+
+## 2026-05-06 JST - docs tagline update
+
+- User requested adding this phrase to docs: "Apache POI-compatible un-official .NET library for Office files, focused on faithful round-trip and Java POI interop."
+- Updated `docs_src/site.json` description so the phrase appears on the generated home page and as the site meta description.
+- Updated `tools/DotnetPoi.DocsGenerator/Program.cs` fallback `DefaultDescription` to keep generated output consistent if `site.json` is unavailable.
+- Regenerated `docs/` with `DOTNET_ROLL_FORWARD=Major dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs` because only .NET 9 runtime is installed locally while the docs generator targets net8.0.
+- Verified with `rg` that the phrase appears in `docs/index.html`, `docs/getting-started/installation.html`, `docs_src/site.json`, and the generator fallback.
+
+---
+
+## 2026-05-06 JST — Round-trip + interop テスト追加（active sheet, auto filter, protection, docx fields）
+
+### やったこと
+
+**1. バグ修正: activeTab が常に "0" と書かれていた**
+
+- `XSSFWorkbook.WriteWorkbook()` の `activeTab` 属性がハードコード `"0"` になっていた → `_activeSheetIndex.ToString()` に修正
+- `ReadWorkbookCalcPr()` に `workbookView/activeTab` のパース追加 → round-trip が成立するようになった
+
+**2. xlsx round-trip テスト追加 (XSSFWorkbookTests.cs)**
+
+| テスト | 内容 |
+|--------|------|
+| `RoundTrip_ActiveSheetIndex_Preserved` | setActiveSheet(1) → write → XML に `activeTab="1"` → read back → getActiveSheetIndex() == 1 |
+| `ActiveCellApi_WorksInMemory` | setActiveCell/getActiveCell/setSelected/isSelected の in-memory API 確認（XML 非対応） |
+
+**3. Interop Direction B フィクスチャ生成 (WriteForPoiTests.cs) — C# → Java POI**
+
+| テスト | 出力ファイル | 内容 |
+|--------|-------------|------|
+| `Write_AutoFilterWorkbook_CreatesFixtureForPoi` | `phase-autofilter.xlsx` | 3行×2列のデータにオートフィルター (A1:B3) |
+| `Write_ProtectedWorkbook_CreatesFixtureForPoi` | `phase-protection.xlsx` | シート保護 + ブック保護 |
+| `Write_ActiveSheetWorkbook_CreatesFixtureForPoi` | `phase-active-sheet.xlsx` | 3 シート、active=1 (Second) |
+| `Write_DocxWithFields_CreatesFixtureForPoi` | `phase-docx-fields.docx` | PAGE / TOC / MERGEFIELD の 3 フィールド |
+
+**4. Interop Direction A リーダー (ReadPoiGeneratedTests.cs) — Java POI → C#**
+
+| テスト | 入力 | 検証内容 |
+|--------|------|---------|
+| `Read_AutoFilterSheet_GeneratedByPoi` | `phase-autofilter.xlsx` | AutoFilter の範囲 + セル値 |
+| `Read_ProtectedSheet_GeneratedByPoi` | `phase-protection.xlsx` | シート保護 + ブック保護 + セル値 |
+| `Read_ActiveSheet_GeneratedByPoi` | `phase-active-sheet.xlsx` | 3 シート、activeSheetIndex=1 |
+| `Read_DocxWithFields_GeneratedByPoi` | `phase-docx-fields.docx` | PAGE / TOC / MERGEFIELD の Instruction |
+
+**5. Java 側フィクスチャ生成 + リーダー (WriteForDotnetTest.java + ReadFromDotnetTest.java)**
+
+- `writePhaseAutoFilterSheet()` — xlsx オートフィルター
+- `writePhaseProtectedSheet()` — xlsx 保護付き
+- `writePhaseActiveSheet()` — active sheet 設定
+- `writePhaseDocxWithFields()` — docx フィールド
+- `readPhaseAutoFilterSheet()` — C# 生成フィクスチャ検証
+- `readPhaseProtectedSheet()` — C# 生成フィクスチャ検証
+- `readPhaseActiveSheet()` — C# 生成フィクスチャ検証
+- `readPhaseDocxFields()` — C# 生成フィクスチャ検証
+
+### テスト結果
+
+- **Core round-trip**: 81 passed (+2 new)
+- **Interop C# WriteForPoi**: 4 passed (+4 new)
+- **全ビルド**: 0 errors
+- Java 側は Maven 環境で `mvn test` 実行時に対応テストが追加される
