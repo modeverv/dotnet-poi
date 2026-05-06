@@ -25,6 +25,10 @@ public sealed class HSSFSheet : ISheet
             throw new ArgumentException("Row number must be non-negative.", nameof(rownum));
         }
 
+        // POI semantics: return existing row if already created
+        if (_rows.TryGetValue(rownum, out var existing))
+            return existing;
+
         var row = new HSSFRow(this, rownum);
         _rows[rownum] = row;
         return row;
