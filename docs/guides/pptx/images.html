@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Images | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../xlsx/layout.html">Layout</a></li>
+<li><a href="../xlsx/images.html">Images</a></li>
+<li><a href="../xlsx/formulas.html">Formulas</a></li>
+<li><a href="../xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../xlsx/protection.html">Protection</a></li>
+<li><a href="../xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="slides.html">Slides</a></li>
+<li><a href="text.html">Text Boxes</a></li>
+<li><a class="active" href="images.html">Images</a></li>
+<li><a href="tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Images</h1>
+<p>Embed images on pptx slides with position, size, rotation, and flipping.</p>
+<h2>Adding a Picture</h2>
+<pre><code class="language-csharp">using DotnetPoi.XSLF.UserModel;
+
+using var ppt = new XMLSlideShow();
+var imageBytes = File.ReadAllBytes(&quot;photo.jpg&quot;);
+
+// Add picture to the presentation (returns the index)
+var imageIndex = ppt.addPicture(imageBytes, XSLFPictureData.PICTURE_TYPE_JPEG);
+
+// Create picture on a slide
+var slide = ppt.createSlide();
+var picture = ppt.createPicture(slide, imageIndex);
+picture.setAnchor(914400, 685800, 4572000, 3429000);
+// setAnchor(x, y, width, height) in EMU</code></pre>
+<h2>Rotation</h2>
+<pre><code class="language-csharp">picture.setRotation(8.0);  // rotate 8 degrees (decimal degrees)</code></pre>
+<h2>Flipping</h2>
+<pre><code class="language-csharp">picture.FlipHorizontal = true;
+picture.FlipVertical = true;</code></pre>
+<h2>Supported Image Types</h2>
+<table>
+<thead><tr><th>Constant</th><th>Format</th></tr></thead>
+<tbody>
+<tr><td><code>PICTURE_TYPE_JPEG</code></td><td>JPEG</td></tr>
+<tr><td><code>PICTURE_TYPE_PNG</code></td><td>PNG</td></tr>
+<tr><td><code>PICTURE_TYPE_GIF</code></td><td>GIF</td></tr>
+<tr><td><code>PICTURE_TYPE_BMP</code></td><td>BMP</td></tr>
+</tbody>
+</table>
+<h2>Picture with Text on the Same Slide</h2>
+<pre><code class="language-csharp">// Add picture
+var picture = ppt.createPicture(slide, imageIndex);
+picture.setAnchor(914400, 685800, 4572000, 3429000);
+
+// Add text box alongside
+var textBox = slide.createTextBox();
+textBox.setAnchor(5715000, 914400, 2743200, 1371600);
+textBox.addParagraph().addRun(&quot;Image caption&quot;);</code></pre>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/Phase33PptxExample/</code> and <code>examples/UsageSamples/Program.cs</code> (<code>CreatePresentation</code>):</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase33PptxExample">examples/Phase33PptxExample</a></p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples">examples/UsageSamples</a></p>
+
+    </main>
+  </div>
+</body>
+</html>

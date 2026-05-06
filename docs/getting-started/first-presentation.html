@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your First PowerPoint Presentation | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="first-document.html">Your First Word Document</a></li>
+<li><a class="active" href="first-presentation.html">Your First Presentation</a></li>
+<li><a href="usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../guides/xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../guides/xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../guides/xlsx/layout.html">Layout</a></li>
+<li><a href="../guides/xlsx/images.html">Images</a></li>
+<li><a href="../guides/xlsx/formulas.html">Formulas</a></li>
+<li><a href="../guides/xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../guides/xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../guides/xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../guides/xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../guides/xlsx/protection.html">Protection</a></li>
+<li><a href="../guides/xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../guides/xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../guides/docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../guides/docx/tables.html">Tables</a></li>
+<li><a href="../guides/docx/images.html">Images</a></li>
+<li><a href="../guides/docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../guides/docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../guides/docx/fields.html">Fields</a></li>
+<li><a href="../guides/docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../guides/pptx/slides.html">Slides</a></li>
+<li><a href="../guides/pptx/text.html">Text Boxes</a></li>
+<li><a href="../guides/pptx/images.html">Images</a></li>
+<li><a href="../guides/pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../guides/xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Your First PowerPoint Presentation</h1>
+<p>This page walks through creating a <code>.pptx</code> file with slides, text boxes, images, and tables.</p>
+<h2>Minimal Example</h2>
+<pre><code class="language-csharp">using DotnetPoi.XSLF.UserModel;
+
+using var prs = new XMLSlideShow();
+
+var slide = prs.createSlide();
+
+// Add a text box
+var textBox = slide.createTextBox();
+textBox.setText(&quot;Hello from dotnet-poi!&quot;);
+textBox.setAnchor(100, 100, 400, 200);
+
+using var file = File.Create(&quot;output.pptx&quot;);
+prs.write(file);</code></pre>
+<h2>Step by Step</h2>
+<h3>1. Create a Presentation</h3>
+<pre><code class="language-csharp">using var prs = new XMLSlideShow();</code></pre>
+<p><code>XMLSlideShow</code> represents a PowerPoint presentation (the <code>.pptx</code> package).</p>
+<h3>2. Add Slides</h3>
+<pre><code class="language-csharp">var slide1 = prs.createSlide();
+var slide2 = prs.createSlide();</code></pre>
+<p>Each call to <code>createSlide()</code> appends a new blank slide.</p>
+<h3>3. Add a Text Box</h3>
+<pre><code class="language-csharp">var textBox = slide.createTextBox();
+textBox.setText(&quot;Hello, World!&quot;);</code></pre>
+<p>Set position and size with <code>setAnchor</code> (x, y, width, height in EMU):</p>
+<pre><code class="language-csharp">textBox.setAnchor(100, 100, 400, 200);</code></pre>
+<p>Format individual text runs:</p>
+<pre><code class="language-csharp">var tp = textBox.addNewTextParagraph();
+var tr = tp.addNewTextRun();
+tr.setText(&quot;Bold title&quot;);
+tr.setBold(true);
+tr.setFontSize(24);
+tr.setFontColor(&quot;FF0000&quot;);</code></pre>
+<h3>4. Add an Image</h3>
+<pre><code class="language-csharp">var imageBytes = File.ReadAllBytes(&quot;photo.jpg&quot;);
+var picIdx = prs.addPicture(imageBytes, XSLFPictureData.PICTURE_TYPE_JPEG);
+
+var slide = prs.createSlide();
+var shape = prs.createPicture(slide, picIdx);
+shape.setAnchor(100, 100, 2000, 1500);
+shape.setRotation(45.0);</code></pre>
+<p><code>addPicture</code> returns a picture index. Use it with <code>createPicture</code> to place the image on a slide.</p>
+<h3>5. Add a Table</h3>
+<pre><code class="language-csharp">var table = slide.createTable(3, 2);
+table.setAnchor(100, 100, 600, 200);
+
+table.getCell(0, 0).setText(&quot;Name&quot;);
+table.getCell(0, 1).setText(&quot;Value&quot;);
+table.getCell(1, 0).setText(&quot;Item 1&quot;);
+table.getCell(1, 1).setText(&quot;42&quot;);</code></pre>
+<h3>6. Save</h3>
+<pre><code class="language-csharp">using var file = File.Create(&quot;output.pptx&quot;);
+prs.write(file);</code></pre>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/Phase33PptxExample/</code> in the repository:</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase33PptxExample">examples/Phase33PptxExample</a></p>
+<p>Run it:</p>
+<pre><code class="language-bash">dotnet run --project examples/Phase33PptxExample</code></pre>
+<p>Generated file: <code>examples/output/phase3_3-pptx-example.pptx</code></p>
+<h2>What&#39;s Next</h2>
+<ul>
+<li><a href="../guides/pptx/images.md">Images in pptx</a> — placement, rotation, scaling</li>
+<li><a href="../guides/pptx/tables.md">Tables in pptx</a> — creating styled tables</li>
+</ul>
+
+    </main>
+  </div>
+</body>
+</html>

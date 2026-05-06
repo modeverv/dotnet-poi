@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auto Filter | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="styles.html">Styles &amp; Formatting</a></li>
+<li><a href="layout.html">Layout</a></li>
+<li><a href="images.html">Images</a></li>
+<li><a href="formulas.html">Formulas</a></li>
+<li><a href="data-validation.html">Data Validation</a></li>
+<li><a href="conditional-formatting.html">Conditional Formatting</a></li>
+<li><a class="active" href="auto-filter.html">Auto Filter</a></li>
+<li><a href="pivot-tables.html">Pivot Tables</a></li>
+<li><a href="protection.html">Protection</a></li>
+<li><a href="rich-text.html">Rich Text</a></li>
+<li><a href="macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../pptx/slides.html">Slides</a></li>
+<li><a href="../pptx/text.html">Text Boxes</a></li>
+<li><a href="../pptx/images.html">Images</a></li>
+<li><a href="../pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Auto Filter</h1>
+<p>Add dropdown filter buttons to column headers.</p>
+<h2>Basic Usage</h2>
+<pre><code class="language-csharp">sheet.setAutoFilter(new CellRangeAddress(2, 6, 0, 3));
+// Adds filter buttons to the header range A2:D6</code></pre>
+<p>The method takes a <code>CellRangeAddress</code> specifying the data range including headers. Excel displays dropdown arrows in the first row of the range.</p>
+<h2>Reading Auto Filter</h2>
+<pre><code class="language-csharp">var filter = sheet.getAutoFilter();
+if (filter is not null)
+{
+    var range = filter.CellRange;
+    // range.FirstRow, range.LastRow, range.FirstCol, range.LastCol
+}</code></pre>
+<p>Auto filter settings are preserved on round-trip.</p>
+
+    </main>
+  </div>
+</body>
+</html>

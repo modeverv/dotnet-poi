@@ -138,6 +138,34 @@ pre code {
   color: #f5f7fb;
 }
 
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0;
+  font-size: .95em;
+}
+
+th, td {
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: var(--accent-soft);
+  font-weight: 700;
+  color: var(--text);
+}
+
+td {
+  color: var(--muted);
+}
+
+tr:nth-child(even) td {
+  background: #f2f4f8;
+}
+
 @media (max-width: 760px) {
   .site-shell {
     display: block;

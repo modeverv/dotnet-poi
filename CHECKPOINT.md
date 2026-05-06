@@ -1060,3 +1060,63 @@ Notes:
 
 - ZIP entry inspection confirmed representative parts exist, e.g. `xl/charts/chart1.xml`, `xl/comments1.xml`, `word/comments.xml`, `word/footnotes.xml`, `word/embeddings/*`, `ppt/media/media1.mp4`, `ppt/media/media1.mp3`, `ppt/comments/comment1.xml`, `ppt/notesSlides/*`, `ppt/charts/chart1.xml`, `ppt/diagrams/*`, `ppt/embeddings/*`。
 - For preservation tests, assert both unknown part bytes and relationship/reference survival. The most fragile part is regenerated center XML/rels (`word/document.xml`, `ppt/slides/slideN.xml`, `xl/worksheets/sheetN.xml`, and their `.rels`)。
+
+---
+
+## 2026-05-15 JST — Phase 9 ドキュメントサイト生成 (28 pages)
+
+- Current task: Phase 9 ドキュメントをユーザーの手を借りず自力で全ページ生成する。
+- Scope: DOC_PLAN.md に沿い、HTML 生成まで完了。コミットしない。
+
+### やったこと
+
+**DocsGenerator 拡張:**
+- Markdown パーサに **テーブル対応** 追加（`|...|` → `<table>`/`<th>`/`<td>`）
+- Markdown パーサに **太字対応** 追加（`**text**` → `<strong>`）
+- `site.css` にテーブルスタイル追加（borders, striped rows, accent header）
+
+**Getting Started セクション (5 pages):**
+- installation.md — NuGet インストール手順、パッケージ分割説明、動作確認
+- first-workbook.md — xlsx 初めてのワークブック作成ガイド
+- first-document.md — docx 初めてのドキュメント作成ガイド
+- first-presentation.md — pptx 初めてのプレゼンテーション作成ガイド
+- usage-samples.md — 既存
+
+**Compatibility セクション (4 pages):**
+- format-coverage.md — xlsx〜xls 全フォーマットの機能マトリクス
+- limitations.md — 既知の制限事項（formula eval, charts, styles, etc.）
+- package-split.md — Core vs Formula 分割設計の説明
+- interop.md — Java POI 双方向互換性テストの説明
+
+**xlsx ガイド (12 pages):**
+- cell-types.md, styles.md, layout.md, images.md, formulas.md
+- data-validation.md, conditional-formatting.md, auto-filter.md
+- pivot-tables.md, protection.md, rich-text.md, macros.md
+
+**docx ガイド (7 pages):**
+- paragraphs.md, tables.md, images.md, headers-footers.md
+- hyperlinks.md, fields.md, sections.md
+
+**pptx ガイド (4 pages):**
+- slides.md, text.md, images.md, tables.md
+
+**xls ガイド (1 page):**
+- overview.md
+
+**Reference (1 page):**
+- examples-index.md — 15の example 一覧表
+
+### Verification
+- `dotnet build tools/DotnetPoi.DocsGenerator/` — Passed
+- `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs` — 35 HTML files generated
+- テーブル `|...|` → 正しく `<table>` HTML に変換
+- 太字 `**text**` → 正しく `<strong>` HTML に変換
+- ナビゲーション: 6 sections, 28 items, 35 pages total
+
+## 2026-05-06 JST - xlsx cell alignment/wrapText status check
+
+- User question: xlsx のセル右揃えとワードラップ機能は未実装か。
+- Checked `src/DotnetPoi.Core/XSSF/UserModel/XSSFCellStyle.cs`: `setAlignment(HorizontalAlignment)` / `getAlignment()` and `setWrapText(bool)` / `getWrapText()` are implemented for XSSF.
+- Checked `src/DotnetPoi.Core/XSSF/UserModel/XSSFWorkbook.cs`: style XML write emits `applyAlignment="true"` and `<alignment horizontal="right" wrapText="true">` when set; read path parses `horizontal`, `vertical`, `wrapText`, `indent`, and `textRotation`.
+- Existing test coverage: `RoundTrip_StyledCell_AlignmentRestored` covers center/top/wrapText/indent/rotation, but there is no focused assertion specifically for `HorizontalAlignment.Right`.
+- Note: HSSF (`.xls`) style alignment/wrap APIs are still stubs returning defaults / throwing `NotImplementedException`; this status check is for xlsx/XSSF only.

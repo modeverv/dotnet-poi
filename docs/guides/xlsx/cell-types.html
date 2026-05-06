@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cell Types and Values | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a class="active" href="cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="styles.html">Styles &amp; Formatting</a></li>
+<li><a href="layout.html">Layout</a></li>
+<li><a href="images.html">Images</a></li>
+<li><a href="formulas.html">Formulas</a></li>
+<li><a href="data-validation.html">Data Validation</a></li>
+<li><a href="conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="auto-filter.html">Auto Filter</a></li>
+<li><a href="pivot-tables.html">Pivot Tables</a></li>
+<li><a href="protection.html">Protection</a></li>
+<li><a href="rich-text.html">Rich Text</a></li>
+<li><a href="macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../pptx/slides.html">Slides</a></li>
+<li><a href="../pptx/text.html">Text Boxes</a></li>
+<li><a href="../pptx/images.html">Images</a></li>
+<li><a href="../pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Cell Types and Values</h1>
+<p>dotnet-poi supports all standard cell types: string, numeric, boolean, date, formula (text + cached value), and error.</p>
+<h2>Writing Cell Values</h2>
+<pre><code class="language-csharp">using DotnetPoi.XSSF.UserModel;
+
+using var wb = new XSSFWorkbook();
+var ws = wb.createSheet(&quot;Types&quot;);
+var row = ws.createRow(0);
+
+row.createCell(0).setCellValue(&quot;Hello&quot;);       // String
+row.createCell(1).setCellValue(42.5);           // Numeric (double)
+row.createCell(2).setCellValue(true);           // Boolean
+row.createCell(3).setCellValue(42);             // int is stored as double</code></pre>
+<h2>Reading Cell Values</h2>
+<pre><code class="language-csharp">using var stream = File.OpenRead(&quot;input.xlsx&quot;);
+using var wb = new XSSFWorkbook(stream);
+var ws = wb.getSheetAt(0);
+var row = ws.getRow(0);
+
+var cellType = row.getCell(0).getCellType();  // CellType enum
+
+switch (cellType)
+{
+    case CellType.Numeric:
+        var num = row.getCell(0).getNumericCellValue();
+        break;
+    case CellType.String:
+        var str = row.getCell(0).getStringCellValue();
+        break;
+    case CellType.Boolean:
+        var b = row.getCell(0).getBooleanCellValue();
+        break;
+    case CellType.Formula:
+        var formula = row.getCell(0).getCellFormula();
+        var cachedType = row.getCell(0).getCachedFormulaResultType();
+        break;
+    case CellType.Error:
+        var err = row.getCell(0).getErrorCellString();
+        break;
+    case CellType.Blank:
+        // Cell is empty
+        break;
+}</code></pre>
+<h2>Date Values</h2>
+<p>Dates in xlsx are stored as numeric cells with a date format. Write a <code>DateTime</code> using <code>setCellValue</code>:</p>
+<pre><code class="language-csharp">row.createCell(0).setCellValue(new DateTime(2025, 1, 15));</code></pre>
+<p>To display as a date, apply a date format:</p>
+<pre><code class="language-csharp">var style = wb.createCellStyle();
+style.setDataFormat(wb.createDataFormat().getFormat(&quot;yyyy-MM-dd&quot;));
+cell.setCellStyle(style);</code></pre>
+<p>When reading back, use <code>DateUtil.isCellDateFormatted()</code> to check if a numeric cell is a date:</p>
+<pre><code class="language-csharp">if (DateUtil.isCellDateFormatted(cell))
+{
+    var date = cell.getDateCellValue();  // returns DateTime
+}</code></pre>
+<h2>Formula Cells</h2>
+<p>Write a formula with <code>setCellFormula</code>. The cached result can be set separately:</p>
+<pre><code class="language-csharp">var cell = row.createCell(0);
+cell.setCellFormula(&quot;SUM(A1:A10)&quot;);
+cell.setCellValue(55.0);  // cached result — Excel recalculates on open</code></pre>
+<p>Read formula text and cached value:</p>
+<pre><code class="language-csharp">var formula = cell.getCellFormula();                 // &quot;SUM(A1:A10)&quot;
+var cachedType = cell.getCachedFormulaResultType();  // CellType.Numeric
+var cachedValue = cell.getNumericCellValue();        // 55.0</code></pre>
+<p><strong>Note:</strong> Full formula evaluation is not available. See <a href="../../compatibility/package-split.md">Package Split</a>.</p>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/Phase7CellTypesExample/</code>:</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase7CellTypesExample">examples/Phase7CellTypesExample</a></p>
+
+    </main>
+  </div>
+</body>
+</html>

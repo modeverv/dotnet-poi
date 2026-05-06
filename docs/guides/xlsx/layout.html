@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Layout | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="styles.html">Styles &amp; Formatting</a></li>
+<li><a class="active" href="layout.html">Layout</a></li>
+<li><a href="images.html">Images</a></li>
+<li><a href="formulas.html">Formulas</a></li>
+<li><a href="data-validation.html">Data Validation</a></li>
+<li><a href="conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="auto-filter.html">Auto Filter</a></li>
+<li><a href="pivot-tables.html">Pivot Tables</a></li>
+<li><a href="protection.html">Protection</a></li>
+<li><a href="rich-text.html">Rich Text</a></li>
+<li><a href="macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../pptx/slides.html">Slides</a></li>
+<li><a href="../pptx/text.html">Text Boxes</a></li>
+<li><a href="../pptx/images.html">Images</a></li>
+<li><a href="../pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Layout</h1>
+<p>Column widths, row heights, merged regions, freeze panes, hidden rows/columns, and active cell position.</p>
+<h2>Column Width</h2>
+<pre><code class="language-csharp">sheet.setColumnWidth(0, 24 * 256);  // column A = 24 characters wide</code></pre>
+<p>Width is in units of 1/256th of a character width. Multiply by 256 for convenience.</p>
+<p>To read back the width of a column:</p>
+<pre><code class="language-csharp">int width = sheet.getColumnWidth(0);  // returns width in 1/256th character units</code></pre>
+<h2>Row Height</h2>
+<pre><code class="language-csharp">row.setHeight(30);  // 30 points</code></pre>
+<p>Height is in points (1/72 inch). The default row height is 15.0 points.</p>
+<p>To read back the height of a row:</p>
+<pre><code class="language-csharp">float height = row.getHeight();  // returns height in points</code></pre>
+<h2>Merged Regions</h2>
+<pre><code class="language-csharp">using DotnetPoi.SS.Util;
+
+sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 3));
+// Merges cells A1:D1 (row 0, columns 0-3)</code></pre>
+<p><code>CellRangeAddress</code> constructor: <code>(firstRow, lastRow, firstCol, lastCol)</code>.</p>
+<h2>Freeze Panes</h2>
+<pre><code class="language-csharp">sheet.createFreezePane(0, 3);
+// Freezes the first 3 rows (header area) — scrollable below row 3
+
+sheet.createFreezePane(2, 0);
+// Freezes the first 2 columns — scrollable to the right</code></pre>
+<p>Parameters: <code>(colSplit, rowSplit)</code>. The split is 0-indexed; rows above and columns left of the split stay visible.</p>
+<h2>Hidden Rows and Columns</h2>
+<pre><code class="language-csharp">sheet.getRow(2).setZeroHeight(true);  // hide row 3
+
+sheet.setColumnHidden(1, true);       // hide column B
+sheet.isColumnHidden(1);              // check if hidden</code></pre>
+<p>Hidden rows/columns are preserved on round-trip.</p>
+<h2>Active Cell and Sheet Selection</h2>
+<p>In Japanese spreadsheet workflows, setting the active cell position and selecting the active sheet is particularly important for user navigation when the file is opened.</p>
+<h3>Set the Active Cell</h3>
+<pre><code class="language-csharp">sheet.setActiveCell(&quot;D5&quot;);  // cell D5 will be selected when opened</code></pre>
+<p>The active cell is the cell that has keyboard focus when the workbook is opened in Excel. The reference is specified as an Excel-style string (e.g. &quot;A1&quot;, &quot;C10&quot;, &quot;AB42&quot;).</p>
+<p>To read back the active cell:</p>
+<pre><code class="language-csharp">string? activeCell = sheet.getActiveCell();  // returns &quot;D5&quot;, or null if not set</code></pre>
+<h3>Set the Active Sheet</h3>
+<pre><code class="language-csharp">wb.setActiveSheet(1);   // the second sheet (0-indexed) becomes the active tab
+wb.setSelectedTab(1);   // alias — selects the tab</code></pre>
+<p>To read back which sheet is active:</p>
+<pre><code class="language-csharp">int activeSheet = wb.getActiveSheetIndex();  // returns 0, 1, 2, ...</code></pre>
+<h3>Select a Sheet</h3>
+<p>When a workbook has multiple sheets, you can mark a sheet as selected (shown in the tab bar):</p>
+<pre><code class="language-csharp">sheet.setSelected(true);   // mark this sheet as selected
+bool selected = sheet.isSelected();  // check if selected</code></pre>
+<h3>Notes</h3>
+<ul>
+<li><code>setActiveSheet()</code> and <code>getActiveSheetIndex()</code> are serialized to XML and round-trip correctly.</li>
+<li><code>setActiveCell()</code> and <code>sheet.setSelected()</code> are available in the API but are currently <strong>in-memory only</strong> — they are not yet written to or read from the underlying XML. A future update will add XML serialization for the <code>&lt;selection&gt;</code> element and <code>activeCell</code> attribute in <code>&lt;sheetViews&gt;</code>.</li>
+</ul>
+<p>See <code>examples/UsageSamples/Program.cs</code> (<code>CreateSpreadsheet</code>) and <code>examples/Phase3InterfaceExample/</code>:</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples">examples/UsageSamples</a></p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase3InterfaceExample">examples/Phase3InterfaceExample</a></p>
+
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Images | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="styles.html">Styles &amp; Formatting</a></li>
+<li><a href="layout.html">Layout</a></li>
+<li><a class="active" href="images.html">Images</a></li>
+<li><a href="formulas.html">Formulas</a></li>
+<li><a href="data-validation.html">Data Validation</a></li>
+<li><a href="conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="auto-filter.html">Auto Filter</a></li>
+<li><a href="pivot-tables.html">Pivot Tables</a></li>
+<li><a href="protection.html">Protection</a></li>
+<li><a href="rich-text.html">Rich Text</a></li>
+<li><a href="macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../pptx/slides.html">Slides</a></li>
+<li><a href="../pptx/text.html">Text Boxes</a></li>
+<li><a href="../pptx/images.html">Images</a></li>
+<li><a href="../pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Images</h1>
+<p>Embed images into xlsx sheets with position, size, and rotation.</p>
+<h2>Embedding an Image</h2>
+<pre><code class="language-csharp">using DotnetPoi.XSSF.UserModel;
+
+using var wb = new XSSFWorkbook();
+var sheet = wb.createSheet(&quot;Images&quot;);
+
+// Read image bytes
+var imageBytes = File.ReadAllBytes(&quot;photo.jpg&quot;);
+var pictureIndex = wb.addPicture(imageBytes, XSSFWorkbook.PICTURE_TYPE_JPEG);
+
+// Create drawing
+var drawing = sheet.createDrawingPatriarch();
+
+// Create anchor (client anchor: rows 0-3, columns 0-3, with dx/dy offsets)
+var anchor = drawing.createAnchor(0, 0, 0, 0, 0, 0, 3, 3);
+
+// Create picture shape
+var picture = drawing.createPicture(anchor, pictureIndex);
+picture.setRotation(45.0);  // rotate 45 degrees</code></pre>
+<h2>Anchor Types</h2>
+<p>Use <code>createAnchor(dx1, dy1, dx2, dy2, col1, row1, col2, row2)</code>:</p>
+<table>
+<thead><tr><th>Parameter</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>dx1, dy1</code></td><td>Offset from top-left of cell (col1, row1) in EMU</td></tr>
+<tr><td><code>col1, row1</code></td><td>Top-left cell coordinate</td></tr>
+<tr><td><code>dx2, dy2</code></td><td>Offset from top-left of cell (col2, row2) in EMU</td></tr>
+<tr><td><code>col2, row2</code></td><td>Bottom-right cell coordinate</td></tr>
+</tbody>
+</table>
+<p>1 EMU = 1/914400 inch. 1 inch = 914400 EMU.</p>
+<h2>Multiple Images</h2>
+<p>Add multiple pictures to the same sheet by calling <code>createPicture</code> multiple times:</p>
+<pre><code class="language-csharp">var pic1 = drawing.createPicture(anchor1, picIdx1);
+var pic2 = drawing.createPicture(anchor2, picIdx2);</code></pre>
+<p>Each picture needs its own anchor and unique picture index from <code>addPicture</code>.</p>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/Phase25ImagesExample/</code>:</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase25ImagesExample">examples/Phase25ImagesExample</a></p>
+
+    </main>
+  </div>
+</body>
+</html>

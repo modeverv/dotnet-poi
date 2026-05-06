@@ -231,6 +231,7 @@ internal static partial class Markdown
         var html = new StringBuilder();
         var paragraph = new StringBuilder();
         var listOpen = false;
+        var tableOpen = false;
         var inCode = false;
         var codeLanguage = string.Empty;
         var code = new StringBuilder();
@@ -261,6 +262,7 @@ internal static partial class Markdown
                 {
                     FlushParagraph(html, paragraph);
                     CloseList(html, ref listOpen);
+                    CloseTable(html, ref tableOpen);
                     codeLanguage = line[3..].Trim();
                     inCode = true;
                 }
@@ -277,6 +279,56 @@ internal static partial class Markdown
             {
                 FlushParagraph(html, paragraph);
                 CloseList(html, ref listOpen);
+                CloseTable(html, ref tableOpen);
+                continue;
+            }
+
+            // Table row: must start and end with |
+            if (line.StartsWith('|') && line.EndsWith('|'))
+            {
+                FlushParagraph(html, paragraph);
+                CloseList(html, ref listOpen);
+
+                // Separator row (|---|) — skip but ensure table is open
+                if (line.Length > 2 && line.All(c => c is '|' or '-' or ':' or ' '))
+                {
+                    if (!tableOpen)
+                    {
+                        html.AppendLine("<table>");
+                        tableOpen = true;
+                    }
+                    continue;
+                }
+
+                if (!tableOpen)
+                {
+                    html.AppendLine("<table>");
+                    tableOpen = true;
+
+                    // First data row is treated as header
+                    html.Append("<thead><tr>");
+                    var headerCells = line.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var cell in headerCells)
+                    {
+                        html.Append("<th>");
+                        html.Append(InlineWithBold(cell));
+                        html.Append("</th>");
+                    }
+                    html.AppendLine("</tr></thead>");
+                    html.AppendLine("<tbody>");
+                }
+                else
+                {
+                    html.Append("<tr>");
+                    var cells = line.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var cell in cells)
+                    {
+                        html.Append("<td>");
+                        html.Append(InlineWithBold(cell));
+                        html.Append("</td>");
+                    }
+                    html.AppendLine("</tr>");
+                }
                 continue;
             }
 
@@ -287,11 +339,12 @@ internal static partial class Markdown
                 {
                     FlushParagraph(html, paragraph);
                     CloseList(html, ref listOpen);
+                    CloseTable(html, ref tableOpen);
                     var text = line[(level + 1)..].Trim();
                     html.Append("<h");
                     html.Append(level);
                     html.Append('>');
-                    html.Append(Inline(text));
+                    html.Append(InlineWithBold(text));
                     html.Append("</h");
                     html.Append(level);
                     html.AppendLine(">");
@@ -302,13 +355,14 @@ internal static partial class Markdown
             if (line.StartsWith("- ", StringComparison.Ordinal))
             {
                 FlushParagraph(html, paragraph);
+                CloseTable(html, ref tableOpen);
                 if (!listOpen)
                 {
                     html.AppendLine("<ul>");
                     listOpen = true;
                 }
                 html.Append("<li>");
-                html.Append(Inline(line[2..].Trim()));
+                html.Append(InlineWithBold(line[2..].Trim()));
                 html.AppendLine("</li>");
                 continue;
             }
@@ -327,6 +381,7 @@ internal static partial class Markdown
 
         FlushParagraph(html, paragraph);
         CloseList(html, ref listOpen);
+        CloseTable(html, ref tableOpen);
         return html.ToString();
     }
 
@@ -336,7 +391,7 @@ internal static partial class Markdown
             return;
 
         html.Append("<p>");
-        html.Append(Inline(paragraph.ToString()));
+        html.Append(InlineWithBold(paragraph.ToString()));
         html.AppendLine("</p>");
         paragraph.Clear();
     }
@@ -350,9 +405,21 @@ internal static partial class Markdown
         listOpen = false;
     }
 
-    private static string Inline(string value)
+    private static void CloseTable(StringBuilder html, ref bool tableOpen)
+    {
+        if (!tableOpen)
+            return;
+
+        html.AppendLine("</tbody>");
+        html.AppendLine("</table>");
+        tableOpen = false;
+    }
+
+    private static string InlineWithBold(string value)
     {
         var encoded = WebUtility.HtmlEncode(value);
+
+        encoded = BoldPattern().Replace(encoded, match => $"<strong>{match.Groups[1].Value}</strong>");
 
         encoded = LinkPattern().Replace(encoded, match =>
         {
@@ -364,6 +431,9 @@ internal static partial class Markdown
         encoded = CodePattern().Replace(encoded, match => $"<code>{match.Groups[1].Value}</code>");
         return encoded;
     }
+
+    [GeneratedRegex(@"\*\*([^*]+)\*\*")]
+    private static partial Regex BoldPattern();
 
     [GeneratedRegex(@"\[([^\]]+)\]\(([^)]+)\)")]
     private static partial Regex LinkPattern();

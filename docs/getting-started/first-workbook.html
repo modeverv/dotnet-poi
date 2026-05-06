@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Usage Samples | dotnet-poi Documentation</title>
+  <title>Your First Spreadsheet | dotnet-poi Documentation</title>
   <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
   <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -16,10 +16,10 @@
 <div class="nav-title">Getting Started</div>
 <ul>
 <li><a href="installation.html">Installation</a></li>
-<li><a href="first-workbook.html">Your First Spreadsheet</a></li>
+<li><a class="active" href="first-workbook.html">Your First Spreadsheet</a></li>
 <li><a href="first-document.html">Your First Word Document</a></li>
 <li><a href="first-presentation.html">Your First Presentation</a></li>
-<li><a class="active" href="usage-samples.html">Usage Samples</a></li>
+<li><a href="usage-samples.html">Usage Samples</a></li>
 </ul>
 </div>
 <div class="nav-section">
@@ -84,49 +84,57 @@
       </nav>
     </aside>
     <main class="content">
-<h1>Usage Samples</h1>
-<p>This documentation starts with runnable examples, not API catalogs. The first sample project creates real Office files, saves them under <code>examples/output/</code>, then reads them back to verify the generated content.</p>
-<p>Run it from the repository root:</p>
-<pre><code class="language-bash">dotnet run --project examples/UsageSamples/UsageSamples.csproj</code></pre>
-<p>Generated files:</p>
-<pre><code class="language-text">examples/output/usage-workbook.xlsx
-examples/output/usage-document.docx
-examples/output/usage-presentation.pptx</code></pre>
-<h2>Spreadsheet</h2>
-<p><code>usage-workbook.xlsx</code> demonstrates the spreadsheet tasks most users need first:</p>
+<h1>Your First Spreadsheet</h1>
+<p>This page walks through creating an <code>.xlsx</code> file with string and numeric cells.</p>
+<h2>Minimal Example</h2>
+<pre><code class="language-csharp">using DotnetPoi.XSSF.UserModel;
+
+using var workbook = new XSSFWorkbook();
+var sheet = workbook.createSheet(&quot;Sheet1&quot;);
+
+var row = sheet.createRow(0);
+row.createCell(0).setCellValue(&quot;Hello&quot;);
+row.createCell(1).setCellValue(42);
+
+using var file = File.Create(&quot;output.xlsx&quot;);
+workbook.write(file);</code></pre>
+<h2>Step by Step</h2>
+<h3>1. Create a Workbook</h3>
+<pre><code class="language-csharp">using var workbook = new XSSFWorkbook();</code></pre>
+<p><code>XSSFWorkbook</code> represents an entire Excel workbook (the <code>.xlsx</code> package). Dispose it when done to free resources.</p>
+<h3>2. Create a Sheet</h3>
+<pre><code class="language-csharp">var sheet = workbook.createSheet(&quot;Sheet1&quot;);</code></pre>
+<p>Sheets are named tabs in the workbook. The name must be unique within the workbook.</p>
+<h3>3. Create Rows and Cells</h3>
+<pre><code class="language-csharp">var row = sheet.createRow(0);        // first row (0-indexed)
+row.createCell(0).setCellValue(&quot;A string&quot;);
+row.createCell(1).setCellValue(123.45);
+row.createCell(2).setCellValue(42);   // int is stored as double</code></pre>
+<p>Cells are created at a column index (0-indexed). Uncreated cells are blank when the file is opened.</p>
+<h3>4. Save</h3>
+<pre><code class="language-csharp">using var file = File.Create(&quot;output.xlsx&quot;);
+workbook.write(file);</code></pre>
+<p>The <code>write()</code> method serializes the entire workbook to the stream. The stream is a standard .NET <code>Stream</code>, so you can write to a file, a <code>MemoryStream</code>, or an HTTP response body.</p>
+<h3>5. Read It Back</h3>
+<pre><code class="language-csharp">using var stream = File.OpenRead(&quot;output.xlsx&quot;);
+using var workbook = new XSSFWorkbook(stream);
+
+var sheet = workbook.getSheetAt(0);
+var row = sheet.getRow(0);
+
+Console.WriteLine(row.getCell(0).getStringCellValue()); // &quot;A string&quot;
+Console.WriteLine(row.getCell(1).getNumericCellValue()); // 123.45</code></pre>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/Phase0WriteExample/</code> in the repository for a complete example that writes an xlsx, saves it, and prints confirmation:</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase0WriteExample">examples/Phase0WriteExample</a></p>
+<p>Run it:</p>
+<pre><code class="language-bash">dotnet run --project examples/Phase0WriteExample</code></pre>
+<p>Generated file: <code>examples/output/phase0-write-example.xlsx</code></p>
+<h2>What&#39;s Next</h2>
 <ul>
-<li>create an <code>.xlsx</code> workbook and sheet</li>
-<li>write string and numeric cells</li>
-<li>apply fonts, fills, borders, alignment, and number formats</li>
-<li>merge a title range</li>
-<li>freeze header rows</li>
-<li>add a whole-number data validation</li>
-<li>preserve rich text in a shared string</li>
-<li>read the workbook back and assert cell values</li>
+<li><a href="../guides/xlsx/cell-types.md">Cell Types and Values</a> — strings, numbers, dates, booleans, formulas</li>
+<li><a href="../guides/xlsx/styles.md">Styles and Formatting</a> — fonts, fills, borders, number formats</li>
 </ul>
-<p>Source: <code>examples/UsageSamples/Program.cs</code>, <code>CreateSpreadsheet</code>.</p>
-<h2>Word Document</h2>
-<p><code>usage-document.docx</code> demonstrates:</p>
-<ul>
-<li>create paragraphs and runs</li>
-<li>apply bold text, font size, color, underline, and hyperlink metadata</li>
-<li>create a table</li>
-<li>embed an inline JPEG image</li>
-<li>read the document back and assert paragraphs, table content, and image data</li>
-</ul>
-<p>Source: <code>examples/UsageSamples/Program.cs</code>, <code>CreateDocument</code>.</p>
-<h2>PowerPoint Presentation</h2>
-<p><code>usage-presentation.pptx</code> demonstrates:</p>
-<ul>
-<li>create slides</li>
-<li>add text boxes and formatted runs</li>
-<li>place and rotate an image</li>
-<li>create a simple table on a slide</li>
-<li>read the presentation back and assert slide, text, and table content</li>
-</ul>
-<p>Source: <code>examples/UsageSamples/Program.cs</code>, <code>CreatePresentation</code>.</p>
-<h2>Documentation Scope</h2>
-<p>Phase 9 documentation is usage-only for now. Do not add class hierarchy pages or generated API reference pages until the practical guides have enough runnable coverage.</p>
 
     </main>
   </div>

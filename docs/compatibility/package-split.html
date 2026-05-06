@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Package Split: Core vs Formula | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../getting-started/installation.html">Installation</a></li>
+<li><a href="../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="format-coverage.html">Format Coverage</a></li>
+<li><a href="limitations.html">Limitations</a></li>
+<li><a class="active" href="package-split.html">Package Split</a></li>
+<li><a href="interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../guides/xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../guides/xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../guides/xlsx/layout.html">Layout</a></li>
+<li><a href="../guides/xlsx/images.html">Images</a></li>
+<li><a href="../guides/xlsx/formulas.html">Formulas</a></li>
+<li><a href="../guides/xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../guides/xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../guides/xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../guides/xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../guides/xlsx/protection.html">Protection</a></li>
+<li><a href="../guides/xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../guides/xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../guides/docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../guides/docx/tables.html">Tables</a></li>
+<li><a href="../guides/docx/images.html">Images</a></li>
+<li><a href="../guides/docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../guides/docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../guides/docx/fields.html">Fields</a></li>
+<li><a href="../guides/docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../guides/pptx/slides.html">Slides</a></li>
+<li><a href="../guides/pptx/text.html">Text Boxes</a></li>
+<li><a href="../guides/pptx/images.html">Images</a></li>
+<li><a href="../guides/pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../guides/xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Package Split: Core vs Formula</h1>
+<p>dotnet-poi ships as <strong>two separate NuGet packages</strong> to decouple Core stability from Formula maturity.</p>
+<h2>The Two Packages</h2>
+<table>
+<thead><tr><th>Package</th><th>NuGet ID</th><th>Contents</th><th>Stability</th></tr></thead>
+<tbody>
+<tr><td>Core</td><td><code>DotnetPoi.Core</code></td><td>All format implementations (XSSF/xlsx, HSSF/xls, XWPF/docx, XSLF/pptx, HWPF/doc, HSLF/ppt, POIFS) + common interfaces + XML writer</td><td><strong>Stable</strong> — ready for v1.0</td></tr>
+<tr><td>Formula</td><td><code>DotnetPoi.Formula</code></td><td>Formula evaluator (<code>IFormulaEvaluator</code>, <code>FormulaEvaluator</code>, <code>CellValue</code>)</td><td><strong>Experimental</strong> — limited scope, iterate freely</td></tr>
+</tbody>
+</table>
+<h2>Design Rules</h2>
+<p>1. <strong>Core has zero knowledge of Formula.</strong> No compile-time dependency. Core works perfectly without Formula. 2. <strong>Formula references Core.</strong> It consumes Core types like <code>ICell</code>, <code>IWorkbook</code>. 3. <strong>Auto-discovery at runtime.</strong> Formula registers itself via a static constructor. When you call <code>createFormulaEvaluator()</code>, Core uses lazy assembly discovery (<code>Type.GetType</code> + <code>RuntimeHelpers.RunClassConstructor</code>) to find and activate Formula automatically. 4. <strong>Graceful fallback.</strong> If Formula is not installed, <code>createFormulaEvaluator()</code> throws a clear <code>NotSupportedException</code>.</p>
+<h2>What Goes Where</h2>
+<table>
+<thead><tr><th>Feature</th><th>Package</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td>Read/write xlsx, xls, docx, pptx</td><td>Core</td><td>Core format operations</td></tr>
+<tr><td>Cell values, styles, layout</td><td>Core</td><td>No evaluation needed</td></tr>
+<tr><td>Formula text read/write</td><td>Core</td><td>Preserving formula text + cached values</td></tr>
+<tr><td><code>setCellFormula</code> / <code>getCellFormula</code></td><td>Core</td><td>Text operations</td></tr>
+<tr><td><code>calcPr fullCalcOnLoad</code></td><td>Core</td><td>Tell Excel to recalculate on open</td></tr>
+<tr><td><code>createFormulaEvaluator()</code></td><td>Core (factory), Formula (impl)</td><td>Factory in Core, evaluator in Formula</td></tr>
+<tr><td><code>evaluate()</code> / <code>evaluateAll()</code></td><td>Formula</td><td>Actual formula calculation</td></tr>
+<tr><td><code>evaluateFormulaCell()</code></td><td>Formula</td><td>Refresh cached result</td></tr>
+</tbody>
+</table>
+<h2>Why This Split</h2>
+<ul>
+<li><strong>Core can be stable early.</strong> All spreadsheet read/write/format logic is self-contained.</li>
+<li><strong>Formula can mature slowly.</strong> Evaluation is complex and can be iterated independently.</li>
+<li><strong>Smaller dependency for simple use cases.</strong> Users who only need xlsx read/write don&#39;t pull in the formula engine.</li>
+<li><strong>Security.</strong> Applications handling untrusted documents can omit the formula evaluator entirely, reducing attack surface.</li>
+</ul>
+<h2>Installation</h2>
+<pre><code class="language-xml">&lt;!-- Read/write only --&gt;
+&lt;PackageReference Include=&quot;DotnetPoi.Core&quot; Version=&quot;0.1.0&quot; /&gt;
+
+&lt;!-- Add formula evaluation --&gt;
+&lt;PackageReference Include=&quot;DotnetPoi.Core&quot; Version=&quot;0.1.0&quot; /&gt;
+&lt;PackageReference Include=&quot;DotnetPoi.Formula&quot; Version=&quot;0.1.0&quot; /&gt;</code></pre>
+
+    </main>
+  </div>
+</body>
+</html>

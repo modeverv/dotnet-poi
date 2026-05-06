@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your First Word Document | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="first-workbook.html">Your First Spreadsheet</a></li>
+<li><a class="active" href="first-document.html">Your First Word Document</a></li>
+<li><a href="first-presentation.html">Your First Presentation</a></li>
+<li><a href="usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../guides/xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../guides/xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../guides/xlsx/layout.html">Layout</a></li>
+<li><a href="../guides/xlsx/images.html">Images</a></li>
+<li><a href="../guides/xlsx/formulas.html">Formulas</a></li>
+<li><a href="../guides/xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../guides/xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../guides/xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../guides/xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../guides/xlsx/protection.html">Protection</a></li>
+<li><a href="../guides/xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../guides/xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../guides/docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../guides/docx/tables.html">Tables</a></li>
+<li><a href="../guides/docx/images.html">Images</a></li>
+<li><a href="../guides/docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../guides/docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../guides/docx/fields.html">Fields</a></li>
+<li><a href="../guides/docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../guides/pptx/slides.html">Slides</a></li>
+<li><a href="../guides/pptx/text.html">Text Boxes</a></li>
+<li><a href="../guides/pptx/images.html">Images</a></li>
+<li><a href="../guides/pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../guides/xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Your First Word Document</h1>
+<p>This page walks through creating a <code>.docx</code> file with paragraphs, formatted runs, and an embedded image.</p>
+<h2>Minimal Example</h2>
+<pre><code class="language-csharp">using DotnetPoi.XWPF.UserModel;
+
+using var doc = new XWPFDocument();
+
+var paragraph = doc.createParagraph();
+var run = paragraph.createRun();
+run.setText(&quot;Hello from dotnet-poi!&quot;);
+run.setBold(true);
+run.setFontSize(14);
+
+using var file = File.Create(&quot;output.docx&quot;);
+doc.write(file);</code></pre>
+<h2>Step by Step</h2>
+<h3>1. Create a Document</h3>
+<pre><code class="language-csharp">using var doc = new XWPFDocument();</code></pre>
+<p><code>XWPFDocument</code> represents a Word document (the <code>.docx</code> package).</p>
+<h3>2. Add Paragraphs and Runs</h3>
+<pre><code class="language-csharp">var p1 = doc.createParagraph();
+var r1 = p1.createRun();
+r1.setText(&quot;Bold heading&quot;);
+r1.setBold(true);
+r1.setFontSize(16);
+
+var p2 = doc.createParagraph();
+var r2 = p2.createRun();
+r2.setText(&quot;Italic subtitle&quot;);
+r2.setItalic(true);
+
+var p3 = doc.createParagraph();
+p3.createRun().setText(&quot;Plain body text.&quot;);</code></pre>
+<p>A paragraph (<code>XWPFParagraph</code>) contains one or more runs (<code>XWPFRun</code>). Each run can have its own formatting.</p>
+<h3>3. Available Run Formatting</h3>
+<table>
+<thead><tr><th>Method</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>setBold(bool)</code></td><td>Bold text</td></tr>
+<tr><td><code>setItalic(bool)</code></td><td>Italic text</td></tr>
+<tr><td><code>setUnderline(UnderlinePatterns)</code></td><td>Underline style</td></tr>
+<tr><td><code>setStrikeThrough(bool)</code></td><td>Strikethrough</td></tr>
+<tr><td><code>setFontName(string)</code></td><td>Font family</td></tr>
+<tr><td><code>setFontSize(int)</code></td><td>Font size in half-points</td></tr>
+<tr><td><code>setColor(string)</code></td><td>Text color (hex RGB, e.g. &quot;FF0000&quot;)</td></tr>
+</tbody>
+</table>
+<h3>4. Embed an Image</h3>
+<pre><code class="language-csharp">var imageBytes = File.ReadAllBytes(&quot;photo.jpg&quot;);
+
+var imagePara = doc.createParagraph();
+var imageRun = imagePara.createRun();
+var picture = imageRun.addPicture(
+    imageBytes,
+    XWPFPictureData.PICTURE_TYPE_JPEG,
+    &quot;photo.jpg&quot;,
+    width:  914400,   // 1 inch in EMU
+    height: 914400);
+
+picture.setRotation(45.0);  // rotate 45 degrees</code></pre>
+<p>Image dimensions are in EMU (English Metric Units). 1 inch = 914400 EMU.</p>
+<h3>5. Save</h3>
+<pre><code class="language-csharp">using var file = File.Create(&quot;output.docx&quot;);
+doc.write(file);</code></pre>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/Phase32DocxExample/</code> in the repository:</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase32DocxExample">examples/Phase32DocxExample</a></p>
+<p>Run it:</p>
+<pre><code class="language-bash">dotnet run --project examples/Phase32DocxExample</code></pre>
+<p>Generated file: <code>examples/output/phase3_2-docx-example.docx</code></p>
+<h2>What&#39;s Next</h2>
+<ul>
+<li><a href="../guides/docx/tables.md">Tables in docx</a> — creating and reading tables</li>
+<li><a href="../guides/docx/headers-footers.md">Headers and Footers</a> — page headers and footers</li>
+</ul>
+
+    </main>
+  </div>
+</body>
+</html>

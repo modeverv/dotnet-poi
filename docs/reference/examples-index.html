@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Examples Index | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../getting-started/installation.html">Installation</a></li>
+<li><a href="../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../guides/xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../guides/xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../guides/xlsx/layout.html">Layout</a></li>
+<li><a href="../guides/xlsx/images.html">Images</a></li>
+<li><a href="../guides/xlsx/formulas.html">Formulas</a></li>
+<li><a href="../guides/xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../guides/xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../guides/xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../guides/xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../guides/xlsx/protection.html">Protection</a></li>
+<li><a href="../guides/xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../guides/xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../guides/docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../guides/docx/tables.html">Tables</a></li>
+<li><a href="../guides/docx/images.html">Images</a></li>
+<li><a href="../guides/docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../guides/docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../guides/docx/fields.html">Fields</a></li>
+<li><a href="../guides/docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../guides/pptx/slides.html">Slides</a></li>
+<li><a href="../guides/pptx/text.html">Text Boxes</a></li>
+<li><a href="../guides/pptx/images.html">Images</a></li>
+<li><a href="../guides/pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../guides/xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a class="active" href="examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Examples Index</h1>
+<p>All runnable examples are in <code>examples/</code>. Build and run with:</p>
+<pre><code class="language-bash">dotnet run --project examples/ExampleName</code></pre>
+<h2>By Phase</h2>
+<table>
+<thead><tr><th>Example</th><th>Phase</th><th>Format</th><th>Topics</th></tr></thead>
+<tbody>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase0WriteExample">Phase0WriteExample</a></td><td>0</td><td>xlsx</td><td>First workbook, create sheet, rows, cells, save, read back</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase1InteropExample">Phase1InteropExample</a></td><td>1</td><td>xlsx</td><td>Java POI interoperability, bidirectional round-trip</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase2ReadExample">Phase2ReadExample</a></td><td>2</td><td>xlsx</td><td>Reading existing workbooks, enumerating sheets and cells</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase3InterfaceExample">Phase3InterfaceExample</a></td><td>3</td><td>xlsx</td><td>Using IWorkbook / ISheet / IRow / ICell interfaces</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase4XSSFOnlyExample">Phase4XSSFOnlyExample</a></td><td>4</td><td>xlsx</td><td>Create, styles, formulas, merged regions, freeze panes</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase5FormulaEvaluatorExample">Phase5FormulaEvaluatorExample</a></td><td>5</td><td>xlsx</td><td>Formula evaluator setup with DotnetPoi.Formula</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase6StreamingExample">Phase6StreamingExample</a></td><td>6</td><td>xlsx</td><td>SXSSF streaming, large data write + read verification</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase7CellTypesExample">Phase7CellTypesExample</a></td><td>7</td><td>xlsx</td><td>Read all cell types, write round-trip with boolean/numeric/string</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase8RichTextExample">Phase8RichTextExample</a></td><td>8</td><td>xlsx</td><td>Rich text strings, formatting runs</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase25ImagesExample">Phase25ImagesExample</a></td><td>25</td><td>xlsx</td><td>Image embedding with anchors and rotation</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase30DocxCreateExample">Phase30DocxCreateExample</a></td><td>30</td><td>docx</td><td>Create document, paragraphs, headers, footers, images, tables</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase31DocxReadExample">Phase31DocxReadExample</a></td><td>31</td><td>docx</td><td>Read back paragraphs, tables, images, fields</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase32DocxExample">Phase32DocxExample</a></td><td>32</td><td>docx</td><td>Read docx from POI, verify paragraphs, tables, pages, images</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase33PptxExample">Phase33PptxExample</a></td><td>33</td><td>pptx</td><td>Read pptx from POI, slides, text, tables, images</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples">UsageSamples</a></td><td>—</td><td>xlsx, docx, pptx</td><td>All-in-one with styles, validation, conditional formatting</td></tr>
+</tbody>
+</table>
+
+    </main>
+  </div>
+</body>
+</html>

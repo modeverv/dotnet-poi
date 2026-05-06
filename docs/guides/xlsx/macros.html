@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Macros (xlsm) | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="styles.html">Styles &amp; Formatting</a></li>
+<li><a href="layout.html">Layout</a></li>
+<li><a href="images.html">Images</a></li>
+<li><a href="formulas.html">Formulas</a></li>
+<li><a href="data-validation.html">Data Validation</a></li>
+<li><a href="conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="auto-filter.html">Auto Filter</a></li>
+<li><a href="pivot-tables.html">Pivot Tables</a></li>
+<li><a href="protection.html">Protection</a></li>
+<li><a href="rich-text.html">Rich Text</a></li>
+<li><a class="active" href="macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../pptx/slides.html">Slides</a></li>
+<li><a href="../pptx/text.html">Text Boxes</a></li>
+<li><a href="../pptx/images.html">Images</a></li>
+<li><a href="../pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Macros (xlsm)</h1>
+<p>dotnet-poi preserves VBA macros when round-tripping xlsm files. The <code>vbaProject.bin</code> is kept byte-for-byte.</p>
+<h2>Preserving Macros on Round-Trip</h2>
+<pre><code class="language-csharp">using var stream = File.OpenRead(&quot;macro-workbook.xlsm&quot;);
+using var wb = new XSSFWorkbook(stream);
+
+// Make changes to cells, styles, etc.
+var sheet = wb.getSheetAt(0);
+sheet.getRow(0).createCell(5).setCellValue(&quot;New data&quot;);
+
+// Save — macro bytes are preserved automatically
+using var outStream = File.Create(&quot;macro-workbook-modified.xlsm&quot;);
+wb.write(outStream);</code></pre>
+<p>No special handling is needed. The macro parts are automatically preserved as long as you don&#39;t remove them.</p>
+<h2>Creating Macro-Enabled Files</h2>
+<p>To create a new xlsm file, write using the <code>xlsm</code> extension. The workbook type is determined by the content:</p>
+<pre><code class="language-csharp">using var wb = new XSSFWorkbook();
+// ... add content ...
+using var file = File.Create(&quot;output.xlsm&quot;);
+wb.write(file);</code></pre>
+<p>For template-based workflows, start from an existing xlsm that contains the macros you need.</p>
+<h2>Limitations</h2>
+<ul>
+<li>Creating new VBA macros programmatically is not supported</li>
+<li>Reading VBA project contents is not supported</li>
+<li>Editing VBA macro source code is not supported</li>
+<li>Adding or removing macro references is not supported</li>
+</ul>
+<h2>Verified Formats</h2>
+<table>
+<thead><tr><th>Format</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>xlsm (Excel macro-enabled)</td><td>✅ Byte-for-byte preservation verified</td></tr>
+<tr><td>docm (Word macro-enabled)</td><td>✅ Byte-for-byte preservation verified</td></tr>
+<tr><td>pptm (PowerPoint macro-enabled)</td><td>✅ Byte-for-byte preservation verified</td></tr>
+</tbody>
+</table>
+
+    </main>
+  </div>
+</body>
+</html>

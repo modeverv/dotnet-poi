@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pivot Tables | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="styles.html">Styles &amp; Formatting</a></li>
+<li><a href="layout.html">Layout</a></li>
+<li><a href="images.html">Images</a></li>
+<li><a href="formulas.html">Formulas</a></li>
+<li><a href="data-validation.html">Data Validation</a></li>
+<li><a href="conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="auto-filter.html">Auto Filter</a></li>
+<li><a class="active" href="pivot-tables.html">Pivot Tables</a></li>
+<li><a href="protection.html">Protection</a></li>
+<li><a href="rich-text.html">Rich Text</a></li>
+<li><a href="macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../pptx/slides.html">Slides</a></li>
+<li><a href="../pptx/text.html">Text Boxes</a></li>
+<li><a href="../pptx/images.html">Images</a></li>
+<li><a href="../pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Pivot Tables</h1>
+<p>dotnet-poi supports programmatic creation of pivot tables. Editing existing pivot tables is not modeled but they are preserved on round-trip.</p>
+<h2>Creating a Pivot Table</h2>
+<pre><code class="language-csharp">using DotnetPoi.XSSF.UserModel;
+using DotnetPoi.SS.Util;
+
+// Create source data
+var sheet = wb.createSheet(&quot;Data&quot;);
+sheet.createRow(0).CreateCells(new[] { &quot;Category&quot;, &quot;Amount&quot; });
+sheet.createRow(1).CreateCells(new[] { &quot;Food&quot;, &quot;100&quot; });
+sheet.createRow(2).CreateCells(new[] { &quot;Travel&quot;, &quot;200&quot; });
+
+// Create pivot table sheet
+var pivotSheet = wb.createSheet(&quot;Pivot&quot;);
+
+// Define source range
+var sourceRange = new CellRangeAddress(0, 2, 0, 1);  // Data!A1:B3
+
+// Create pivot table
+var pivotTable = pivotSheet.createPivotTable(sourceRange, new CellReference(0, 0));
+
+// Add rows and data fields
+var categoryField = pivotTable.getRowLabel().AddValueField(0);     // Column 0 = Category
+var amountField = pivotTable.getDataFields().AddValueField(1);     // Column 1 = Amount
+amountField.SetValueFieldSum();</code></pre>
+<h2>Limitations</h2>
+<ul>
+<li>Only programmatic creation is supported</li>
+<li>Editing existing pivot tables is not modeled</li>
+<li>Pivot tables in existing files are preserved as unknown parts on round-trip</li>
+</ul>
+
+    </main>
+  </div>
+</body>
+</html>

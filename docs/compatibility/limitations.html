@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Limitations | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../getting-started/installation.html">Installation</a></li>
+<li><a href="../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="format-coverage.html">Format Coverage</a></li>
+<li><a class="active" href="limitations.html">Limitations</a></li>
+<li><a href="package-split.html">Package Split</a></li>
+<li><a href="interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../guides/xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../guides/xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../guides/xlsx/layout.html">Layout</a></li>
+<li><a href="../guides/xlsx/images.html">Images</a></li>
+<li><a href="../guides/xlsx/formulas.html">Formulas</a></li>
+<li><a href="../guides/xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../guides/xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../guides/xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../guides/xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../guides/xlsx/protection.html">Protection</a></li>
+<li><a href="../guides/xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../guides/xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../guides/docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../guides/docx/tables.html">Tables</a></li>
+<li><a href="../guides/docx/images.html">Images</a></li>
+<li><a href="../guides/docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../guides/docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../guides/docx/fields.html">Fields</a></li>
+<li><a href="../guides/docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../guides/pptx/slides.html">Slides</a></li>
+<li><a href="../guides/pptx/text.html">Text Boxes</a></li>
+<li><a href="../guides/pptx/images.html">Images</a></li>
+<li><a href="../guides/pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../guides/xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Limitations</h1>
+<p>This page documents known limitations and missing features that may affect real-world use. Check <a href="format-coverage.md">Format Coverage</a> for the full status matrix.</p>
+<h2>Critical Gaps</h2>
+<h3>Formula Evaluation</h3>
+<p>dotnet-poi can write formula text and preserve cached values, but <strong>full formula evaluation is permanently deferred</strong>. This means:</p>
+<ul>
+<li><code>setCellFormula(&quot;SUM(A1:A10)&quot;)</code> works and Excel recalculates on open</li>
+<li><code>XSSFFormulaEvaluator</code> exists as a partial implementation (SUM, AVERAGE, CONCATENATE, basic arithmetic) but will not be expanded</li>
+<li>Programmatic access to freshly calculated results without saving is <strong>not supported</strong></li>
+<li>Adding <code>DotnetPoi.Formula</code> package enables <code>createFormulaEvaluator()</code> for the limited evaluator</li>
+</ul>
+<h3>Chart Creation</h3>
+<p>Charts in xlsx and pptx are <strong>preserved on round-trip but cannot be created or edited programmatically</strong>. If your workflow requires generating chart visuals from data, this is not yet supported.</p>
+<h3>docx Styles</h3>
+<p>Only direct formatting (bold, italic, font size, color, etc.) is supported. <strong>Paragraph styles (Normal, Heading 1, Title) and character styles are not implemented.</strong> Documents that depend on style-based formatting may lose appearance when round-tripped.</p>
+<h3>docx Table Features</h3>
+<p>Cell merging and table borders are <strong>not implemented</strong> in docx tables.</p>
+<h2>Moderate Gaps</h2>
+<table>
+<thead><tr><th>Feature</th><th>Format</th><th>Impact</th></tr></thead>
+<tbody>
+<tr><td>Comments (read/create)</td><td>xlsx, docx</td><td>Existing comments preserved on round-trip but cannot be read or created</td></tr>
+<tr><td>Text boxes (w:txbxContent)</td><td>docx</td><td>Text inside Word text boxes is not readable</td></tr>
+<tr><td>Content controls (SDT)</td><td>docx</td><td>Structured document tags not supported</td></tr>
+<tr><td>Section columns</td><td>docx</td><td>Multi-column layout not supported</td></tr>
+<tr><td>Track changes</td><td>docx</td><td>Revision marks not supported</td></tr>
+<tr><td>Grouped shapes</td><td>pptx</td><td>Shape grouping not supported</td></tr>
+<tr><td>Notes slides</td><td>pptx</td><td>Speaker notes cannot be created or read</td></tr>
+<tr><td>Sparklines</td><td>xlsx</td><td>In-cell sparkline charts not supported</td></tr>
+<tr><td>External data connections</td><td>xlsx</td><td>Data connections not supported</td></tr>
+</tbody>
+</table>
+<h2>Minor Gaps</h2>
+<table>
+<thead><tr><th>Feature</th><th>Format</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Auto-shapes</td><td>xlsx</td><td>Not supported</td></tr>
+<tr><td>SmartArt editing</td><td>pptx</td><td>Preserved as unknown parts</td></tr>
+<tr><td>Animations/transitions editing</td><td>pptx</td><td>Preserved as unknown parts</td></tr>
+<tr><td>Theme editing</td><td>pptx</td><td>Layout/master/theme preserved but not editable</td></tr>
+<tr><td>Password hashing</td><td>xlsx</td><td>Protection on/off works; password hash not implemented</td></tr>
+<tr><td>xls (HSSF)</td><td>xls</td><td>Legacy format; minimal support</td></tr>
+</tbody>
+</table>
+<h2>When to Use Java POI Instead</h2>
+<p>If your project depends on any of the following, consider using Apache POI (Java) directly or bridging via a microservice:</p>
+<ul>
+<li>Programmatic formula evaluation (Excel calculation engine)</li>
+<li>Chart creation from data</li>
+<li>Heavy use of docx paragraph/table styles</li>
+<li>Full xls (BIFF) support</li>
+<li>Legacy doc (HWPF) or ppt (HSLF) formats</li>
+</ul>
+
+    </main>
+  </div>
+</body>
+</html>

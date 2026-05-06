@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Text Boxes | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../xlsx/layout.html">Layout</a></li>
+<li><a href="../xlsx/images.html">Images</a></li>
+<li><a href="../xlsx/formulas.html">Formulas</a></li>
+<li><a href="../xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../xlsx/protection.html">Protection</a></li>
+<li><a href="../xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="slides.html">Slides</a></li>
+<li><a class="active" href="text.html">Text Boxes</a></li>
+<li><a href="images.html">Images</a></li>
+<li><a href="tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>Text Boxes</h1>
+<p>Add and format text on slides.</p>
+<h2>Creating a Text Box</h2>
+<pre><code class="language-csharp">using DotnetPoi.XSLF.UserModel;
+
+using var ppt = new XMLSlideShow();
+var slide = ppt.createSlide();
+var textBox = slide.createTextBox();
+textBox.setAnchor(685800, 457200, 7315200, 914400);
+// setAnchor(x, y, width, height) — all values in EMU</code></pre>
+<h2>Adding Text</h2>
+<pre><code class="language-csharp">var paragraph = textBox.addParagraph();
+var run = paragraph.addRun(&quot;Hello from dotnet-poi!&quot;);</code></pre>
+<h2>Multiple Paragraphs</h2>
+<pre><code class="language-csharp">var titleBox = slide.createTextBox();
+titleBox.setAnchor(685800, 457200, 7315200, 914400);
+var title = titleBox.addParagraph().addRun(&quot;Title&quot;);
+title.Bold = true;
+title.FontSize = 28;
+
+var subtitleBox = slide.createTextBox();
+subtitleBox.setAnchor(685800, 1371600, 7315200, 914400);
+subtitleBox.addParagraph().addRun(&quot;This is a subtitle.&quot;);</code></pre>
+<h2>Run Formatting</h2>
+<pre><code class="language-csharp">var run = paragraph.addRun(&quot;Formatted text&quot;);
+run.Bold = true;
+run.Italic = true;
+run.FontSize = 24;
+run.FontName = &quot;Arial&quot;;
+run.FontColor = &quot;FF0000&quot;;  // hex RGB
+run.Underline = true;</code></pre>
+<h2>Reading Slide Text</h2>
+<pre><code class="language-csharp">var shapes = slide.getAutoShapes();  // returns text boxes
+var text = shapes[0].Paragraphs[0].getPlainText();</code></pre>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/Phase33PptxExample/</code> and <code>examples/UsageSamples/Program.cs</code> (<code>CreatePresentation</code>):</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase33PptxExample">examples/Phase33PptxExample</a></p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples">examples/UsageSamples</a></p>
+
+    </main>
+  </div>
+</body>
+</html>

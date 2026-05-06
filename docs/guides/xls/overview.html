@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>xls (HSSF) Overview | dotnet-poi Documentation</title>
+  <meta name="description" content="Usage-focused documentation for working with Office files from .NET.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../xlsx/layout.html">Layout</a></li>
+<li><a href="../xlsx/images.html">Images</a></li>
+<li><a href="../xlsx/formulas.html">Formulas</a></li>
+<li><a href="../xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../xlsx/protection.html">Protection</a></li>
+<li><a href="../xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../pptx/slides.html">Slides</a></li>
+<li><a href="../pptx/text.html">Text Boxes</a></li>
+<li><a href="../pptx/images.html">Images</a></li>
+<li><a href="../pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a class="active" href="overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>xls (HSSF) Overview</h1>
+<p>HSSF provides read and write support for the legacy xls (BIFF) format. Coverage is ~10%.</p>
+<h2>Status</h2>
+<p>HSSF is the oldest and least complete format implementation in dotnet-poi. It supports basic cell read/write operations but most advanced features (styles, images, charts, formulas, data validation, filters, pivot tables) are not implemented.</p>
+<h2>Basic Read and Write</h2>
+<pre><code class="language-csharp">using DotnetPoi.HSSF.UserModel;
+
+// Write
+using var wb = new HSSFWorkbook();
+var sheet = wb.createSheet(&quot;Sheet1&quot;);
+var row = sheet.createRow(0);
+row.createCell(0).setCellValue(&quot;Hello from HSSF&quot;);
+
+using var file = File.Create(&quot;output.xls&quot;);
+wb.write(file);
+
+// Read
+using var stream = File.OpenRead(&quot;input.xls&quot;);
+using var wb2 = new HSSFWorkbook(stream);
+var value = wb2.getSheetAt(0).getRow(0).getCell(0).getStringCellValue();</code></pre>
+<h2>When to Use HSSF</h2>
+<ul>
+<li>You need to read or update existing xls files without style changes</li>
+<li>You have a legacy workflow that requires xls output</li>
+<li>You are migrating from xls to xlsx and need a transitional solution</li>
+</ul>
+<h2>When to Use XSSF Instead</h2>
+<ul>
+<li>All new development should use XSSF (xlsx)</li>
+<li>xlsx is more capable, more widely supported, and has higher coverage</li>
+<li>Excel can open xlsx files from Excel 2007 onwards</li>
+<li>LibreOffice/OpenOffice handles xlsx as well as xls</li>
+</ul>
+<h2>Limitations</h2>
+<ul>
+<li>No formula support</li>
+<li>No image support</li>
+<li>No style support (fonts, fills, borders, number formats)</li>
+<li>No data validation</li>
+<li>No conditional formatting</li>
+<li>No auto filter</li>
+<li>No pivot tables</li>
+<li>No protection</li>
+<li>No chart support</li>
+<li>No rich text</li>
+</ul>
+<p>HSSF is maintained for compatibility but is not a priority for new development.</p>
+
+    </main>
+  </div>
+</body>
+</html>

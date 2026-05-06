@@ -6,8 +6,170 @@
       "title": "Getting Started",
       "items": [
         {
+          "title": "Installation",
+          "path": "getting-started/installation.md"
+        },
+        {
+          "title": "Your First Spreadsheet",
+          "path": "getting-started/first-workbook.md"
+        },
+        {
+          "title": "Your First Word Document",
+          "path": "getting-started/first-document.md"
+        },
+        {
+          "title": "Your First Presentation",
+          "path": "getting-started/first-presentation.md"
+        },
+        {
           "title": "Usage Samples",
           "path": "getting-started/usage-samples.md"
+        }
+      ]
+    },
+    {
+      "title": "Compatibility",
+      "items": [
+        {
+          "title": "Format Coverage",
+          "path": "compatibility/format-coverage.md"
+        },
+        {
+          "title": "Limitations",
+          "path": "compatibility/limitations.md"
+        },
+        {
+          "title": "Package Split",
+          "path": "compatibility/package-split.md"
+        },
+        {
+          "title": "Java POI Interop",
+          "path": "compatibility/interop.md"
+        }
+      ]
+    },
+    {
+      "title": "xlsx Guides",
+      "items": [
+        {
+          "title": "Cell Types & Values",
+          "path": "guides/xlsx/cell-types.md"
+        },
+        {
+          "title": "Styles & Formatting",
+          "path": "guides/xlsx/styles.md"
+        },
+        {
+          "title": "Layout",
+          "path": "guides/xlsx/layout.md"
+        },
+        {
+          "title": "Images",
+          "path": "guides/xlsx/images.md"
+        },
+        {
+          "title": "Formulas",
+          "path": "guides/xlsx/formulas.md"
+        },
+        {
+          "title": "Data Validation",
+          "path": "guides/xlsx/data-validation.md"
+        },
+        {
+          "title": "Conditional Formatting",
+          "path": "guides/xlsx/conditional-formatting.md"
+        },
+        {
+          "title": "Auto Filter",
+          "path": "guides/xlsx/auto-filter.md"
+        },
+        {
+          "title": "Pivot Tables",
+          "path": "guides/xlsx/pivot-tables.md"
+        },
+        {
+          "title": "Protection",
+          "path": "guides/xlsx/protection.md"
+        },
+        {
+          "title": "Rich Text",
+          "path": "guides/xlsx/rich-text.md"
+        },
+        {
+          "title": "Macros (xlsm)",
+          "path": "guides/xlsx/macros.md"
+        }
+      ]
+    },
+    {
+      "title": "docx Guides",
+      "items": [
+        {
+          "title": "Paragraphs & Runs",
+          "path": "guides/docx/paragraphs.md"
+        },
+        {
+          "title": "Tables",
+          "path": "guides/docx/tables.md"
+        },
+        {
+          "title": "Images",
+          "path": "guides/docx/images.md"
+        },
+        {
+          "title": "Headers & Footers",
+          "path": "guides/docx/headers-footers.md"
+        },
+        {
+          "title": "Hyperlinks",
+          "path": "guides/docx/hyperlinks.md"
+        },
+        {
+          "title": "Fields",
+          "path": "guides/docx/fields.md"
+        },
+        {
+          "title": "Page Setup",
+          "path": "guides/docx/sections.md"
+        }
+      ]
+    },
+    {
+      "title": "pptx Guides",
+      "items": [
+        {
+          "title": "Slides",
+          "path": "guides/pptx/slides.md"
+        },
+        {
+          "title": "Text Boxes",
+          "path": "guides/pptx/text.md"
+        },
+        {
+          "title": "Images",
+          "path": "guides/pptx/images.md"
+        },
+        {
+          "title": "Tables",
+          "path": "guides/pptx/tables.md"
+        }
+      ]
+    },
+    {
+      "title": "xls (HSSF)",
+      "items": [
+        {
+          "title": "Overview",
+          "path": "guides/xls/overview.md"
+        }
+      ]
+    },
+    {
+      "title": "Reference",
+      "items": [
+        {
+          "title": "Examples Index",
+          "path": "reference/examples-index.md"
         }
       ]
     }
