@@ -10,8 +10,8 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 [![NuGet Formula](https://img.shields.io/nuget/v/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
 [![NuGet Formula Downloads](https://img.shields.io/nuget/dt/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
-![Status](https://img.shields.io/badge/status-WIP-yellow)
-![Phase](https://img.shields.io/badge/phase-4%20HSSF%20xls%20bootstrap%20%E2%80%94%20in%20progress-yellow)
+![Status](https://img.shields.io/badge/status-beta-orange)
+![Tests](https://img.shields.io/badge/tests-293%20passing-brightgreen)
 
 ## NuGet Package Strategy
 
@@ -51,7 +51,7 @@ dotnet-poi ships as **two separate NuGet packages** with a clear separation of c
 
 ## Status
 
-Current focus: **Phase 4 — POIFS + HSSF (`.xls`) bootstrap is in progress**.
+Current status: **beta** — `DotnetPoi.Core` v0.1.0 and `DotnetPoi.Formula` v0.1.0 are published on [NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core).
 
 Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not modeled for creation or editing / ❌ not implemented / — not applicable.
 
@@ -154,7 +154,7 @@ Tracked in [NOW.md](./NOW.md):
 
 ## Quick Start
 
-> ⚠️ NuGet package not yet published. Use a project reference or clone the repository directly.
+Published to **[NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core)** — `dotnet add package DotnetPoi.Core`.
 
 ```bash
 git clone --recurse-submodules https://github.com/modeverv/dotnet-poi
