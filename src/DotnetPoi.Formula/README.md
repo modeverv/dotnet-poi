@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/modeverv/dotnet-poi/actions/workflows/ci.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![.NET Standard](https://img.shields.io/badge/.NET%20Standard-2.0-%23820171)
 ![Status](https://img.shields.io/badge/status-early%20beta-yellow)
