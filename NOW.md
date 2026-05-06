@@ -38,7 +38,7 @@
 | 〃 | マクロ有効（xlsm） | ✅ | VBA バイト保存 + ラウンドトリップ確認済 |
 | 〃 | **スパークライン** | ❌ | |
 | 〃 | **外部データ接続** | 🔵 不明パーツ保存のみ | `xl/connections.xml` / `xl/externalLinks/*` は round-trip 保持されるが API モデルなし |
-| 〃 | テスト数 | **235** | POI実ファイルを使ったpreservation検証テスト(+4: pptxグループ化, xlsxオートシェイプ)を含む |
+| 〃 | テスト数 | **238** | POI実ファイルを使ったpreservation検証テスト(+4: pptxグループ化, xlsxオートシェイプ, +1 docxヘッダ・フッター, +2 docx SDT)を含む |
 
 ---
 
@@ -53,17 +53,18 @@
 | 〃 | 行間・段落前後スペース | ✅ | |
 | 〃 | 箇条書き（箇条/番号付き） | ✅ | OOXML numbering 対応 |
 | **表** | 表作成・読み取り（セル・行・列） | ✅ | round-trip 確認済 |
-| 〃 | セル結合・罫線 | ❌ | |
+| 〃 | セル結合・罫線 | 🔵 | `tcPr`/`tblPr` の未知子要素として raw XML 保持。API からの新規作成は未対応 |
 | **セクション** | ページ設定（サイズ/余白/縦横） | ✅ | |
 | 〃 | ヘッダー・フッター | ✅ | round-trip 確認済。画像・書式などリッチコンテンツも `_preservedEntries` で保持（API非経由時） |
-| 〃 | **段組** | ❌ | |
+| 〃 | **段組** | ✅ | `setColumns()`/`getColumnCount()`/`getColumnSpacing()` API、round-trip 確認済 |
 | **リンク** | ハイパーリンク（外部URL） | ✅ | round-trip 確認済 |
 | **画像** | 画像埋め込み（インライン・回転） | ✅ | |
+| 〃 | **フローティング画像（アンカー付き）** | 🔵 | `<wp:anchor>` は raw XML capture/re-emission で round-trip 保持 |
 | 〃 | **テキストボックス（w:txbxContent）** | ❌ | Word の「テキストボックス」内のテキストは読めない |
 | **注釈** | **コメント** | 🔵 不明パーツ保存のみ | 既存コメントは round-trip 保持されるが API モデルなし |
 | 〃 | **脚注・文末脚注** | 🔵 不明パーツ保存のみ | `word/footnotes.xml` / `word/endnotes.xml` は round-trip 保持されるが API モデルなし |
 | **フィールド** | **TOC（目次）/ ページ番号 / 差し込み印刷** | ✅ | write/read/round-trip 完了 |
-| **SDT** | **コンテンツコントロール（段落レベル）** | 🔵 | ブロックレベル `w:sdt`（bodyの直下）は raw XML 補完で round-trip 維持。インラインSDT（段落内）は未対応 |
+| **SDT** | **コンテンツコントロール** | 🔵 | ブロックレベル `w:sdt`（bodyの直下）もインライン `w:sdt`（段落内）も raw XML 補完で round-trip 維持。テキストボックス（`w:txbxContent`）は DrawingML の深いネスト内にあり未対応 |
 | **スタイル** | **段落スタイル / 文字スタイル / テーブルスタイル** | ❌ | 直接書式のみ対応。Style定義ファイル(`word/styles.xml`)は🔵保持されるが、document.xml内のスタイル参照はモデル書き換えで消失 |
 | **変更履歴** | **トラックチェンジ** | ❌ | |
 | **その他** | マクロ有効（docm） | ✅ | VBA バイト保存 |
@@ -152,12 +153,12 @@
 
 | プロジェクト | テスト数 | 備考 |
 |---|---|---|
-| Core.Tests | 237 | POI実ファイルpreservation検証テスト(+4: pptxグループ化, xlsxオートシェイプ, docxヘッダ・フッター, docx SDT)を含む |
+| Core.Tests | 244 | POI実ファイルpreservation検証テスト(+4: pptxグループ化, xlsxオートシェイプ, docxヘッダ・フッター, docx SDT, docx floating images)を含む |
 | Formula.Tests | 10 | 数式評価エンジンは未実装のため最小限 |
 | Interop.Tests (C#) | 55 | 双方向 interop fixture 検証 + preservation tests（auto filter/protection/active sheet/docx fields 追加） |
-| **Total (C#)** | **302** | |
+| **Total (C#)** | **309** | |
 | Java POI 側 (Maven) | 44 tests | うち dotnet-poi 関連 24 tests（auto filter/protection/active sheet/docx fields 追加） |
 
 ---
 
-*最終更新: 2026-05-06*
+*最終更新: 2026-05-18*

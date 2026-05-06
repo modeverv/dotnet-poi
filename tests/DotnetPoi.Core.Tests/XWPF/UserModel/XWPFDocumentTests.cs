@@ -571,6 +571,67 @@ public class XWPFDocumentTests
     }
 
     [Fact]
+    public void RoundTrip_HeaderFooterVariants_Restored()
+    {
+        using var original = new XWPFDocument();
+        original.setHeaderText("Default Header");
+        original.setFirstHeaderText("First Page Header");
+        original.setEvenHeaderText("Even Page Header");
+        original.setFooterText("Default Footer");
+        original.setFirstFooterText("First Page Footer");
+        original.setEvenFooterText("Even Page Footer");
+        original.createParagraph().createRun().setText("header/footer variant test");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        // Verify XML contains all three headerReference types
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var docEntry = archive.GetEntry("word/document.xml");
+        Assert.NotNull(docEntry);
+        using var r = new StreamReader(docEntry.Open());
+        var docXml = r.ReadToEnd();
+        Assert.Contains("w:type=\"default\"", docXml);
+        Assert.Contains("w:type=\"first\"", docXml);
+        Assert.Contains("w:type=\"even\"", docXml);
+
+        // Verify rels contain all three headers
+        var relsEntry = archive.GetEntry("word/_rels/document.xml.rels");
+        Assert.NotNull(relsEntry);
+        using var relsReader = new StreamReader(relsEntry.Open());
+        var relsXml = relsReader.ReadToEnd();
+        Assert.Contains("header1.xml", relsXml);
+        Assert.Contains("header2.xml", relsXml);
+        Assert.Contains("header3.xml", relsXml);
+        Assert.Contains("footer1.xml", relsXml);
+        Assert.Contains("footer2.xml", relsXml);
+        Assert.Contains("footer3.xml", relsXml);
+
+        // Verify content types
+        var ctEntry = archive.GetEntry("[Content_Types].xml");
+        Assert.NotNull(ctEntry);
+        using var ctReader = new StreamReader(ctEntry.Open());
+        var ctXml = ctReader.ReadToEnd();
+        Assert.Contains("/word/header1.xml", ctXml);
+        Assert.Contains("/word/header2.xml", ctXml);
+        Assert.Contains("/word/header3.xml", ctXml);
+        Assert.Contains("/word/footer1.xml", ctXml);
+        Assert.Contains("/word/footer2.xml", ctXml);
+        Assert.Contains("/word/footer3.xml", ctXml);
+
+        // Load and verify API
+        stream.Position = 0;
+        using var loaded = new XWPFDocument(stream);
+        Assert.Equal("Default Header", loaded.getHeaderText());
+        Assert.Equal("First Page Header", loaded.getFirstHeaderText());
+        Assert.Equal("Even Page Header", loaded.getEvenHeaderText());
+        Assert.Equal("Default Footer", loaded.getFooterText());
+        Assert.Equal("First Page Footer", loaded.getFirstFooterText());
+        Assert.Equal("Even Page Footer", loaded.getEvenFooterText());
+    }
+
+    [Fact]
     public void RoundTrip_UnknownParts_Preserved()
     {
         using var original = new XWPFDocument();

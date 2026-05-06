@@ -36,7 +36,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests (237) — all formats (+6: pptx group shapes, xlsx auto-shapes, docx header/footer, docx SDT preservation)
+│   ├── DotnetPoi.Core.Tests/       # Core tests (244) — all formats (+7: pptx group shapes, xlsx auto-shapes, docx header/footer, docx SDT, docx floating images, docx table/rPr raw preservation)
 │   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
 │   ├── DotnetPoi.Interop.Tests/   # Bidirectional compatibility tests
 │   │   ├── java/                #   Maven project (Apache POI dependency)
@@ -319,7 +319,7 @@ Goal: close practical compatibility gaps left after the MVP. Work in this priori
 |---|---|---|---|
 | 1 | xlsx/XSSF | ~78% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; rich text (per-character formatting) ✅; pivot tables (programmatic create + unknown parts preserve) ✅; auto filter ✅; sheet/workbook protection ✅; active sheet/active cell API ✅ (activeSheet round-trip, activeCell in-memory only); no formula evaluation; charts deferred |
 | 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
-| 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅; styles/comments/footnotes/endnotes/OLE round-trip preserve 🔵; block-level SDT/content controls preserve 🔵 |
+| 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅; styles/comments/footnotes/endnotes/OLE round-trip preserve 🔵; SDT/content controls (block-level + inline) preserve 🔵 |
 | 4 | pptx/XSLF | ~40% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; unknown part preservation ✅; tables (p:graphicFrame/a:tbl) write/read ✅; non-image media (video/audio) round-trip preserve ✅; 18 round-trip tests |
 | 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
 | 6 | doc/HWPF | ~5% | read-only stub only |
@@ -450,6 +450,9 @@ Goal: make interop checks explicit before declaring a format slice “done”.
 
 このフェーズは **docx の欠損している実用動作を埋める** ためのフェーズ。Apache POI の XWPF 実装とテストを必ず参照し、独自仕様に寄せない。
 
+マニュアルテストに使うファイル達を生成するプロジェクトが欲しいですね。自力で用意してテストすることで安定する。
+
+
 優先順位:
 
 1. **Sections / page model**
@@ -470,9 +473,9 @@ Goal: make interop checks explicit before declaring a format slice “done”.
    - cell merge、row/column/cell width、borders、shading、vertical alignment、cell margins、table layout、table styles を実装する。
    - 帳票用途を重視し、生成後に Word で開いて崩れにくいことを検証する。
 
-5. **Text boxes and content controls**
+5. **Text boxes and content controls** (SDT preservation ✅ completed as Phase 9 extension)
    - Word text boxes (`w:txbxContent`) 内テキストの read / preserve / write 方針を決める。
-   - block-level SDT だけでなく inline SDT の保持を拡張する。
+   - ~~block-level SDT だけでなく inline SDT の保持を拡張する。~~ ✅ 完了: 段落レベルの未知子要素保存でカバー済み (block-level + inline 両方)。
    - API モデル化できない場合も、軽編集時に消さない preservation を優先する。
 
 6. **Review and references**
@@ -485,6 +488,41 @@ Goal: make interop checks explicit before declaring a format slice “done”.
 - 既存 docx/docm を読み込み、本文の軽微な編集をして保存しても、未対応の styles/comments/footnotes/endnotes/images/OLE/content controls 等を壊さない。
 - C# round-trip tests、Java POI interop tests、preservation tests を追加する。
 - Phase 11 の manual verification 対象に docx/docm を追加し、リリース前に実アプリで確認できるようにする。
+
+実装順：
+1. ✅ ~~Text boxes / SDT~~ → SDT 保存完了 (inline + block-level)。テキストボックス（`w:txbxContent`）は DrawingML 深いネスト内で未対応。
+2. ✅ **Sections / page model** — 完了
+   - page size, orientation, margins ✅
+   - columns (`w:cols`) 読み書き ✅
+   - header/footer variants (default/first/even) ✅
+   - 段落レベル sectPr (section breaks) raw XML 保存 ✅
+   - sectPr 未知子要素 (pgBorders, lnNumType, docGrid, formProt) preservation ✅
+   - 複数セクション (mid-document body-level sectPr) round-trip ✅
+3. ✅ **Images（floating）** — 完了
+   - `<wp:anchor>` raw XML capture/re-emission ✅
+   - blip パース → XWPFPicture 生成 → media/ + rels 整合性維持 ✅
+4. ✅ **Table cell merge / borders** — 完了（raw XML preservation で既存文書のセル結合・罫線・`rPr` 子要素（`w:shd` 等）を保持。run-level + paragraph-level の rPr preservation 対応済。API からの新規作成は未対応）
+5. ❌ Review / references（comments, footnotes, endnotes, bookmarks, tracked changes）
+6. ❌ Styles（**6-3 まで対応すれば十分**。6-4以降は具体的な需要が出てから）
+    - 6-1. ❌ **スタイル名の read/write**（最軽量・今すぐ価値が出る）
+        - `XWPFParagraph.setStyle(styleId)` → `<w:pStyle w:val="..."/>` を書くだけ
+        - `XWPFParagraph.getStyleID()` → `<w:pStyle>` を読むだけ
+        - テンプレート由来の `word/styles.xml` が既にあれば Word 側が解決するので、参照を書くだけで動く
+        - 壊れるリスク: なし
+    - 6-2. ❌ **`word/styles.xml` のパース**（styleId ↔ name マッピング）
+        - `XWPFStyles` 相当のモデルを持ち、styleId → 表示名・basedOn・type を読み取る
+        - `XWPFDocument.getStyles().getStyle(styleId)` 相当の API
+        - 壊れるリスク: なし（読み取り専用ならリスクゼロ）
+    - 6-3. ❌ **新規文書へのデフォルトスタイル書き込み**
+        - 新規 `XWPFDocument` 作成時に最小限の `word/styles.xml` を生成する（Normal / Heading1〜3 程度）
+        - 書き方を誤ると Word が「修復しますか」ダイアログを出す可能性がある（データ消失はない）
+        - POI の `XWPFDocument` が生成する `word/styles.xml` を fixture として使い、それに合わせる
+    - 6-4. ⏸ **スタイル継承のリゾルブ**（C# 上での実効値取得）— 需要が出てから
+        - 段落の「実効フォントサイズ」などを取得するために basedOn チェーンを辿る
+        - Word 側が描画時に解決してくれるため、**表示目的なら省略可能**
+        - ライブラリ利用者が C# 上で有効値を知りたい場合にのみ必要
+    - 6-5. ⏸ **文字スタイル・表スタイル・リストスタイル全対応**— 需要が出てから
+        - POI の `XWPFStyles` 全体を移植する
 
 ### Phase 11 — Manual Office / LibreOffice Verification
 

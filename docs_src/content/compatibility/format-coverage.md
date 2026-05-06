@@ -32,17 +32,18 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Paragraphs/runs | text, font name/size/color, bold, italic, underline, strikeout | ✅ | Round-trip verified |
 | Paragraphs | alignment, indents, spacing, bullet/numbered lists | ✅ | |
 | Tables | create/read tables, rows, cells | ✅ | Round-trip verified |
-| Tables | cell merging, borders | ❌ | |
+| Tables | cell merging, borders | 🔵 | Round-trip preserved via raw XML capture/re-emission; API-level creation not modeled |
 | Sections | page size, margins, orientation | ✅ | |
 | Sections | headers and footers | ✅ | Round-trip verified. Rich content (images, formatting) preserved via `_preservedEntries` when not modified via API. |
-| Sections | columns | ❌ | |
+| Sections | columns | ✅ | `setColumns()` API, round-trip verified |
 | Links | hyperlinks (external URLs) | ✅ | |
 | Images | inline images with rotation | ✅ | |
+| Images | floating (anchored) images | 🔵 | `<wp:anchor>` elements preserved via raw XML capture/re-emission |
 | Images | text boxes (w:txbxContent) | ❌ | |
 | Annotations | comments | 🔵 | Existing parts round-trip via `_preservedEntries` |
 | Annotations | footnotes, endnotes | 🔵 | `word/footnotes.xml` / `word/endnotes.xml` round-trip preserved |
 | Fields | TOC, page numbers, mail merge | ✅ | Write/read/round-trip |
-| SDT | content controls (block-level) | 🔵 | Block-level `w:sdt` in `w:body` preserved via raw XML capture/re-emission. Inline SDT (inside `w:p`) not covered. |
+| SDT | content controls (block-level and inline) | 🔵 | Block-level `w:sdt` in `w:body` and inline `w:sdt` inside `w:p` preserved via raw XML capture/re-emission. Text boxes (`w:txbxContent`) deeply nested inside DrawingML and not yet covered. |
 | Styles | paragraph/character/table styles | ❌ | Direct formatting only; `word/styles.xml` 🔵 preserved but style refs in document.xml lost on model rewrite |
 | Track Changes | revision marks | ❌ | |
 | Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries` |

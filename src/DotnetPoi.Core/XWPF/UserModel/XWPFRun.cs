@@ -16,6 +16,17 @@ public sealed class XWPFRun
     internal string? HyperlinkUrl => _hyperlinkUrl;
     internal string? HyperlinkRelId { get; set; }
 
+    // Raw XML for anchored (floating) images inside this run
+    private readonly List<string> _rawAnchorXml = new();
+    internal IReadOnlyList<string> RawAnchorXml => _rawAnchorXml;
+    internal void addRawAnchorXml(string xml) => _rawAnchorXml.Add(xml);
+
+    // Raw XML for unmodeled children of run properties (rPr), e.g., w:shd, highlight, etc.
+    private readonly List<string> _preservedRawRPrChildren = new();
+    internal IReadOnlyList<string> PreservedRawRPrChildren => _preservedRawRPrChildren;
+    internal bool HasPreservedRawRPrChildren => _preservedRawRPrChildren.Count > 0;
+    internal void addPreservedRawRPrChild(string rawXml) => _preservedRawRPrChildren.Add(rawXml);
+
     internal XWPFRun(XWPFParagraph paragraph)
     {
         _paragraph = paragraph;

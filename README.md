@@ -11,7 +11,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 [![NuGet Formula Downloads](https://img.shields.io/nuget/dt/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-beta-orange)
-![Tests](https://img.shields.io/badge/tests-302%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-309%20passing-brightgreen)
 
 ## NuGet Package Strategy
 
@@ -85,17 +85,18 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | Paragraphs/runs | text, font name/size/color, bold, italic, underline, strikeout | ✅ | Round-trip covered. |
 | Paragraphs | alignment, indents, spacing, bullet/numbered lists | ✅ | OOXML numbering is implemented. |
 | Tables | create/read tables, rows, cells | ✅ | Round-trip covered. |
-| Tables | cell merge and table borders | ❌ | |
+| Tables | cell merge and table borders | 🔵 | Existing merge/borders preserved via raw XML; API-level creation not modeled. |
 | Sections | page setup, headers, footers | ✅ | Rich content (images, formatting) in headers/footers preserved via `_preservedEntries` when not modified via API. |
-| Sections | columns | ❌ | |
+| Sections | columns | ✅ | `setColumns()`/`getColumnCount()`/`getColumnSpacing()` API, round-trip verified |
 | Links | external hyperlinks | ✅ | |
 | Images | inline images and rotation | ✅ | |
+| Images | floating (anchored) images | 🔵 | `<wp:anchor>` elements preserved via raw XML capture/re-emission. | |
 | Images | Word text boxes (`w:txbxContent`) | ❌ | Text inside Word text boxes is not read. |
 | Review | comments, footnotes, endnotes | 🔵 | Existing parts round-trip via `_preservedEntries`; API-level creation/editing is not modeled. |
 | Fields | TOC, page numbers, mail merge-style fields | ✅ | Write/read/round-trip covered. |
 | Styles | paragraph, character, and table styles | ❌ | Direct formatting is supported; style model parity is not. |
 | Other | docm macro preservation, unknown part preservation | ✅ | |
-| Other | content controls (block-level SDT) | 🔵 | Block-level `w:sdt` in `w:body` preserved via raw XML capture/re-emission. Inline SDT (inside `w:p`) not covered. |
+| Other | content controls (SDT) | 🔵 | Block-level `w:sdt` in `w:body` and inline `w:sdt` inside `w:p` are preserved via raw XML capture/re-emission. Text boxes (`w:txbxContent`) are deeply nested inside DrawingML and not yet covered. |
 | Other | tracked changes (ins/del/move) | ❌ | |
 | Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries`. |
 
@@ -141,9 +142,9 @@ Highest priority gaps:
 | 2 | Chart creation | xlsx, pptx | Existing charts can be preserved, but report/presentation generation often needs to create charts from data. |
 | 3 | Comment API model | xlsx, docx | Existing comments survive round-trip through `_preservedEntries`, but API-level read/create/edit support is not implemented. |
 | 4 | HSSF `.xls` depth | xls | Basic values exist, but full BIFF record, style, formula, and drawing support is still in progress. |
-| 5 | docx styles and text boxes | docx | Word documents commonly rely on styles and text boxes for layout and semantics. |
+| 5 | docx styles and text boxes | docx | Word documents commonly rely on styles and text boxes for layout and semantics. SDT is now preserved. |
 
-Lower priority gaps include SmartArt, animations, transitions, `xls`/`doc`/`ppt` legacy depth, tracked changes, content controls, and sparklines.
+Lower priority gaps include SmartArt, animations, transitions, `xls`/`doc`/`ppt` legacy depth, tracked changes, and sparklines.
 
 ### Test Coverage Snapshot
 
@@ -151,10 +152,10 @@ Tracked in [NOW.md](./NOW.md):
 
 | Project | Tests | Notes |
 |---|---:|---|
-| Core.Tests | 237 | +3 POI test-file preservation verification tests, +1 xlsx auto-shape, +1 docx header/footer preservation, +1 docx SDT preservation. |
+| Core.Tests | 244 | +3 POI test-file preservation verification tests, +1 xlsx auto-shape, +1 docx header/footer preservation, +2 docx SDT preservation, +1 docx floating anchor images preservation. |
 | Formula.Tests | 10 | Minimal formula package coverage. |
 | Interop.Tests (C#) | 55 | Bidirectional Java/.NET fixtures and preservation tests. |
-| **Total (C#)** | **302** | |
+| **Total (C#)** | **309** | |
 | Java POI side (Maven) | 44 | Java fixture generation/readback tests. |
 
 ---

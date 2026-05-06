@@ -21,6 +21,18 @@ public sealed class XWPFParagraph
 {
     private readonly List<XWPFRun> _runs = new();
     private readonly List<XWPFField> _fields = new();
+    private readonly List<string> _preservedRawElements = new();
+    internal IReadOnlyList<string> PreservedRawElements => _preservedRawElements;
+    internal void addPreservedRawElement(string rawXml) => _preservedRawElements.Add(rawXml);
+    // Paragraph-level section properties (sectPr inside pPr for section breaks)
+    private string? _preservedSectPr;
+    internal string? PreservedSectPr => _preservedSectPr;
+    internal void setPreservedSectPr(string rawXml) => _preservedSectPr = rawXml;
+    // Raw XML for unmodeled children of paragraph-level run properties (pPr/rPr), e.g., w:shd at paragraph level
+    private readonly List<string> _preservedRawPPrRPrChildren = new();
+    internal IReadOnlyList<string> PreservedRawPPrRPrChildren => _preservedRawPPrRPrChildren;
+    internal bool HasPreservedRawPPrRPrChildren => _preservedRawPPrRPrChildren.Count > 0;
+    internal void addPreservedRawPPrRPrChild(string rawXml) => _preservedRawPPrRPrChildren.Add(rawXml);
     private ParagraphAlignment? _alignment;
     // Indentation (twips = 1/1440 inch)
     private int _indentLeft;

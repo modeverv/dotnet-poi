@@ -35,3 +35,10 @@ dependency-reduced-pom.xml
 *.swp
 *.swo
 *~
+
+__pycache__
+
+999_gabage
+999_gabage/*
+
+tmp-*

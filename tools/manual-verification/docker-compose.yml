@@ -1,0 +1,23 @@
+services:
+  libreoffice:
+    image: lscr.io/linuxserver/libreoffice:latest
+    container_name: dotnet-poi-phase11-libreoffice
+    shm_size: "1gb"
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Asia/Tokyo}
+      TITLE: dotnet-poi Phase 11 LibreOffice
+    volumes:
+      - ../..:/workspace
+      - libreoffice-config:/config
+      - ./evidence:/workspace/tools/manual-verification/evidence
+    ports:
+      - "127.0.0.1:3110:3000"
+      - "127.0.0.1:3111:3001"
+    restart: unless-stopped
+
+volumes:
+  libreoffice-config:

@@ -66,13 +66,23 @@ public sealed class XWPFDocument : IDisposable
     private long _marginHeader = 720;  // 0.5in
     private long _marginFooter = 720;
 
-    // Headers / footers (single default for first section)
-    private string? _headerText;
-    private string? _footerText;
-    private int _headerCount;
-    private int _footerCount;
+    // Headers / footers (three variants per section: default, first page, even page)
+    private string? _headerText;         // default header
+    private string? _headerFirstText;    // first page header
+    private string? _headerEvenText;     // even page header
+    private string? _footerText;         // default footer
+    private string? _footerFirstText;    // first page footer
+    private string? _footerEvenText;     // even page footer
     private bool _headerModified;
     private bool _footerModified;
+
+    // Computed header/footer counts (how many distinct files to write)
+    private int _headerCount => (!string.IsNullOrEmpty(_headerText) ? 1 : 0)
+                              + (!string.IsNullOrEmpty(_headerFirstText) ? 1 : 0)
+                              + (!string.IsNullOrEmpty(_headerEvenText) ? 1 : 0);
+    private int _footerCount => (!string.IsNullOrEmpty(_footerText) ? 1 : 0)
+                              + (!string.IsNullOrEmpty(_footerFirstText) ? 1 : 0)
+                              + (!string.IsNullOrEmpty(_footerEvenText) ? 1 : 0);
 
     // Unknown part preservation: ZIP entries not understood by the model are stored
     // byte-for-byte and re-emitted during write, ensuring layouts, themes, styles,
@@ -83,6 +93,20 @@ public sealed class XWPFDocument : IDisposable
     // Raw XML preservation for unknown direct children of w:body in document.xml
     // (SDT / content controls, altChunk, bookmarks, track changes, etc.).
     internal readonly List<string> _preservedRawBodyElements = new();
+
+    // Columns (newspaper columns in a section)
+    private int _columnCount = 1;
+    private long _columnSpacing; // twips (1/1440 inch) between columns
+
+    // Raw XML preservation for unknown children of the final w:sectPr
+    // (pgBorders, lnNumType, docGrid, formProt, etc.)
+    private readonly List<string> _preservedRawSectPrChildren = new();
+
+    // Body-level section breaks — mid-document w:sectPr elements that appear between
+    // body children (paragraphs, tables). Captured as raw XML for verbatim re-emission.
+    // The LAST element in this list is the final section; its children are parsed for
+    // model state (pgSz, pgMar, cols, etc.) via ParseFinalSectPr().
+    private readonly List<string> _preservedBodySectPr = new();
 
     public XWPFDocument() { }
 
@@ -153,27 +177,80 @@ public sealed class XWPFDocument : IDisposable
     public long getMarginBottom() => _marginBottom;
     public long getMarginLeft() => _marginLeft;
 
+    /// <summary>Set newspaper columns for the final section.</summary>
+    /// <param name="count">Number of columns (1 = no columns).</param>
+    /// <param name="spacingTwips">Spacing between columns in twips (1/1440 inch).</param>
+    public void setColumns(int count, long spacingTwips = 0)
+    {
+        _columnCount = count <= 0 ? 1 : count;
+        _columnSpacing = spacingTwips;
+    }
+
+    /// <summary>Get number of columns in the final section.</summary>
+    public int getColumnCount() => _columnCount;
+
+    /// <summary>Get spacing between columns in twips.</summary>
+    public long getColumnSpacing() => _columnSpacing;
+
     /// <summary>Set default header text (plain text, first section).</summary>
     public void setHeaderText(string text)
     {
         _headerText = text;
-        _headerCount = text.Length > 0 ? 1 : 0;
         _headerModified = true;
     }
 
     /// <summary>Get default header text.</summary>
     public string? getHeaderText() => _headerText;
 
+    /// <summary>Set first-page header text.</summary>
+    public void setFirstHeaderText(string text)
+    {
+        _headerFirstText = text;
+        _headerModified = true;
+    }
+
+    /// <summary>Get first-page header text.</summary>
+    public string? getFirstHeaderText() => _headerFirstText;
+
+    /// <summary>Set even-page header text.</summary>
+    public void setEvenHeaderText(string text)
+    {
+        _headerEvenText = text;
+        _headerModified = true;
+    }
+
+    /// <summary>Get even-page header text.</summary>
+    public string? getEvenHeaderText() => _headerEvenText;
+
     /// <summary>Set default footer text (plain text, first section).</summary>
     public void setFooterText(string text)
     {
         _footerText = text;
-        _footerCount = text.Length > 0 ? 1 : 0;
         _footerModified = true;
     }
 
     /// <summary>Get default footer text.</summary>
     public string? getFooterText() => _footerText;
+
+    /// <summary>Set first-page footer text.</summary>
+    public void setFirstFooterText(string text)
+    {
+        _footerFirstText = text;
+        _footerModified = true;
+    }
+
+    /// <summary>Get first-page footer text.</summary>
+    public string? getFirstFooterText() => _footerFirstText;
+
+    /// <summary>Set even-page footer text.</summary>
+    public void setEvenFooterText(string text)
+    {
+        _footerEvenText = text;
+        _footerModified = true;
+    }
+
+    /// <summary>Get even-page footer text.</summary>
+    public string? getEvenFooterText() => _footerEvenText;
 
     internal bool HasHeader => _headerCount > 0;
     internal bool HasFooter => _footerCount > 0;
@@ -198,10 +275,44 @@ public sealed class XWPFDocument : IDisposable
         if (_numInstances.Count > 0)
             WriteEntry(archive, "word/numbering.xml", WriteNumbering);
         // headers and footers — write model content only if modified via API, otherwise preserved bytes are used
-        if (_headerCount > 0 && _headerModified)
-            WriteEntry(archive, "word/header1.xml", WriteHeader);
-        if (_footerCount > 0 && _footerModified)
-            WriteEntry(archive, "word/footer1.xml", WriteFooter);
+        if (_headerModified)
+        {
+            int hIdx = 1;
+            if (!string.IsNullOrEmpty(_headerText))
+            {
+                var text = _headerText!; // capture for closure
+                WriteEntry(archive, $"word/header{hIdx++}.xml", w => WriteHeader(w, text));
+            }
+            if (!string.IsNullOrEmpty(_headerFirstText))
+            {
+                var text = _headerFirstText!;
+                WriteEntry(archive, $"word/header{hIdx++}.xml", w => WriteHeader(w, text));
+            }
+            if (!string.IsNullOrEmpty(_headerEvenText))
+            {
+                var text = _headerEvenText!;
+                WriteEntry(archive, $"word/header{hIdx++}.xml", w => WriteHeader(w, text));
+            }
+        }
+        if (_footerModified)
+        {
+            int fIdx = 1;
+            if (!string.IsNullOrEmpty(_footerText))
+            {
+                var text = _footerText!;
+                WriteEntry(archive, $"word/footer{fIdx++}.xml", w => WriteFooter(w, text));
+            }
+            if (!string.IsNullOrEmpty(_footerFirstText))
+            {
+                var text = _footerFirstText!;
+                WriteEntry(archive, $"word/footer{fIdx++}.xml", w => WriteFooter(w, text));
+            }
+            if (!string.IsNullOrEmpty(_footerEvenText))
+            {
+                var text = _footerEvenText!;
+                WriteEntry(archive, $"word/footer{fIdx++}.xml", w => WriteFooter(w, text));
+            }
+        }
         foreach (var pic in _pictures)
         {
             WriteBinaryEntry(archive, $"word/media/{pic.getFileName()}", pic.Data);
@@ -441,27 +552,41 @@ public sealed class XWPFDocument : IDisposable
             }
         }
 
-        // Read header1.xml and footer1.xml text
+        // Read header/footer XML text, routing to correct variant field by filename
         foreach (var kv in hfRelMap)
         {
             var entry = archive.GetEntry(kv.Value);
             if (entry is null) continue;
             using var s = entry.Open();
             using var hr = XmlReader.Create(s, new XmlReaderSettings { IgnoreWhitespace = false });
+
+            // Determine variant from filename (header1=default, header2=first, header3=even)
+            var fileName = Path.GetFileNameWithoutExtension(kv.Value);
+            bool isHeader = fileName.StartsWith("header", StringComparison.Ordinal);
+            int idx = isHeader
+                ? (fileName == "header1" ? 0 : fileName == "header2" ? 1 : 2)
+                : (fileName == "footer1" ? 0 : fileName == "footer2" ? 1 : 2);
+
             while (hr.Read())
             {
                 if (hr.NodeType == XmlNodeType.Element && hr.LocalName == "t")
                 {
                     var text = hr.ReadElementContentAsString();
-                    if (kv.Value.Contains("header"))
-                        _headerText = (_headerText ?? "") + text;
+                    if (isHeader)
+                    {
+                        if (idx == 0) _headerText = (_headerText ?? "") + text;
+                        else if (idx == 1) _headerFirstText = (_headerFirstText ?? "") + text;
+                        else _headerEvenText = (_headerEvenText ?? "") + text;
+                    }
                     else
-                        _footerText = (_footerText ?? "") + text;
+                    {
+                        if (idx == 0) _footerText = (_footerText ?? "") + text;
+                        else if (idx == 1) _footerFirstText = (_footerFirstText ?? "") + text;
+                        else _footerEvenText = (_footerEvenText ?? "") + text;
+                    }
                     continue;
                 }
             }
-            if (kv.Value.Contains("header")) _headerCount = 1;
-            else _footerCount = 1;
         }
     }
 
@@ -501,8 +626,15 @@ public sealed class XWPFDocument : IDisposable
         int xfrmRot = 0;
         bool inInline = false;
 
+        // Table property parsing state
+        bool inTblPr = false;
+        bool inTrPr = false;
+        bool inTcPr = false;
+
         // Raw XML preservation state
         int bodyDepth = -1;
+        int paragraphDepth = -1;
+        int sectPrDepth = -1;
         bool skipRead = false;
 
         while (skipRead || reader.Read())
@@ -538,6 +670,37 @@ public sealed class XWPFDocument : IDisposable
                         skipRead = true;
                         continue;
                     }
+                }
+
+                // Track w:p entry for inline SDT/bookmark/track-changes preservation
+                if (reader.NamespaceURI == NsW && reader.LocalName == "p")
+                {
+                    paragraphDepth = reader.Depth;
+                }
+
+                // Capture unknown direct children of w:p (inline SDT, bookmarks, tracked changes, etc.)
+                if (paragraphDepth >= 0 && reader.Depth == paragraphDepth + 1)
+                {
+                    bool isKnown = reader.NamespaceURI == NsW
+                        && reader.LocalName is "pPr" or "r" or "hyperlink";
+                    if (!isKnown && currentParagraph is not null)
+                    {
+                        currentParagraph.addPreservedRawElement(reader.ReadOuterXml());
+                        skipRead = true;
+                        continue;
+                    }
+                }
+
+                // Capture body-level section breaks (mid-document sectPr between body children)
+                // The ENTIRE element is captured as raw XML for verbatim re-emission.
+                // The LAST body-level sectPr is also captured here; its children are later
+                // parsed for model state via ParseFinalSectPr() after the while loop.
+                if (reader.NamespaceURI == NsW && reader.LocalName == "sectPr"
+                    && bodyDepth >= 0 && reader.Depth == bodyDepth + 1)
+                {
+                    _preservedBodySectPr.Add(reader.ReadOuterXml());
+                    skipRead = true;
+                    continue;
                 }
             }
 
@@ -684,6 +847,23 @@ public sealed class XWPFDocument : IDisposable
                                 if (ftp is not null && long.TryParse(ftp, out var mf)) _marginFooter = mf;
                                 break;
                             }
+                            case "cols":
+                            {
+                                var colNum = reader.GetAttribute("w:num");
+                                var colSpace = reader.GetAttribute("w:space");
+                                if (colNum is not null && int.TryParse(colNum, out var cn) && cn > 1)
+                                    _columnCount = cn;
+                                if (colSpace is not null && long.TryParse(colSpace, out var cs))
+                                    _columnSpacing = cs;
+                                break;
+                            }
+                            case "sectPr" when inPPr && currentParagraph is not null:
+                            {
+                                // Paragraph-level section break — capture raw XML for re-emission
+                                currentParagraph.setPreservedSectPr(reader.ReadOuterXml());
+                                skipRead = true;
+                                continue;
+                            }
                             case "t" when currentRun is not null && !inRPr:
                                 var tContent = reader.ReadElementContentAsString();
                                 currentRun.setText(tContent);
@@ -736,6 +916,64 @@ public sealed class XWPFDocument : IDisposable
                             case "tc" when currentRow is not null:
                                 currentTableCell = currentRow.createCell();
                                 break;
+
+                            // Table property context tracking
+                            case "tblPr" when currentTable is not null:
+                                inTblPr = true;
+                                break;
+                            case "trPr" when currentRow is not null:
+                                inTrPr = true;
+                                break;
+                            case "tcPr" when currentTableCell is not null:
+                                inTcPr = true;
+                                break;
+
+                            // tblPr modeled children
+                            case "tblW" when inTblPr && currentTable is not null:
+                                if (long.TryParse(reader.GetAttribute("w:w"), out var tw))
+                                    currentTable.setWidth(tw, reader.GetAttribute("w:type") ?? "dxa");
+                                break;
+                            case "tblStyle" when inTblPr && currentTable is not null:
+                                currentTable.setTableStyle(reader.GetAttribute("w:val"));
+                                break;
+
+                            // trPr modeled children
+                            case "trHeight" when inTrPr && currentRow is not null:
+                            {
+                                var hAttr = reader.GetAttribute("w:val");
+                                var rule = reader.GetAttribute("w:hRule");
+                                if (hAttr is not null && long.TryParse(hAttr, out var th))
+                                    currentRow.setHeight(th, rule ?? "atLeast");
+                                break;
+                            }
+                            case "tblHeader" when inTrPr && currentRow is not null:
+                                currentRow.setHeader(true);
+                                break;
+
+                            // tcPr modeled children
+                            case "tcW" when inTcPr && currentTableCell is not null:
+                                if (long.TryParse(reader.GetAttribute("w:w"), out var tcw))
+                                    currentTableCell.setWidth(tcw, reader.GetAttribute("w:type") ?? "dxa");
+                                break;
+                            case "gridSpan" when inTcPr && currentTableCell is not null:
+                                if (int.TryParse(reader.GetAttribute("w:val"), out var gs) && gs > 1)
+                                    currentTableCell.setGridSpan(gs);
+                                break;
+                            case "vMerge" when inTcPr && currentTableCell is not null:
+                            {
+                                var v = reader.GetAttribute("w:val");
+                                currentTableCell.setVMerge(v ?? "continue");
+                                break;
+                            }
+                            case "hMerge" when inTcPr && currentTableCell is not null:
+                            {
+                                var v = reader.GetAttribute("w:val");
+                                currentTableCell.setHMerge(v ?? "continue");
+                                break;
+                            }
+                            case "vAlign" when inTcPr && currentTableCell is not null:
+                                currentTableCell.setVAlign(reader.GetAttribute("w:val"));
+                                break;
                         }
                         break;
 
@@ -751,6 +989,30 @@ public sealed class XWPFDocument : IDisposable
                             wpDocPrDescr = reader.GetAttribute("descr");
                             if (long.TryParse(reader.GetAttribute("id"), out var id)) wpDocPrId = id;
                         }
+                        // Anchored (floating) images: capture entire anchor as raw XML
+                        if (reader.LocalName == "anchor" && currentRun is not null)
+                        {
+                            var anchorXml = reader.ReadOuterXml();
+                            skipRead = true;
+
+                            // Parse anchor XML to register picture data
+                            var (embed, cx, cy, descr, rot) = ParseAnchorBlip(anchorXml);
+                            if (embed is not null
+                                && picIndexByRelId.TryGetValue(embed, out var picIdx)
+                                && (uint)picIdx < (uint)_pictures.Count)
+                            {
+                                var picData = _pictures[picIdx];
+                                var drawingId = ReserveDrawingId();
+                                var picture = new XWPFPicture(picData, descr ?? picData.getFileName(),
+                                    cx, cy, embed, drawingId);
+                                picture.SetRotationAttribute(rot);
+                                AttachPictureToRun(currentRun, picture);
+                            }
+
+                            // Store raw XML for re-emission on write
+                            currentRun.addRawAnchorXml(anchorXml);
+                            continue;
+                        }
                         break;
 
                     case NsA:
@@ -764,6 +1026,58 @@ public sealed class XWPFDocument : IDisposable
                         }
                         break;
                 }
+
+                // Capture unmodeled direct children of body-level w:sectPr
+                // (pgBorders, lnNumType, docGrid, formProt, etc.) that fell through
+                // the main switch because they aren't pgSz/pgMar/cols.
+                if (sectPrDepth >= 0 && reader.Depth == sectPrDepth + 1 && reader.NodeType == XmlNodeType.Element)
+                {
+                    _preservedRawSectPrChildren.Add(reader.ReadOuterXml());
+                    skipRead = true;
+                    continue;
+                }
+
+                // Capture unmodeled children of tblPr, trPr, tcPr as raw XML for re-emission
+                // NOTE: The property container elements (tblPr, trPr, tcPr) themselves MUST be
+                // excluded so that their EndElement handler can reset the inXxxPr flag.
+                if (inTblPr && currentTable is not null && reader.NodeType == XmlNodeType.Element
+                    && reader.LocalName is not ("tblPr" or "tblW" or "tblStyle"))
+                {
+                    currentTable.addPreservedRawTblPrChild(reader.ReadOuterXml());
+                    skipRead = true;
+                    continue;
+                }
+                if (inTrPr && currentRow is not null && reader.NodeType == XmlNodeType.Element
+                    && reader.LocalName is not ("trPr" or "trHeight" or "tblHeader"))
+                {
+                    currentRow.addPreservedRawTrPrChild(reader.ReadOuterXml());
+                    skipRead = true;
+                    continue;
+                }
+                if (inTcPr && currentTableCell is not null && reader.NodeType == XmlNodeType.Element
+                    && reader.LocalName is not ("tcPr" or "tcW" or "gridSpan" or "vMerge" or "hMerge" or "vAlign"))
+                {
+                    currentTableCell.addPreservedRawTcPrChild(reader.ReadOuterXml());
+                    skipRead = true;
+                    continue;
+                }
+                // Capture unmodeled children of run properties (rPr) as raw XML for re-emission
+                // Run-level rPr (inside w:r)
+                if (inRPr && currentRun is not null && reader.NodeType == XmlNodeType.Element
+                    && reader.LocalName is not ("rPr" or "b" or "i" or "u" or "strike" or "rFonts" or "sz" or "color"))
+                {
+                    currentRun.addPreservedRawRPrChild(reader.ReadOuterXml());
+                    skipRead = true;
+                    continue;
+                }
+                // Paragraph-level rPr (inside w:pPr)
+                if (inRPr && inPPr && currentParagraph is not null && currentRun is null && reader.NodeType == XmlNodeType.Element
+                    && reader.LocalName is not ("rPr" or "b" or "i" or "u" or "strike" or "rFonts" or "sz" or "color"))
+                {
+                    currentParagraph.addPreservedRawPPrRPrChild(reader.ReadOuterXml());
+                    skipRead = true;
+                    continue;
+                }
             }
             else if (reader.NodeType == XmlNodeType.EndElement)
             {
@@ -776,6 +1090,7 @@ public sealed class XWPFDocument : IDisposable
                                 currentParagraph = null;
                                 currentRun = null;
                                 inPPr = false;
+                                paragraphDepth = -1;
                                 break;
                             case "hyperlink":
                                 hyperlinkRelId = null;
@@ -793,6 +1108,15 @@ public sealed class XWPFDocument : IDisposable
                                 inDrawing = false;
                                 inInline = false;
                                 break;
+                            case "tblPr":
+                                inTblPr = false;
+                                break;
+                            case "trPr":
+                                inTrPr = false;
+                                break;
+                            case "tcPr":
+                                inTcPr = false;
+                                break;
                             case "tbl":
                                 currentTable = null;
                                 break;
@@ -801,6 +1125,9 @@ public sealed class XWPFDocument : IDisposable
                                 break;
                             case "tc":
                                 currentTableCell = null;
+                                break;
+                            case "sectPr":
+                                sectPrDepth = -1;
                                 break;
                             case "body":
                                 bodyDepth = -1;
@@ -830,6 +1157,127 @@ public sealed class XWPFDocument : IDisposable
                 }
             }
         }
+
+        // After the read loop, parse the LAST body-level sectPr for model state
+        // (pgSz, pgMar, cols, and unmodeled children like pgBorders, lnNumType, etc.)
+        ParseFinalSectPr();
+    }
+
+    private void ParseFinalSectPr()
+    {
+        if (_preservedBodySectPr.Count == 0)
+            return;
+
+        var lastSectPr = _preservedBodySectPr[_preservedBodySectPr.Count - 1];
+        using var sr = new StringReader(lastSectPr);
+        using var reader = XmlReader.Create(sr, new XmlReaderSettings { IgnoreWhitespace = false });
+
+        _preservedRawSectPrChildren.Clear();
+
+        bool skipRead = false;
+        while (skipRead || reader.Read())
+        {
+            skipRead = false;
+            if (reader.NodeType != XmlNodeType.Element) continue;
+
+            switch (reader.LocalName)
+            {
+                case "sectPr":
+                    // The outer element — skip to process children
+                    break;
+                case "pgSz":
+                {
+                    var pgW = reader.GetAttribute("w:w");
+                    var pgH = reader.GetAttribute("w:h");
+                    var orient = reader.GetAttribute("w:orient");
+                    if (pgW is not null && long.TryParse(pgW, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pw))
+                        _pageWidth = pw;
+                    if (pgH is not null && long.TryParse(pgH, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ph))
+                        _pageHeight = ph;
+                    if (orient == "landscape")
+                        _pageOrientation = "landscape";
+                    break;
+                }
+                case "pgMar":
+                {
+                    var tp = reader.GetAttribute("w:top");
+                    var rp = reader.GetAttribute("w:right");
+                    var bp = reader.GetAttribute("w:bottom");
+                    var lp = reader.GetAttribute("w:left");
+                    var hdp = reader.GetAttribute("w:header");
+                    var ftp = reader.GetAttribute("w:footer");
+                    if (tp is not null && long.TryParse(tp, out var mt)) _marginTop = mt;
+                    if (rp is not null && long.TryParse(rp, out var mr)) _marginRight = mr;
+                    if (bp is not null && long.TryParse(bp, out var mb)) _marginBottom = mb;
+                    if (lp is not null && long.TryParse(lp, out var ml)) _marginLeft = ml;
+                    if (hdp is not null && long.TryParse(hdp, out var mh)) _marginHeader = mh;
+                    if (ftp is not null && long.TryParse(ftp, out var mf)) _marginFooter = mf;
+                    break;
+                }
+                case "cols":
+                {
+                    var colNum = reader.GetAttribute("w:num");
+                    var colSpace = reader.GetAttribute("w:space");
+                    if (colNum is not null && int.TryParse(colNum, out var cn) && cn > 1)
+                        _columnCount = cn;
+                    if (colSpace is not null && long.TryParse(colSpace, out var cs))
+                        _columnSpacing = cs;
+                    break;
+                }
+                case "headerReference":
+                case "footerReference":
+                    // These are handled by model — skip raw preservation
+                    break;
+                default:
+                    // Unmodeled children (pgBorders, lnNumType, docGrid, formProt, etc.)
+                    // captured as raw for re-emission in model's final sectPr
+                    if (reader.IsEmptyElement)
+                    {
+                        // Self-closing: build XML manually to avoid .NET 8 ReadOuterXml bug
+                        // Do NOT advance reader here — the while loop handles that via reader.Read()
+                        _preservedRawSectPrChildren.Add(CaptureEmptyElementXml(reader));
+                    }
+                    else
+                    {
+                        // Non-empty element: ReadOuterXml advances past it, so use skipRead
+                        _preservedRawSectPrChildren.Add(reader.ReadOuterXml());
+                        skipRead = true;
+                    }
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Captures the current XmlReader self-closing element as a raw XML string
+    /// WITHOUT advancing the reader. The caller/loop handles advancement.
+    /// Does NOT use ReadOuterXml() for self-closing elements to work around a .NET 8
+    /// bug where ReadOuterXml() on a self-closing element with no trailing whitespace
+    /// before the next sibling silently consumes that sibling.
+    /// Only call for self-closing (IsEmptyElement == true) elements.
+    /// </summary>
+    private static string CaptureEmptyElementXml(XmlReader reader)
+    {
+        // Self-closing element: build XML manually
+        var sb = new StringBuilder();
+        sb.Append('<');
+        if (!string.IsNullOrEmpty(reader.Prefix))
+            sb.Append(reader.Prefix).Append(':');
+        sb.Append(reader.LocalName);
+
+        if (reader.HasAttributes)
+        {
+            for (int i = 0; i < reader.AttributeCount; i++)
+            {
+                reader.MoveToAttribute(i);
+                sb.Append(' ').Append(reader.Name).Append("=\"").Append(reader.Value).Append('"');
+            }
+            reader.MoveToElement();
+        }
+
+        sb.Append(" />");
+        // Do NOT advance reader — the calling loop's reader.Read() handles that
+        return sb.ToString();
     }
 
     private Dictionary<string, int> BuildPictureRelMap(ZipArchive archive)
@@ -902,6 +1350,43 @@ public sealed class XWPFDocument : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// Parses a captured wp:anchor XML string to extract picture-related attributes:
+    /// blip embed (relationship ID), extent cx/cy, docPr descr, and xfrm rot.
+    /// </summary>
+    private static (string? embed, long cx, long cy, string? descr, int rot) ParseAnchorBlip(string anchorXml)
+    {
+        string? embed = null, descr = null;
+        long cx = 0, cy = 0;
+        int rot = 0;
+
+        using var sr = new StringReader(anchorXml);
+        using var reader = XmlReader.Create(sr, new XmlReaderSettings { IgnoreWhitespace = false });
+
+        while (reader.Read())
+        {
+            if (reader.NodeType != XmlNodeType.Element) continue;
+            switch (reader.LocalName)
+            {
+                case "blip":
+                    embed = GetAttributeByLocalName(reader, "embed");
+                    break;
+                case "extent":
+                    if (long.TryParse(reader.GetAttribute("cx"), out var ecx)) cx = ecx;
+                    if (long.TryParse(reader.GetAttribute("cy"), out var ecy)) cy = ecy;
+                    break;
+                case "docPr":
+                    descr = reader.GetAttribute("descr");
+                    break;
+                case "xfrm":
+                    if (int.TryParse(reader.GetAttribute("rot"), out var xrot)) rot = xrot;
+                    break;
+            }
+        }
+
+        return (embed, cx, cy, descr, rot);
+    }
+
     private static int ExtensionToFormat(string ext) => ext switch
     {
         "jpg" or "jpeg" => XWPFPictureData.PICTURE_TYPE_JPEG,
@@ -937,10 +1422,18 @@ public sealed class XWPFDocument : IDisposable
         WriteOverride(writer, "/word/settings.xml", ContentTypeSettings);
         if (_numInstances.Count > 0)
             WriteOverride(writer, "/word/numbering.xml", ContentTypeNumbering);
-        if (_headerCount > 0)
-            WriteOverride(writer, "/word/header1.xml", ContentTypeHeader);
-        if (_footerCount > 0)
-            WriteOverride(writer, "/word/footer1.xml", ContentTypeFooter);
+        {
+            int hIdx = 1;
+            foreach (var hText in new[] { _headerText, _headerFirstText, _headerEvenText })
+                if (!string.IsNullOrEmpty(hText))
+                    WriteOverride(writer, $"/word/header{hIdx++}.xml", ContentTypeHeader);
+        }
+        {
+            int fIdx = 1;
+            foreach (var fText in new[] { _footerText, _footerFirstText, _footerEvenText })
+                if (!string.IsNullOrEmpty(fText))
+                    WriteOverride(writer, $"/word/footer{fIdx++}.xml", ContentTypeFooter);
+        }
         if (_vbaProjectBin != null)
         {
             WriteOverride(writer, "/word/vbaProject.bin", ContentTypeVbaProject);
@@ -991,18 +1484,27 @@ public sealed class XWPFDocument : IDisposable
             var vbaRelId = $"rId{_pictures.Count + 2 + offset}";
             WriteRelationship(writer, vbaRelId, "vbaProject.bin", RelTypeVbaProject);
         }
-        // headers and footers
-        if (_headerCount > 0)
+        // headers (variants: default, first, even)
         {
-            offset++;
-            var hRelId = $"rId{_pictures.Count + 2 + offset - 1}";
-            WriteRelationship(writer, hRelId, "header1.xml", RelTypeHeader);
+            int hFileIdx = 1;
+            foreach (var hText in new[] { _headerText, _headerFirstText, _headerEvenText })
+            {
+                if (string.IsNullOrEmpty(hText)) continue;
+                offset++;
+                var relId = $"rId{_pictures.Count + 2 + offset - 1}";
+                WriteRelationship(writer, relId, $"header{hFileIdx++}.xml", RelTypeHeader);
+            }
         }
-        if (_footerCount > 0)
+        // footers (variants: default, first, even)
         {
-            offset++;
-            var fRelId = $"rId{_pictures.Count + 2 + offset - 1}";
-            WriteRelationship(writer, fRelId, "footer1.xml", RelTypeFooter);
+            int fFileIdx = 1;
+            foreach (var fText in new[] { _footerText, _footerFirstText, _footerEvenText })
+            {
+                if (string.IsNullOrEmpty(fText)) continue;
+                offset++;
+                var relId = $"rId{_pictures.Count + 2 + offset - 1}";
+                WriteRelationship(writer, relId, $"footer{fFileIdx++}.xml", RelTypeFooter);
+            }
         }
         writer.WriteEndElement();
     }
@@ -1014,30 +1516,28 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteEndElement();
     }
 
-    private void WriteHeader(PoiXmlWriter writer)
+    private static void WriteHeader(PoiXmlWriter writer, string text)
     {
         writer.WriteStartElement("w", "hdr");
         writer.WriteAttributeString("xmlns:w", NsW);
         writer.WriteStartElement("w", "p");
         writer.WriteStartElement("w", "r");
         writer.WriteStartElement("w", "t");
-        if (_headerText is not null)
-            writer.WriteString(_headerText);
+        writer.WriteString(text);
         writer.WriteEndElement();
         writer.WriteEndElement();
         writer.WriteEndElement();
         writer.WriteEndElement();
     }
 
-    private void WriteFooter(PoiXmlWriter writer)
+    private static void WriteFooter(PoiXmlWriter writer, string text)
     {
         writer.WriteStartElement("w", "ftr");
         writer.WriteAttributeString("xmlns:w", NsW);
         writer.WriteStartElement("w", "p");
         writer.WriteStartElement("w", "r");
         writer.WriteStartElement("w", "t");
-        if (_footerText is not null)
-            writer.WriteString(_footerText);
+        writer.WriteString(text);
         writer.WriteEndElement();
         writer.WriteEndElement();
         writer.WriteEndElement();
@@ -1069,6 +1569,12 @@ public sealed class XWPFDocument : IDisposable
         {
             writer.WriteRaw(raw);
         }
+        // Emit mid-document body-level section breaks (all except the final one)
+        // The final body-level sectPr is emitted as the model's sectPr below.
+        for (int i = 0; i < _preservedBodySectPr.Count - 1; i++)
+        {
+            writer.WriteRaw(_preservedBodySectPr[i]);
+        }
         writer.WriteStartElement("w", "sectPr");
         // pgSz: page size + orientation
         writer.WriteStartElement("w", "pgSz");
@@ -1086,23 +1592,54 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteAttributeString("w", "header", _marginHeader.ToString(CultureInfo.InvariantCulture));
         writer.WriteAttributeString("w", "footer", _marginFooter.ToString(CultureInfo.InvariantCulture));
         writer.WriteEndElement();
-        // headerReference / footerReference
-        if (_headerCount > 0 || _footerCount > 0)
+        // cols: newspaper columns
+        if (_columnCount > 1 || _columnSpacing > 0)
+        {
+            writer.WriteStartElement("w", "cols");
+            writer.WriteAttributeString("w", "num", _columnCount.ToString(CultureInfo.InvariantCulture));
+            if (_columnSpacing > 0)
+                writer.WriteAttributeString("w", "space", _columnSpacing.ToString(CultureInfo.InvariantCulture));
+            writer.WriteEndElement();
+        }
+        // Re-emit preserved raw sectPr children (pgBorders, lnNumType, docGrid, formProt, etc.)
+        foreach (var raw in _preservedRawSectPrChildren)
+        {
+            writer.WriteRaw(raw);
+        }
+        // headerReference / footerReference (variants: default, first, even)
         {
             int relOffset = 2 + _pictures.Count + _hyperlinkUrls.Count;
             if (_numInstances.Count > 0) relOffset++;
             if (_vbaProjectBin != null) relOffset++;
-            if (_headerCount > 0)
+
+            // Headers in type-order: default, first, even
+            var headerVariants = new (string? text, string type)[]
             {
+                (_headerText, "default"),
+                (_headerFirstText, "first"),
+                (_headerEvenText, "even"),
+            };
+            foreach (var (text, type) in headerVariants)
+            {
+                if (string.IsNullOrEmpty(text)) continue;
                 writer.WriteStartElement("w", "headerReference");
-                writer.WriteAttributeString("w", "type", "default");
+                writer.WriteAttributeString("w", "type", type);
                 writer.WriteAttributeString("r", "id", $"rId{relOffset++}");
                 writer.WriteEndElement();
             }
-            if (_footerCount > 0)
+
+            // Footers in type-order: default, first, even
+            var footerVariants = new (string? text, string type)[]
             {
+                (_footerText, "default"),
+                (_footerFirstText, "first"),
+                (_footerEvenText, "even"),
+            };
+            foreach (var (text, type) in footerVariants)
+            {
+                if (string.IsNullOrEmpty(text)) continue;
                 writer.WriteStartElement("w", "footerReference");
-                writer.WriteAttributeString("w", "type", "default");
+                writer.WriteAttributeString("w", "type", type);
                 writer.WriteAttributeString("r", "id", $"rId{relOffset++}");
                 writer.WriteEndElement();
             }
@@ -1119,7 +1656,9 @@ public sealed class XWPFDocument : IDisposable
         if (para.Alignment is not null || para.IndentLeft != 0
             || para.IndentRight != 0 || para.IndentFirstLine != 0 || para.IndentHanging != 0
             || para.SpacingBefore != 0 || para.SpacingAfter != 0 || para.SpacingBetween != 0
-            || para.NumId is not null)
+            || para.NumId is not null
+            || para.PreservedSectPr is not null
+            || para.HasPreservedRawPPrRPrChildren)
         {
             writer.WriteStartElement("w", "pPr");
             if (para.Alignment is not null)
@@ -1180,6 +1719,16 @@ public sealed class XWPFDocument : IDisposable
                 writer.WriteEndElement();
                 writer.WriteEndElement();
             }
+            // Re-emit paragraph-level section properties (sectPr for section break)
+            if (para.PreservedSectPr is not null)
+            {
+                writer.WriteRaw(para.PreservedSectPr);
+            }
+            // Re-emit preserved raw pPr/rPr children (e.g., w:shd at paragraph level)
+            foreach (var rawChild in para.PreservedRawPPrRPrChildren)
+            {
+                writer.WriteRaw(rawChild);
+            }
             writer.WriteEndElement(); // pPr
         }
 
@@ -1231,18 +1780,53 @@ public sealed class XWPFDocument : IDisposable
             writer.WriteEndElement();
         }
 
+        // Re-emit unknown direct children of w:p (inline SDT, bookmarks, tracked changes, etc.)
+        foreach (var raw in para.PreservedRawElements)
+        {
+            writer.WriteRaw(raw);
+        }
+
         writer.WriteEndElement();
     }
 
     private void WriteTable(PoiXmlWriter writer, XWPFTable table)
     {
         writer.WriteStartElement("w", "tbl");
-        writer.WriteStartElement("w", "tblPr");
-        writer.WriteStartElement("w", "tblW");
-        writer.WriteAttributeString("w", "w", "5000");
-        writer.WriteAttributeString("w", "type", "dxa");
-        writer.WriteEndElement();
-        writer.WriteEndElement(); // tblPr
+
+        // tblPr: modeled properties + preserved raw children
+        if (table.getWidth() > 0 || table.getWidthType() is not null
+            || table.getTableStyle() is not null
+            || table.PreservedRawTblPrChildren.Count > 0)
+        {
+            writer.WriteStartElement("w", "tblPr");
+            if (table.getTableStyle() is not null)
+            {
+                writer.WriteStartElement("w", "tblStyle");
+                writer.WriteAttributeString("w", "val", table.getTableStyle());
+                writer.WriteEndElement();
+            }
+            if (table.getWidth() > 0)
+            {
+                writer.WriteStartElement("w", "tblW");
+                writer.WriteAttributeString("w", "w", table.getWidth().ToString(CultureInfo.InvariantCulture));
+                writer.WriteAttributeString("w", "type", table.getWidthType() ?? "dxa");
+                writer.WriteEndElement();
+            }
+            foreach (var raw in table.PreservedRawTblPrChildren)
+                writer.WriteRaw(raw);
+            writer.WriteEndElement(); // tblPr
+        }
+        else
+        {
+            // Always emit at least a basic tblPr for validity
+            writer.WriteStartElement("w", "tblPr");
+            writer.WriteStartElement("w", "tblW");
+            writer.WriteAttributeString("w", "w", "5000");
+            writer.WriteAttributeString("w", "type", "dxa");
+            writer.WriteEndElement();
+            writer.WriteEndElement(); // tblPr
+        }
+
         if (table.GridColWidths.Count > 0)
         {
             writer.WriteStartElement("w", "tblGrid");
@@ -1257,9 +1841,75 @@ public sealed class XWPFDocument : IDisposable
         foreach (var row in table.Rows)
         {
             writer.WriteStartElement("w", "tr");
+
+            // trPr
+            if (row.getHeight() > 0 || row.isHeader() || row.PreservedRawTrPrChildren.Count > 0)
+            {
+                writer.WriteStartElement("w", "trPr");
+                if (row.isHeader())
+                {
+                    writer.WriteStartElement("w", "tblHeader");
+                    writer.WriteEndElement();
+                }
+                if (row.getHeight() > 0)
+                {
+                    writer.WriteStartElement("w", "trHeight");
+                    writer.WriteAttributeString("w", "val", row.getHeight().ToString(CultureInfo.InvariantCulture));
+                    if (row.getHeightRule() is not null)
+                        writer.WriteAttributeString("w", "hRule", row.getHeightRule());
+                    writer.WriteEndElement();
+                }
+                foreach (var raw in row.PreservedRawTrPrChildren)
+                    writer.WriteRaw(raw);
+                writer.WriteEndElement(); // trPr
+            }
+
             foreach (var cell in row.Cells)
             {
                 writer.WriteStartElement("w", "tc");
+
+                // tcPr
+                if (cell.getWidth() > 0 || cell.getGridSpan() > 1 || cell.getVMerge() is not null
+                    || cell.getHMerge() is not null || cell.getVAlign() is not null
+                    || cell.PreservedRawTcPrChildren.Count > 0)
+                {
+                    writer.WriteStartElement("w", "tcPr");
+                    if (cell.getWidth() > 0)
+                    {
+                        writer.WriteStartElement("w", "tcW");
+                        writer.WriteAttributeString("w", "w", cell.getWidth().ToString(CultureInfo.InvariantCulture));
+                        writer.WriteAttributeString("w", "type", cell.getWidthType() ?? "dxa");
+                        writer.WriteEndElement();
+                    }
+                    if (cell.getGridSpan() > 1)
+                    {
+                        writer.WriteStartElement("w", "gridSpan");
+                        writer.WriteAttributeString("w", "val", cell.getGridSpan().ToString(CultureInfo.InvariantCulture));
+                        writer.WriteEndElement();
+                    }
+                    if (cell.getVMerge() is not null)
+                    {
+                        writer.WriteStartElement("w", "vMerge");
+                        writer.WriteAttributeString("w", "val", cell.getVMerge());
+                        writer.WriteEndElement();
+                    }
+                    if (cell.getHMerge() is not null)
+                    {
+                        writer.WriteStartElement("w", "hMerge");
+                        writer.WriteAttributeString("w", "val", cell.getHMerge());
+                        writer.WriteEndElement();
+                    }
+                    if (cell.getVAlign() is not null)
+                    {
+                        writer.WriteStartElement("w", "vAlign");
+                        writer.WriteAttributeString("w", "val", cell.getVAlign()!);
+                        writer.WriteEndElement();
+                    }
+                    foreach (var raw in cell.PreservedRawTcPrChildren)
+                        writer.WriteRaw(raw);
+                    writer.WriteEndElement(); // tcPr
+                }
+
                 foreach (var para in cell.Paragraphs)
                 {
                     WriteParagraph(writer, para);
@@ -1293,7 +1943,8 @@ public sealed class XWPFDocument : IDisposable
 
             writer.WriteStartElement("w", "r");
             if (run.Bold || run.Italic || run.Underline || run.Strike
-                || run.FontName is not null || run.FontSize > 0 || run.Color is not null)
+                || run.FontName is not null || run.FontSize > 0 || run.Color is not null
+                || run.HasPreservedRawRPrChildren)
             {
                 writer.WriteStartElement("w", "rPr");
                 if (run.Bold)
@@ -1339,6 +1990,11 @@ public sealed class XWPFDocument : IDisposable
                     writer.WriteAttributeString("w", "val", run.Color);
                     writer.WriteEndElement();
                 }
+                // Re-emit preserved raw rPr children (e.g., w:shd, w:highlight, etc.)
+                foreach (var rawChild in run.PreservedRawRPrChildren)
+                {
+                    writer.WriteRaw(rawChild);
+                }
                 writer.WriteEndElement(); // rPr
             }
             writer.WriteStartElement("w", "t");
@@ -1355,6 +2011,15 @@ public sealed class XWPFDocument : IDisposable
         foreach (var picture in run.Pictures)
         {
             WriteInlinePicture(writer, picture);
+        }
+        // Re-emit anchored (floating) images from raw XML preservation
+        foreach (var rawAnchor in run.RawAnchorXml)
+        {
+            writer.WriteStartElement("w", "r");
+            writer.WriteStartElement("w", "drawing");
+            writer.WriteRaw(rawAnchor);
+            writer.WriteEndElement(); // w:drawing
+            writer.WriteEndElement(); // w:r
         }
     }
 

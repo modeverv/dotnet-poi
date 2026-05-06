@@ -1,0 +1,6 @@
+*
+!.gitignore
+!v*/
+!v*/INDEX.md
+!v*/images/
+!v*/images/*.png

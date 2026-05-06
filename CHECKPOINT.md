@@ -1,5 +1,379 @@
 # CHECKPOINT
 
+## 2026-05-06 JST - Switch manual verification scripts to generated documents
+
+- Current task: macOS/Linux/Windows の手動検証スクリプトの対象を、`tools/manual-verification/generated-documents/` の生成済みファイルに切り替える。ユーザー確認で `.xls` 以外は開けたため `.xls` は matrix から除外。
+- Scope: `tools/manual-verification/scripts/run_linux_evidence.py`, `run_linux_manual_verification.py`, `run_macos_office_evidence.py`, `run_windows_office_evidence.py`, README, CHECKPOINT。コミットしない。
+
+### やったこと
+
+- Linux versioned evidence matrix を generated documents 固定に変更。
+  - 対象: xlsx, xlsm, encrypted xlsx, docx, docm, encrypted docx, pptx, pptm, encrypted pptx。
+  - password は generated encrypted files 共通で `f`。
+  - `.xls` と旧 `examples/output` / interop fixture fallback は対象外にした。
+- macOS Office evidence matrix を同じ 9 件に変更。
+- Windows Office evidence matrix を同じ 9 件に変更。
+- Linux automated assist (`run_linux_manual_verification.py`) も generated documents 固定に変更し、encrypted 3 件を password `f` で open/store/reopen するようにした。
+- README の Linux manual/evidence 説明を generated documents 前提に更新。
+
+### Verification
+
+- `python3 -m py_compile tools/manual-verification/scripts/run_linux_evidence.py tools/manual-verification/scripts/run_linux_manual_verification.py tools/manual-verification/scripts/run_macos_office_evidence.py tools/manual-verification/scripts/run_windows_office_evidence.py` 成功。
+- `tools/manual-verification/scripts/run-linux-manual-check.sh` 実行成功。
+  - 9 件 PASS: `manual-simple.xlsx`, `manual-simple.xlsm`, `manual-encrypted.xlsx`, `manual-simple.docx`, `manual-simple.docm`, `manual-encrypted.docx`, `manual-simple.pptx`, `manual-simple.pptm`, `manual-encrypted.pptx`。
+- `tools/manual-verification/scripts/run-linux-evidence.sh` 実行成功。
+  - 9 件 PASS、0 missing、0 fail。
+  - `tools/manual-verification/evidence/v0.1.0-f82672e/INDEX.md` と PNG previews を再生成。
+
+## 2026-05-06 JST - Add manual verification document generator
+
+- Current task: `tools/manual-verification` 内に、手動テスト用の簡単な Office ファイルを生成する .NET console project を追加する。
+- Scope: `tools/manual-verification/DocumentGenerator/`、`tools/manual-verification/generated-documents/.gitignore`、`tools/manual-verification/README.md`、`DotnetPOI.sln`。コミットしない。
+
+### やったこと
+
+- `tools/manual-verification/DocumentGenerator/DocumentGenerator.csproj` を追加し、`DotnetPoi.Core` を参照。
+- `DotnetPOI.sln` に `DocumentGenerator` project を追加。
+- 生成先 `tools/manual-verification/generated-documents/` を追加し、生成ファイルは gitignore。
+- generator は次の 10 ファイルを作る:
+  - `manual-simple.xlsx`
+  - `manual-simple.xlsm`
+  - `manual-encrypted.xlsx`
+  - `manual-simple.pptx`
+  - `manual-simple.pptm`
+  - `manual-encrypted.pptx`
+  - `manual-simple.docx`
+  - `manual-simple.docm`
+  - `manual-encrypted.docx`
+  - `manual-simple.xls`
+- macro-enabled files は `tests/test-files/example.xlsm|docm|pptm` の `vbaProject.bin` を再利用。
+- encrypted files の password は `f`。xlsx/pptx は既存 `writeEncrypted`、docx は `EncryptionInfo(EncryptionMode.agile)` で package を暗号化。
+- `tools/manual-verification/README.md` に実行方法を追加。
+
+### Verification
+
+- `dotnet build tools/manual-verification/DocumentGenerator/DocumentGenerator.csproj` 成功。
+- `dotnet run --project tools/manual-verification/DocumentGenerator/DocumentGenerator.csproj` 成功。
+- 生成直後に encrypted xlsx/pptx/docx を password `f` で復号し、dotnet-poi で読み戻せることを generator 内で確認。
+
+## 2026-05-18 JST — Phase 10 item 4 Table cell merge / borders 完了（raw XML preservation）
+
+- Task: Phase 10 item 4 — Table cell merge / borders を完遂。既存文書のセル結合・罫線・`w:shd` 等の rPr 子要素が round-trip で保持されることを確認。
+
+### 対応内容
+
+**1. テーブル読み取りバグ修正（tblPr/trPr/tcPr exclusion list）**
+- raw XML capture ブロックで、`tblPr`/`trPr`/`tcPr` 要素自体が exclusion list に含まれていなかったため、`ReadOuterXml()` が container 要素を丸ごと消費 → EndElement で `inTblPr`/`inTrPr`/`inTcPr` がリセットされず、後続の `tblGrid`/`tr`/`tc` も raw capture されてセルが空になるバグを修正。
+- 3箇所の exclusion list に `"tblPr"`/`"trPr"`/`"tcPr"` を追加。
+
+**2. run-level rPr raw XML preservation（`XWPFRun.PreservedRawRPrChildren`）**
+- Read path: `inRPr` かつ `currentRun != null` のとき、既知の子要素（b/i/u/strike/rFonts/sz/color/rPr 以外）を `ReadOuterXml()` で捕捉し `currentRun.addPreservedRawRPrChild()` に保存。
+- Write path (`WriteRun`): `rPr` 書き出し条件に `run.HasPreservedRawRPrChildren` を追加。modeled 子要素の後、`PreservedRawRPrChildren` を `WriteRaw` で再出力。
+
+**3. paragraph-level rPr raw XML preservation（`XWPFParagraph.PreservedRawPPrRPrChildren`）**
+- Read path: `inRPr && inPPr && currentParagraph != null && currentRun == null` のとき、未知子要素を捕捉して `currentParagraph.addPreservedRawPPrRPrChild()` に保存。
+- Write path (`WriteParagraph`): `pPr` 書き出し条件に `para.HasPreservedRawPPrRPrChildren` を追加。PreservedSectPr の後、`PreservedRawPPrRPrChildren` を `WriteRaw` で再出力。
+
+**4. 診断ツールで w:shd 全保持確認**
+- `bug57031.docx`（100 個の `<w:shd>` を含む）で before/after を比較。
+- 改善前: Output shd = 20（80 ロスト）
+- 改善後: Output shd = 100（全保持 ✅）
+- 内訳: tblPr=8, tcPr=12, other=80（run-level/paragraph-level rPr 由来）
+
+### 状態更新
+
+- docx Tables → cell merging/borders: ❌ → 🔵（raw XML preservation で保持）
+- Phase 10 item 4: 🔄 → ✅
+- Core tests: 244 passing（変更なし。バグ修正＋preservation 強化）
+- 全 C# tests: 309 passing
+- 次: Phase 10 item 5（Review/references）または item 6（Styles 6-1）へ
+
+- Current task: Phase 11 の Windows 版手動検証スクリプトを作成する。macOS 版 (`run_macos_office_evidence.py`) と同じ構造で、COM automation を使った Python スクリプト + `.bat` ランチャーとして実装する。
+- Scope: `tools/manual-verification/scripts/` への新規ファイル追加。ライブラリ本体には触れない。コミットしない。
+
+### 設計方針
+
+- macOS 版との対称性を保ち、同じ `case_matrix()` / `table_rows()` / `write_index()` 構造を使う。
+- COM automation: `win32com.client.DispatchEx` で Excel/Word/PowerPoint を起動。
+- マクロダイアログ: `app.AutomationSecurity = 1` (msoAutomationSecurityLow) で COM 側で抑制。macOS のような UI ボタンクリックは不要。
+- スクリーンショット: `PIL.ImageGrab.grab()` (Pillow)。
+- ウィンドウ前面化: Excel は `excel.Hwnd` 経由で `win32gui.SetForegroundWindow`。Word/PowerPoint は `app.Activate()` + sleep。
+- ケース間クリーン: `GetActiveObject` 経由でアプリを graceful quit → それでも残る場合は `taskkill /F /IM`。
+- 依存: `pip install pywin32 Pillow`。Windows + Microsoft Office が必要。
+
+### 生成物
+
+- `tools/manual-verification/scripts/run_windows_office_evidence.py`
+- `tools/manual-verification/scripts/run-windows-office-evidence.bat`
+
+### 注意
+
+- macOS 上では実行できないため動作確認は未実施。Windows で `pip install pywin32 Pillow` 後に実行する。
+- PowerPoint の `Visible` / `AutomationSecurity` プロパティは COM binding バージョンによって挙動が異なる場合がある。
+
+## 2026-05-06 xx:xx JST - Phase 11 verification layout discussion
+
+- Current task: Phase 10 の実装が並行中でライブラリが一時的にビルドエラーになる前提で、Phase 11 の手動 Office / LibreOffice 検証テストや docker-compose をどこに置くべきか相談。
+- Scope: 方針整理のみ。ライブラリ本体・テストコード・compose ファイルは未変更。コミットしない。
+
+### わかったこと
+
+- 既存の `tools/dev/docker-compose.yml` は開発用 devbox。Phase 11 の manual verification suite とは用途が違うため、同じ compose に混ぜない方がよい。
+- `tests/` は xUnit / Java POI interop など通常の自動テスト置き場として維持し、GUI / Office / LibreOffice 依存の手動検証は `tools/` 配下の独立ツールとして扱うのがよい。
+
+### 推奨方針
+
+- Phase 11 のランナー、スクリプト、docker-compose、チェックリスト、証跡出力先は `tools/manual-verification/` に集約する。
+- 自動化できるが CI 必須ではない検証コードを .NET プロジェクト化する場合は `tools/DotnetPoi.ManualVerification/` として solution に追加し、compose や scripts から呼び出す。
+- 実行結果・スクリーンショット・ログなどの大きい生成物は原則 git 管理外にし、再現性に必要なチェックリストや小さな expected metadata だけを追跡する。
+
+## 2026-05-06 xx:xx JST - Scaffold Phase 11 Linux LibreOffice harness
+
+- Current task: Phase 11 用の各種ディレクトリ・ファイルを `tools/` 配下に用意し、まず Linux 環境を起動するところまで進める。
+- Scope: `tools/manual-verification/` の新規追加と `CHECKPOINT.md` 更新。ライブラリ本体には触れない。コミットしない。
+
+### やったこと
+
+- `tools/manual-verification/` を追加。
+- `docker-compose.yml` を追加し、`lscr.io/linuxserver/libreoffice:latest` ベースの LibreOffice Web desktop を起動する構成にした。
+  - host: `http://localhost:3110`
+  - host HTTPS: `https://localhost:3111`
+  - container workspace: `/workspace`
+  - evidence: `/workspace/tools/manual-verification/evidence`
+- `scripts/run-linux-libreoffice.sh` / `scripts/stop-linux-libreoffice.sh` / `scripts/status-linux-libreoffice.sh` を追加し、実行権限を付けた。
+- `checklists/xlsx.md` / `checklists/docx.md` / `checklists/pptx.md` を追加。
+- `evidence/.gitignore` を追加し、スクリーンショット・ログ・生成ファイルなどの大きい証跡は git 管理外にした。
+- `README.md` と `.env.sample` を追加。
+
+### Verification
+
+- `docker compose -f tools/manual-verification/docker-compose.yml config` 成功。
+- `tools/manual-verification/scripts/run-linux-libreoffice.sh` で image pull と container start 成功。
+- `tools/manual-verification/scripts/status-linux-libreoffice.sh` で `dotnet-poi-phase11-libreoffice` が `Up` であることを確認。
+- `docker exec dotnet-poi-phase11-libreoffice curl -I http://127.0.0.1:3000` で container 内 nginx が `HTTP/1.1 200 OK` を返すことを確認。
+- sandbox から host 側 `127.0.0.1:3110` への `curl` は接続できなかったが、Docker port publish は `127.0.0.1:3110->3000/tcp` / `127.0.0.1:3111->3001/tcp` として設定済み。手元ブラウザから確認する次段階。
+
+## 2026-05-06 xx:xx JST - Add Linux automated assist for Phase 11
+
+- Current task: `tmp/` のサンプルを参考に、`examples/output` 配下のファイルを一時対象として Linux LibreOffice 環境で確認するスクリプトを追加・実行する。
+- Scope: `tools/manual-verification/` のスクリプトと README 更新、CHECKPOINT 更新。ライブラリ本体には触れない。コミットしない。
+
+### やったこと
+
+- `tools/manual-verification/scripts/run-linux-manual-check.sh` を追加。
+  - `tools/manual-verification/docker-compose.yml` の LibreOffice コンテナを起動。
+  - コンテナ内で Python/UNO ベースの検証スクリプトを実行。
+- `tools/manual-verification/scripts/run_linux_manual_verification.py` を追加。
+  - 入力元は一時的に `examples/output`。
+  - 対象拡張子は `.xlsx`, `.xls`, `.xlsm`, `.docx`, `.docm`, `.pptx`, `.pptm`。
+  - 暗号化ファイルはパスワード matrix 未整理のため既定 skip。
+  - 元ファイルは変更せず、`tools/manual-verification/evidence/linux/workfiles/` にコピーしてから LibreOffice で open/store/reopen。
+  - 結果は `tools/manual-verification/evidence/linux/session.log` と `summary.md` に出力。`evidence/` は gitignore 済み。
+- `tools/manual-verification/README.md` に Linux automated assist の実行方法を追記。
+
+### Verification
+
+- `python3 -m py_compile tools/manual-verification/scripts/run_linux_manual_verification.py` 成功。
+- `tools/manual-verification/scripts/run-linux-manual-check.sh` 実行成功。
+- LibreOffice: `LibreOffice 25.8.1.1 580(Build:1)`。
+- `examples/output` から 17 ファイルを確認し、open/store/reopen/no-exception は全件 PASS。
+  - docx: 3 件
+  - pptx: 3 件
+  - xls: 1 件
+  - xlsx: 10 件
+- skip:
+  - `edge-encrypted-sparse.xlsx`
+  - `phase3_4-agile-encrypted-example.xlsx`
+- 注意:
+  - LibreOffice 終了時 stderr に `libpng error: IDAT: CRC error` が 3 行出た。全体結果は PASS だが、画像入りファイルの目視確認時に要確認。
+  - 現在の container image には screenshot tool がないため、スクリーンショット自動取得は未実装。目視は `http://localhost:3110` の Web desktop で行う。
+
+## 2026-05-06 xx:xx JST - Capture Phase 11 LibreOffice screenshots
+
+- Current task: Linux LibreOffice Web desktop のスクリーンショットを撮り、`evidence/` 配下に現在の DotnetPOI バージョンのディレクトリを作って画像と GitHub 表示用 `INDEX.md` を置く。
+- Scope: `tools/manual-verification/evidence/` と screenshot 起動補助スクリプトの追加。ライブラリ本体には触れない。コミットしない。
+
+### やったこと
+
+- 現在のプロジェクトバージョンを `DotnetPoi.Core.csproj` / `DotnetPoi.Formula.csproj` の `VersionPrefix=0.1.0` と確認。
+- 現在の git revision は `f82672e`。
+- 証跡ディレクトリとして `tools/manual-verification/evidence/v0.1.0-f82672e/` を作成。
+- `tools/manual-verification/evidence/.gitignore` を更新し、通常の一時 evidence は ignore しつつ、`v*/INDEX.md` と `v*/images/*.png` は git 追跡可能にした。
+- `tools/manual-verification/scripts/open-linux-screenshot-target.sh` を追加。
+  - LibreOffice container 内の `abc` ユーザーで、指定ファイルを Web desktop に `--view` 表示する。
+- `examples/output` の非暗号化 17 ファイルを LibreOffice Web desktop で開き、ブラウザ経由で PNG スクリーンショットを保存。
+- `tools/manual-verification/evidence/v0.1.0-f82672e/INDEX.md` を作成し、GitHub で画像が一覧表示されるように相対 `<img>` リンクを配置。
+
+### 生成物
+
+- `tools/manual-verification/evidence/v0.1.0-f82672e/INDEX.md`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/01-edge-docx-empty-and-text.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/02-edge-empty-workbook.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/03-edge-formulas.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/04-edge-pptx-empty-slide.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/05-edge-sparse-and-strings.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/06-phase0-write-example.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/07-phase1-dotnet-poi-write.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/08-phase2_5-images-example.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/09-phase3-interface-example.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/10-phase3_2-docx-example.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/11-phase3_3-pptx-example.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/12-phase4-hssf-xls-example.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/13-phase5-formula-evaluator-example.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/14-phase7-cell-types-example.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/15-usage-document.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/16-usage-presentation.png`
+- `tools/manual-verification/evidence/v0.1.0-f82672e/images/17-usage-workbook.png`
+
+### Verification
+
+- in-app browser で `http://localhost:3110` を開き、LibreOffice Web desktop のスクリーンショット取得が可能なことを確認。
+- `file tools/manual-verification/evidence/v0.1.0-f82672e/images/*.png` で全 PNG が `806 x 1010` として認識されることを確認。
+- `git check-ignore` で versioned evidence は追跡可能、一時 `evidence/linux/summary.md` は引き続き ignore されることを確認。
+- スクリーンショット取得後、container 内の `soffice.bin` / `oosplash` を停止。
+
+## 2026-05-06 xx:xx JST - Add one-command Linux evidence generator
+
+- Current task: shell で個別に頑張るのではなく、Linux コンテナ内の Python ランナーで version 取得・Docker 起動・暗号化ファイルを含む種別 matrix の open/reopen 確認・PNG evidence export・`INDEX.md` 生成まで一発実行できるように調整する。
+- Scope: `tools/manual-verification/scripts/` と README、versioned evidence の再生成、CHECKPOINT 更新。ライブラリ本体には触れない。コミットしない。
+
+### やったこと
+
+- `tools/manual-verification/scripts/run-linux-evidence.sh` を追加。
+  - `src/DotnetPoi.Core/DotnetPoi.Core.csproj` から `VersionPrefix` を読み取る。
+  - `git rev-parse --short HEAD` から revision を取得。
+  - `DOTNETPOI_VERSION` / `DOTNETPOI_REVISION` / `DOTNETPOI_EVIDENCE_ID` を container 内 Python に渡す。
+  - `docker compose -f tools/manual-verification/docker-compose.yml up -d` 後、container 内で evidence runner を実行。
+- `tools/manual-verification/scripts/run_linux_evidence.py` を追加。
+  - LibreOffice UNO で対象ファイルを open。
+  - work copy を reopen。
+  - LibreOffice の PNG export filter (`calc_png_Export`, `writer_png_Export`, `impress_png_Export`) で preview PNG を作る。
+  - `tools/manual-verification/evidence/v<version>-<revision>/INDEX.md` を GitHub 表示向けに生成。
+- `tools/manual-verification/README.md` に `run-linux-evidence.sh` の説明を追加。
+
+### Matrix 結果
+
+- PASS:
+  - `xlsx`: `examples/output/usage-workbook.xlsx`
+  - `xlsm`: `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-xlsm-interop.xlsm`
+  - `encrypted xlsx`: `examples/output/phase3_4-agile-encrypted-example.xlsx` (`password=f`)
+  - `encrypted xlsx edge`: `examples/output/edge-encrypted-sparse.xlsx` (`password=edge-pass`)
+  - `docx`: `examples/output/usage-document.docx`
+  - `docm`: `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-docm-interop.docm`
+  - `pptx`: `examples/output/usage-presentation.pptx`
+  - `pptm`: `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-pptm-interop.pptm`
+  - `xls`: `examples/output/phase4-hssf-xls-example.xls`
+- MISSING fixture:
+  - `encrypted xlsm`
+  - `encrypted docx`
+  - `encrypted docm`
+  - `encrypted pptx`
+  - `encrypted pptm`
+
+### Verification
+
+- `python3 -m py_compile tools/manual-verification/scripts/run_linux_evidence.py` 成功。
+- `tools/manual-verification/scripts/run-linux-evidence.sh` 実行成功。
+- `tools/manual-verification/evidence/v0.1.0-f82672e/INDEX.md` が再生成された。
+- Result counts: `9` pass, `5` missing fixture, `0` fail。
+- PNG previews:
+  - Calc/Writer: `817 x 1057`
+  - Impress: `960 x 720`
+
+### 注意
+
+- 暗号化 xlsx は確認できた。
+- 暗号化 xlsm/docx/docm/pptx/pptm は、この repo に現物 fixture がないため未確認。Phase 10/並行作業で build が不安定な間は dotnet-poi で新規生成せず、`MISSING` として明示する。
+
+## 2026-05-06 xx:xx JST - macOS Office evidence attempt failed; split permission workflow
+
+- Current task: macOS Microsoft Office 版を Linux evidence と同様に整備し、`tmp/` の AppleScript も参考に実機で確認する。
+- User direction update: LLM だけで macOS の権限まわりを無理に突破しようとせず、スクリプトを二段構えにする。
+  - 権限取得 / 事前準備モード
+  - 取得済み権限で screenshot / Office open / evidence 生成を実行するモード
+- Scope: まず失敗内容と今後の方針を CHECKPOINT に記録してから実装を続ける。コミットしない。
+
+### うまくいかなかったこと
+
+- `tools/manual-verification/scripts/run-macos-office-evidence.sh` と `run_macos_office_evidence.py` を追加し、macOS Office 版の一発 runner を試作した。
+- Office アプリの存在と version は確認できた。
+  - Excel: `16.108.3`
+  - Word: `16.108.3`
+  - PowerPoint: `16.108.3`
+- `screencapture` は Codex 実行コンテキストから `could not create image from display` で失敗した。
+  - 原因は Screen Recording / TCC 権限の可能性が高い。
+  - LLM 側で強引に回避すべきではない。
+- AppleScript / LaunchServices 経由の Office 起動も環境依存が強かった。
+  - `open -a "Microsoft Excel"` が script 実行中に application name 解決失敗することがあった。
+  - `/Applications/Microsoft Excel.app` の直接指定では `kLSNoExecutableErr` が出ることがあった。
+  - Office 実行ファイルを直接叩くと `code -6` で落ちた。
+  - `open -n -a "Microsoft Excel" file` は単発では成功したが、runner 内では TCC / LaunchServices / Office 起動状態の影響を受けやすい。
+- Excel の暗号化ファイル open は、AppleScript dictionary command (`open workbook ... password ...`) が dictionary load 状態に依存して syntax / parameter error になることがあった。
+- `qlmanage` による Quick Look PNG preview は動作したが、これは Office で開いた証跡ではなく、あくまで preview 生成手段。Office open/reopen と evidence image の責務を分ける必要がある。
+
+### これからやること
+
+- macOS Office evidence は二段構えにする。
+- Phase A: permission/bootstrap mode
+  - Office アプリを起動する。
+  - `screencapture` を実行して Screen Recording 権限の許可を促す。
+  - AppleScript/System Events を使う場合は Automation / Accessibility 権限の許可を促す。
+  - 成功/失敗を `tools/manual-verification/evidence/macos-permissions/` などに記録する。
+  - このモードは権限プロンプトを出すことが目的であり、実ファイル検証はしない。
+- Phase B: evidence mode
+  - 権限が取得済みであることを前提に、Office open/reopen/screenshot/INDEX 生成を行う。
+  - 権限不足を検出したら fail ではなく `PERMISSION_REQUIRED` として明示し、bootstrap mode を案内する。
+  - Quick Look preview は fallback / supplemental image として扱い、Office screenshot と混同しない。
+- script design:
+  - `run-macos-office-permissions.sh`
+  - `run-macos-office-evidence.sh`
+  - 共通 Python module or shared helper は必要になってから分ける。
+- 次の実装では、権限が原因の失敗を通常のファイル互換性 failure と混ぜない。
+
+### その後の進捗
+
+- `tools/manual-verification/scripts/run-macos-office-permissions.sh` を追加。
+  - `run_macos_office_permissions.py` を呼ぶ。
+  - Office launch / `screencapture` / System Events / key events の権限状態を確認。
+  - `tools/manual-verification/evidence/macos-permissions/STATUS.md` に結果を書く。
+- `tools/manual-verification/scripts/run-macos-office-evidence.sh` / `run_macos_office_evidence.py` を二段構え方針に合わせて調整。
+  - evidence mode は `screencapture` preflight が失敗した場合、互換性 FAIL ではなく `PERMISSION_REQUIRED` の `INDEX.md` を書いて止まる。
+  - パスワードダイアログ用に Office app を前面化し、System Events の対象 process を明示して keystroke するようにした。
+- 権限取得後、`tools/manual-verification/scripts/run-macos-office-permissions.sh` が PASS。
+  - Screen capture: PASS
+  - System Events: PASS
+  - Key events: PASS
+  - Office launch: PASS
+- `tools/manual-verification/scripts/run-macos-office-evidence.sh` が成功。
+  - `tools/manual-verification/evidence/v0.1.0-f82672e-macos/INDEX.md` を生成。
+  - Office versions: Excel/Word/PowerPoint `16.108.3`。
+  - Result counts: `9` pass, `5` missing fixture, `0` permission required, `0` fail。
+  - PNG screenshots: `2048 x 1330`。
+
+### macOS Office evidence 結果
+
+- PASS:
+  - `xlsx`: `examples/output/usage-workbook.xlsx`
+  - `xlsm`: `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-xlsm-interop.xlsm`
+  - `encrypted xlsx`: `examples/output/phase3_4-agile-encrypted-example.xlsx` (`password=f`)
+  - `encrypted xlsx edge`: `examples/output/edge-encrypted-sparse.xlsx` (`password=edge-pass`)
+  - `docx`: `examples/output/usage-document.docx`
+  - `docm`: `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-docm-interop.docm`
+  - `pptx`: `examples/output/usage-presentation.pptx`
+  - `pptm`: `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-pptm-interop.pptm`
+  - `xls`: `examples/output/phase4-hssf-xls-example.xls`
+- MISSING fixture:
+  - `encrypted xlsm`
+  - `encrypted docx`
+  - `encrypted docm`
+  - `encrypted pptx`
+  - `encrypted pptm`
+
+### 注意
+
+- macOS Office は初回 permission prompt / 起動状態に依存するため、最初に `run-macos-office-permissions.sh` を実行する運用にする。
+- `workfiles/` 配下に Office lock files (`~$...`) が残ることがあるが、versioned evidence の追跡対象は `INDEX.md` と `images/*.png` のみ。
+
 ## 2026-05-06 17:16 JST - Add Phase 10 docx completion and Phase 11 manual verification
 
 - Current task: `agents.md` に Phase 10 として docx の欠損動作実装方針、Phase 11 として手動 Office / LibreOffice 検証運用を追記する。
@@ -1365,7 +1739,35 @@ Notes:
 - Core.Tests: 235 → **236**
 - **全 C# 301 tests passing** ✅
 
-## 2026-05-06 JST - docx SDT (content controls) raw XML preservation
+## 2026-05-06 JST — docx inline SDT (paragraph-level) raw XML preservation
+
+- Task: item from Phase 10 priority — inline SDT inside `w:p` (from the user's explicit request: "Text boxes / SDT（今回の延長で一番楽）を実装お願いします")
+- Scope: XWPFParagraph + XWPFDocument.cs の拡張。ブロックレベルSDTに続き、インラインSDT（`w:p` 直下の `w:sdt`）も raw XML 保存でカバー。
+
+### Implementation
+
+1. **`XWPFParagraph.cs`** — `_preservedRawElements` List + `PreservedRawElements` / `addPreservedRawElement()` を追加
+2. **`XWPFDocument.cs` `ReadDocument()`**:
+   - `paragraphDepth` 変数を追加し、`w:p` entry/exit を追跡
+   - body-level 未知要素捕捉ブロックの後、paragraph-level 未知要素捕捉ブロックを追加: `reader.Depth == paragraphDepth + 1` かつ `pPr/r/hyperlink` 以外の要素を `currentParagraph.addPreservedRawElement()` に保存
+3. **`XWPFDocument.cs` `WriteParagraph()`**:
+   - fields 書き出し後、`w:p` クローズ前に `para.PreservedRawElements` を `WriteRaw` で再出力
+
+### Verification
+
+- `Docx_BlockLevelSdt_Preserved` (60316.docx): 27 SDT elements verified → ✅ upgraded assertion from >= 2 to >= 27
+- New `Docx_InlineSdt_Preserved` (52449.docx): 1 inline SDT verified → ✅ passed
+- **全 238 Core tests passing** ✅
+- 全 10 Formula + 55 Interop tests も passing ✅
+- **全 C# 303 tests passing** ✅
+
+### Status updates
+
+- `README.md`: SDT row updated to mention "block-level + inline". Badge 302→303. Core.Tests 237→238. Total 302→303.
+- `NOW.md`: SDT row updated (inline SDT covered). Core.Tests 237→238. Total 302→303.
+- `agents.md`: Core.Tests 237→238. SDT progress note updated to include inline.
+- `format-coverage.md`: SDT row updated (block-level and inline).
+- `CHECKPOINT.md`: This entry.
 
 - Task: item 4 from priority list — docx SDT/テキストボックスを document.xml の未知要素保存でカバー
 - Scope: XWPFDocument.cs のみ。テキストボックス（w:txbxContent）は DrawingML シェイプ内にネストしているため未対応。
@@ -1400,3 +1802,45 @@ Notes:
 
 - Core.Tests: 236 → **237**
 - **全 C# 302 tests passing** ✅
+
+## 2026-05-06 JST — docx header/footer variants (default/first/even)
+
+- Task: Phase 10 item 2 continuation — headers/footers now support three variants: default, first page, and even page.
+- Scope: XWPF implementation + new round-trip test.
+
+### Implementation
+
+- **`XWPFDocument.cs`**
+  - Added `_headerFirstText`, `_headerEvenText`, `_footerFirstText`, `_footerEvenText` fields (alongside existing `_headerText`/`_footerText`).
+  - `_headerCount` / `_footerCount` changed from simple fields to computed properties summing non-null variants.
+  - Added API: `setFirstHeaderText()`, `getFirstHeaderText()`, `setEvenHeaderText()`, `getEvenHeaderText()`, `setFirstFooterText()`, `getFirstFooterText()`, `setEvenFooterText()`, `getEvenFooterText()`.
+  - `write()`: Iterates active variants and writes header1.xml (default), header2.xml (first), header3.xml (even); same for footers.
+  - `WriteDocumentRelationships()`: Emits relationships for all active header/footer variants with sequential rId.
+  - `WriteContentTypes()`: Emits overrides for all header/footer variants.
+  - `WriteDocument()`: Emits `<w:headerReference>` / `<w:footerReference>` in sectPr with correct `w:type` ("default", "first", "even") for each active variant.
+  - `ReadHeadersFooters()`: Routes extracted text to correct variant field based on filename (header1→default, header2→first, header3→even; same for footers).
+
+### Verification
+
+## 2026-05-06 JST — docx floating (anchored) images `<wp:anchor>` raw XML preservation
+
+- Task: Phase 10 item 3 — Images (floating). Implement raw XML preservation for `<wp:anchor>` elements in `XWPFDocument`.
+
+### Implementation
+
+- **`XWPFRun.cs`**: Added `_rawAnchorXml` List + `RawAnchorXml` / `addRawAnchorXml()` for storing captured anchor XML per run.
+
+- **`XWPFDocument.cs`**:
+  - **Read path**: In `ReadDocument()`, added capture of `<wp:anchor>` elements via `reader.ReadOuterXml()`. Creates `XWPFPicture` from parsed blip for picture data registration. Stores raw XML on `currentRun` via `addRawAnchorXml()`.
+  - **`ParseAnchorBlip()` helper**: New static method that parses captured anchor XML string to extract `embed` (relationship ID), `cx`, `cy` (extent), `descr` (docPr), `rot` (xfrm rotation). Uses `XmlReader` over `StringReader`.
+  - **Write path**: In `WriteRun()`, after inline pictures, iterates `run.RawAnchorXml` and writes each inside `<w:r><w:drawing>{raw}</w:drawing></w:r>`.
+  - Confirmed `ReadOuterXml()` includes necessary `xmlns:*` declarations (`wp`, `a`, `pic`, `r`).
+
+### Verification
+
+- New test: `Docx_FloatingAnchorImages_Preserved` — uses `poi/test-data/document/drawing.docx` (2 anchor+blip, 28 inline images):
+  - All media files survive round-trip ✅
+  - Output document.xml contains `<wp:anchor` ✅
+- **全 244 Core tests passing** ✅ (was 243)
+- Total C# tests: **309**
+- `README.md`, `NOW.md`, `format-coverage.md`, `agents.md` updated with floating image status 🔵 and test counts.

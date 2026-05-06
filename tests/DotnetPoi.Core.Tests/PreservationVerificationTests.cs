@@ -294,16 +294,11 @@ public class PreservationVerificationTests
     [Fact]
     public void Docx_BlockLevelSdt_Preserved()
     {
-        // Block-level SDT (w:sdt as direct child of w:body, containing paragraphs
-        // inside w:sdtContent) should survive round-trip via raw XML preservation.
-        // Files with only inline SDT (inside paragraphs) like 52449.docx are not
-        // covered by this mechanism.
+        // Block-level SDT (w:sdt as direct child of w:body) and inline SDT
+        // (w:sdt inside w:p) should both survive round-trip via raw XML preservation.
+        // 60316.docx has 27 SDT elements total.
         var path = Path.Combine(PoiTestData, "document/60316.docx");
         Assert.True(File.Exists(path), $"File not found: {path}");
-
-        // 60316.docx has 3 block-level SDT elements verified during development.
-        // Total SDT occurrences in output should count both open tags and references
-        // within preserved raw XML content.
 
         var raw = File.ReadAllBytes(path);
         var before = GetZipEntries(raw);
@@ -332,8 +327,139 @@ public class PreservationVerificationTests
             sdtCount++;
             idx += 6;
         }
-        Console.WriteLine($"  Block-level SDT elements in output: {sdtCount}");
-        Assert.True(sdtCount >= 2, $"Expected at least 2 block-level SDT elements, got {sdtCount}");
+        Console.WriteLine($"  SDT elements in output: {sdtCount}");
+        Assert.True(sdtCount >= 27, $"Expected at least 27 SDT elements, got {sdtCount}. Inline SDT preservation may not be working.");
+    }
+
+    [Fact]
+    public void Docx_InlineSdt_Preserved()
+    {
+        // 52449.docx has 1 inline SDT (inside w:p). Verify it survives.
+        var path = Path.Combine(PoiTestData, "document/52449.docx");
+        Assert.True(File.Exists(path), $"File not found: {path}");
+
+        var raw = File.ReadAllBytes(path);
+        var before = GetZipEntries(raw);
+
+        using var doc = new XWPFDocument(new MemoryStream(raw));
+        using var ms = new MemoryStream();
+        doc.write(ms);
+        var after = GetZipEntries(ms.ToArray());
+
+        DumpLostEntries("docx inline SDT round-trip (52449.docx)", before, after);
+
+        ms.Position = 0;
+        using var verifyArchive = new ZipArchive(ms, ZipArchiveMode.Read);
+        var docEntry = verifyArchive.GetEntry("word/document.xml");
+        Assert.NotNull(docEntry);
+        using var r = new StreamReader(docEntry.Open());
+        var docXml = r.ReadToEnd();
+        Assert.Contains("<w:sdt", docXml, StringComparison.Ordinal);
+        Console.WriteLine("  Inline SDT preserved in 52449.docx ✅");
+    }
+
+    [Fact]
+    public void Docx_RoundTrip_Columns_Restored()
+    {
+        using var doc = new XWPFDocument();
+        doc.createParagraph().createRun().setText("p1");
+        doc.setColumns(3, 360);
+
+        byte[] raw;
+        using (var ms = new MemoryStream()) { doc.write(ms); raw = ms.ToArray(); }
+
+        // Verify write: document.xml should contain cols element
+        using var verifyArchive = new ZipArchive(new MemoryStream(raw), ZipArchiveMode.Read);
+        var entry = verifyArchive.GetEntry("word/document.xml")!;
+        using var r = new StreamReader(entry.Open());
+        var xmlContent = r.ReadToEnd();
+        Assert.Contains("w:cols", xmlContent, StringComparison.Ordinal);
+        Assert.Contains("w:num=\"3\"", xmlContent, StringComparison.Ordinal);
+        Assert.Contains("w:space=\"360\"", xmlContent, StringComparison.Ordinal);
+        Console.WriteLine("  ✅ Write path: cols element emitted with num=3, space=360");
+
+        // Verify read back
+        using var loaded = new XWPFDocument(new MemoryStream(raw));
+        Assert.Equal(3, loaded.getColumnCount());
+        Assert.Equal(360, loaded.getColumnSpacing());
+        Console.WriteLine("  ✅ Read path: column count=3, spacing=360");
+    }
+
+    [Fact]
+    public void Docx_RoundTrip_ColsElement_Preserved()
+    {
+        // Load a real docx with w:cols (60316.docx has w:cols w:space=\"720\"),
+        // write it, then verify the cols element survives in the output.
+        var path = Path.Combine(PoiTestData, "document/60316.docx");
+        Assert.True(File.Exists(path));
+
+        byte[] raw;
+        using (var doc = new XWPFDocument(File.OpenRead(path)))
+        using (var ms = new MemoryStream()) { doc.write(ms); raw = ms.ToArray(); }
+
+        using var verifyArchive = new ZipArchive(new MemoryStream(raw), ZipArchiveMode.Read);
+        var entry = verifyArchive.GetEntry("word/document.xml")!;
+        using var r = new StreamReader(entry.Open());
+        var xmlContent = r.ReadToEnd();
+        Assert.Contains("w:cols", xmlContent, StringComparison.Ordinal);
+        Console.WriteLine("  ✅ cols element preserved in output");
+    }
+
+    [Fact]
+    public void Docx_RoundTrip_MultiSection_Preserved()
+    {
+        // Headers.docx has 3 sectPr elements (multi-section document).
+        // Verify all survive round-trip.
+        var path = Path.Combine(PoiTestData, "document/Headers.docx");
+        Assert.True(File.Exists(path));
+
+        var raw = File.ReadAllBytes(path);
+        var before = GetZipEntries(raw);
+
+        using var doc = new XWPFDocument(new MemoryStream(raw));
+        using var ms = new MemoryStream();
+        doc.write(ms);
+        var after = GetZipEntries(ms.ToArray());
+
+        DumpLostEntries("docx multi-section (Headers.docx)", before, after);
+
+        // Verify document.xml contains multiple sectPr
+        ms.Position = 0;
+        using var verifyArchive = new ZipArchive(ms, ZipArchiveMode.Read);
+        var entry = verifyArchive.GetEntry("word/document.xml")!;
+        using var r = new StreamReader(entry.Open());
+        var docXml = r.ReadToEnd();
+
+        int sectPrCount = CountOccurrences(docXml, "<w:sectPr");
+        Console.WriteLine($"  sectPr elements in output: {sectPrCount}");
+        Assert.True(sectPrCount >= 3, $"Expected at least 3 sectPr, got {sectPrCount}");
+        Assert.Contains("w:cols", docXml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Docx_RoundTrip_SectPrUnknownChildren_Preserved()
+    {
+        // bib-chernigovka.netdo.ru_download_docs_17459.docx has w:pgBorders.
+        // Verify unmodeled sectPr children survive round-trip.
+        var path = Path.Combine(PoiTestData, "document/bib-chernigovka.netdo.ru_download_docs_17459.docx");
+        if (!File.Exists(path))
+        {
+            Console.WriteLine("  ⚠️ pgBorders test file not available, skipping test.");
+            return; // soft-skip
+        }
+
+        var raw = File.ReadAllBytes(path);
+        using var doc = new XWPFDocument(new MemoryStream(raw));
+        using var ms = new MemoryStream();
+        doc.write(ms);
+        ms.Position = 0;
+
+        using var verifyArchive = new ZipArchive(ms, ZipArchiveMode.Read);
+        var entry = verifyArchive.GetEntry("word/document.xml")!;
+        using var r = new StreamReader(entry.Open());
+        var docXml = r.ReadToEnd();
+        Assert.Contains("pgBorders", docXml, StringComparison.Ordinal);
+        Console.WriteLine("  ✅ pgBorders preserved after round-trip");
     }
 
     private static int CountOccurrences(string text, string pattern)
@@ -345,6 +471,40 @@ public class PreservationVerificationTests
             idx += pattern.Length;
         }
         return count;
+    }
+
+    [Fact]
+    public void Docx_FloatingAnchorImages_Preserved()
+    {
+        var path = Path.Combine(PoiTestData, "document/drawing.docx");
+        Assert.True(File.Exists(path), $"File not found: {path}");
+
+        var raw = File.ReadAllBytes(path);
+        var before = GetZipEntries(raw);
+        var mediaFiles = before.Where(n => n.StartsWith("word/media/", StringComparison.OrdinalIgnoreCase)).ToList();
+        Console.WriteLine($"  Media files: {mediaFiles.Count}");
+        foreach (var m in mediaFiles) Console.WriteLine($"    {m}");
+
+        using var doc = new XWPFDocument(new MemoryStream(raw));
+        using var ms = new MemoryStream();
+        doc.write(ms);
+        var after = GetZipEntries(ms.ToArray());
+
+        DumpLostEntries("docx floating anchor images (drawing.docx)", before, after);
+
+        // Media entries should survive
+        foreach (var m in mediaFiles)
+            Assert.Contains(m, after);
+
+        // Verify output document.xml contains wp:anchor
+        ms.Position = 0;
+        using var verifyArchive = new ZipArchive(ms, ZipArchiveMode.Read);
+        var docEntry = verifyArchive.GetEntry("word/document.xml");
+        Assert.NotNull(docEntry);
+        using var r = new StreamReader(docEntry.Open());
+        var docXml = r.ReadToEnd();
+        Assert.Contains("<wp:anchor", docXml, StringComparison.Ordinal);
+        Console.WriteLine("  Output document.xml contains wp:anchor ✅");
     }
 
     private static HashSet<string> GetZipEntries(byte[] data)
