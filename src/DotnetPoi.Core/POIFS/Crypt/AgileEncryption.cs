@@ -263,8 +263,8 @@ internal sealed class AgileEncryptionParameters
         using var memory = new MemoryStream();
         Span<byte> header = stackalloc byte[8];
         BinaryPrimitives.WriteUInt16LittleEndian(header, EncryptionInfo.AgileMajor);
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(2), EncryptionInfo.AgileMinor);
-        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4), EncryptionInfo.AgileFlags);
+        BinaryPrimitives.WriteUInt16LittleEndian(((Span<byte>)header).Slice(2), EncryptionInfo.AgileMinor);
+        BinaryPrimitives.WriteUInt32LittleEndian(((Span<byte>)header).Slice(4), EncryptionInfo.AgileFlags);
         memory.Write(header.ToArray(), 0, header.Length);
 
         var xml = BuildEncryptionInfoXml();

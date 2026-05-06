@@ -231,14 +231,14 @@ public static class CompoundFile
             var buffer = new byte[DirectoryEntrySize];
             var nameBytes = Encoding.Unicode.GetBytes(entry.Name + "\0");
             nameBytes.AsSpan(0, Math.Min(nameBytes.Length, 64)).CopyTo(buffer);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(64), (ushort)Math.Min(nameBytes.Length, 64));
+            BinaryPrimitives.WriteUInt16LittleEndian(((Span<byte>)buffer).Slice(64), (ushort)Math.Min(nameBytes.Length, 64));
             buffer[66] = entry.Type;
             buffer[67] = 1;
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(68), entry.LeftSiblingId);
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(72), entry.RightSiblingId);
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(76), entry.ChildId);
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(116), entry.StartSector);
-            BinaryPrimitives.WriteInt64LittleEndian(buffer.AsSpan(120), entry.Size);
+            BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)buffer).Slice(68), entry.LeftSiblingId);
+            BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)buffer).Slice(72), entry.RightSiblingId);
+            BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)buffer).Slice(76), entry.ChildId);
+            BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)buffer).Slice(116), entry.StartSector);
+            BinaryPrimitives.WriteInt64LittleEndian(((Span<byte>)buffer).Slice(120), entry.Size);
             memory.Write(buffer, 0, buffer.Length);
         }
 
@@ -264,20 +264,20 @@ public static class CompoundFile
 
     private static DirEntry ReadDirectoryEntry(ReadOnlySpan<byte> buffer)
     {
-        var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(64));
+        var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(64));
         var name = string.Empty;
         if (nameLength >= 2)
         {
-            name = Encoding.Unicode.GetString(buffer.AsSpan(0, nameLength - 2).ToArray());
+            name = Encoding.Unicode.GetString(buffer.Slice(0, nameLength - 2).ToArray());
         }
 
         return new DirEntry(name, buffer[66], Array.Empty<byte>())
         {
-            LeftSiblingId = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(68)),
-            RightSiblingId = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(72)),
-            ChildId = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(76)),
-            StartSector = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(116)),
-            Size = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(120))
+            LeftSiblingId = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(68)),
+            RightSiblingId = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(72)),
+            ChildId = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(76)),
+            StartSector = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(116)),
+            Size = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(120))
         };
     }
 
@@ -392,23 +392,23 @@ public static class CompoundFile
         Span<byte> header = stackalloc byte[SectorSize];
         header.Fill(0xFF);
         Signature.CopyTo(header);
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(24), 0x003E);
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(26), 0x0003);
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(28), 0xFFFE);
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(30), 9);
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(32), 6);
-        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(40), 0);
-        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(44), fatSectors);
-        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(48), directoryStart);
-        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(52), 0);
-        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(56), MiniStreamCutoff);
-        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(60), miniFatStart);
-        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(64), miniFatSectors);
-        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(68), EndOfChain);
-        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(72), 0);
+        BinaryPrimitives.WriteUInt16LittleEndian(((Span<byte>)header).Slice(24), 0x003E);
+        BinaryPrimitives.WriteUInt16LittleEndian(((Span<byte>)header).Slice(26), 0x0003);
+        BinaryPrimitives.WriteUInt16LittleEndian(((Span<byte>)header).Slice(28), 0xFFFE);
+        BinaryPrimitives.WriteUInt16LittleEndian(((Span<byte>)header).Slice(30), 9);
+        BinaryPrimitives.WriteUInt16LittleEndian(((Span<byte>)header).Slice(32), 6);
+        BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)header).Slice(40), 0);
+        BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)header).Slice(44), fatSectors);
+        BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)header).Slice(48), directoryStart);
+        BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)header).Slice(52), 0);
+        BinaryPrimitives.WriteUInt32LittleEndian(((Span<byte>)header).Slice(56), MiniStreamCutoff);
+        BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)header).Slice(60), miniFatStart);
+        BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)header).Slice(64), miniFatSectors);
+        BinaryPrimitives.WriteUInt32LittleEndian(((Span<byte>)header).Slice(68), EndOfChain);
+        BinaryPrimitives.WriteInt32LittleEndian(((Span<byte>)header).Slice(72), 0);
         for (var i = 0; i < 109; i++)
         {
-            BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(76 + i * 4), i < fatSectors ? (uint)(fatStart + i) : FreeSect);
+            BinaryPrimitives.WriteUInt32LittleEndian(((Span<byte>)header).Slice(76 + i * 4), i < fatSectors ? (uint)(fatStart + i) : FreeSect);
         }
 
         output.Write(header.ToArray(), 0, header.Length);
@@ -430,7 +430,7 @@ public static class CompoundFile
             for (var j = 0; j < SectorSize / sizeof(uint); j++)
             {
                 var index = i * (SectorSize / sizeof(uint)) + j;
-                BinaryPrimitives.WriteUInt32LittleEndian(sector.AsSpan(j * sizeof(uint)), index < entries.Count ? entries[index] : FreeSect);
+                BinaryPrimitives.WriteUInt32LittleEndian(((Span<byte>)sector).Slice(j * sizeof(uint)), index < entries.Count ? entries[index] : FreeSect);
             }
 
             output.Write(sector, 0, sector.Length);

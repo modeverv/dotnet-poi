@@ -1,0 +1,53 @@
+name: Docs Site
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "docs_src/**"
+      - "tools/DotnetPoi.DocsGenerator/**"
+
+jobs:
+  generate:
+    name: Generate documentation site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('tools/DotnetPoi.DocsGenerator/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build DocsGenerator
+        run: |
+          dotnet build tools/DotnetPoi.DocsGenerator/ -c Release
+
+      - name: Generate HTML from docs_src/
+        run: |
+          dotnet run --project tools/DotnetPoi.DocsGenerator/ -- docs_src docs
+
+      - name: Verify generated site
+        run: |
+          echo "=== Generated HTML files ==="
+          find docs/ -name "*.html" | sort
+          echo "=== Total HTML pages ==="
+          find docs/ -name "*.html" | wc -l
+
+      - name: Commit updated docs/
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: regenerate documentation site"
+          file_pattern: docs/
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
