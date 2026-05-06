@@ -620,9 +620,8 @@ public class ReadFromDotnetTest {
             XSSFSheet sheet = workbook.getSheet("Data");
             assertNotNull(sheet);
 
-            // Verify sheet is protected (POI 5.5.1: getProtection() returns SheetProtection via Sheet interface;
-            // getSheetProtection() was added in POI 5.6.0+)
-            assertNotNull(sheet.getProtection(), "sheet should have protection settings");
+            // Verify sheet is protected (POI 5.5.1: use low-level CTWorksheet API)
+            assertNotNull(sheet.getCTWorksheet().getSheetProtection(), "sheet should have protection settings");
 
             assertEquals("protected cell", sheet.getRow(0).getCell(0).getStringCellValue());
         }
