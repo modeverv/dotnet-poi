@@ -140,6 +140,16 @@ public sealed class PoiXmlWriter : IDisposable
         _writer.Write('>');
     }
 
+    /// <summary>
+    /// Writes raw XML markup verbatim. The caller is responsible for well-formedness.
+    /// </summary>
+    public void WriteRaw(string data)
+    {
+        if (string.IsNullOrEmpty(data)) return;
+        CloseStartTagIfNeeded(markParentHasContent: true);
+        _writer.Write(data);
+    }
+
     public void Dispose()
     {
         _writer.Flush();

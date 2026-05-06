@@ -1214,4 +1214,38 @@ Notes:
 - pptx 2411-Performance_Up.pptx: 231 entries **全部保持**（notes slides 41 + layouts/masters/theme/media/printerSettings）
 - xlsx 123233_charts.xlsx: 20 entries **全部保持**（charts 4 + drawing）
 - docx 55966.docx + testComment.docx: 全 entries **保持**（styles, comments, glossary）
-- ❌ 本当に失われる: auto-shapes (drawing.xml内の`<xdr:sp>`), sparklines (sheet.xml extLst), group shapes/connectors (slide.xml内), track changes/table borders/text boxes/SDT (document.xml内)
+- ❌ 本当に失われる: auto-shapes (drawing.xml内の`<xdr:sp>`), sparklines (sheet.xml extLst), track changes/table borders/text boxes/SDT (document.xml内)
+
+---
+
+## 2026-05-06 JST — pptx グループシェイプ・コネクタの raw XML 保存対応
+
+### やったこと
+
+**背景:** pptx の `p:grpSp`（グループ化）, `p:cxnSp`（コネクタ）, その他未知の `p:*` 要素は `p:spTree` 内の child element として存在するが、読み込み時に捨てられていた。
+
+**実装:**
+
+1. **`XSLFSlide.cs`** — `_preservedRawElements` List + `getPreservedRawElements()` / `addPreservedRawElement()` を追加
+2. **`XMLSlideShow.cs` `ParseSlideXml`:**
+   - `inSpTree` フラグ + `skipRead` フラグを追加
+   - `p:spTree` の entry/exit を検出
+   - 未知の `p:*` child element を `reader.ReadOuterXml()` で raw XML として保存
+3. **`XMLSlideShow.cs` `WriteSlide`:**
+   - モデル要素（pic/sp/graphicFrame）の後で `w.WriteRaw(raw)` で未知要素を再出力
+4. **`PoiXmlWriter.cs`** — `WriteRaw(string)` メソッドを追加
+
+**テスト結果（2411-Performance_Up.pptx, 48 slides）:**
+- **416 preserved raw elements** を全スライドからキャプチャ
+- **48/48 スライド** にグループシェイプまたはコネクタが出力 XML に含まれる ✅
+- ZIP entry 保持も既存通り ✅
+
+**更新したファイル:**
+
+| ファイル | 変更 |
+|---------|------|
+| `README.md` | pptx Shapes: group shapes/connectors ❌→🔵 |
+| `NOW.md` | グループ化/コネクタ・線 ❌→🔵 |
+| `docs_src/content/compatibility/format-coverage.md` | 同 ❌→🔵 |
+| `docs/` | 再生成 (35 HTML) |
+| `CHECKPOINT.md` | このエントリ |

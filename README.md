@@ -105,7 +105,7 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | Text | text boxes, multiple paragraphs, run formatting | ✅ | Bold, italic, underline, strikeout, size, font, and color are covered. |
 | Shapes | pictures, anchors, size, rotation | ✅ | Round-trip covered. |
 | Shapes | tables | ✅ | `p:graphicFrame` / `a:tbl` write/read is implemented. |
-| Shapes | group shapes, connectors, most auto-shapes | ❌ | |
+| Shapes | group shapes, connectors | 🔵 | Unknown `p:spTree` children preserved verbatim via raw XML capture/re-emission. |
 | Shapes | SmartArt, charts | 🔵 | Existing parts are preserved, but not modeled. |
 | Media | video/audio embedding | 🔵 | Non-image `ppt/media/*` parts round-trip via `_preservedEntries`; API-level embedding is not modeled. |
 | Animation | animations and transitions | 🔵 | Preserved as unknown parts where present. |

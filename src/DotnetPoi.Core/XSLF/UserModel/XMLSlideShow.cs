@@ -453,6 +453,10 @@ public sealed class XMLSlideShow : IDisposable
         foreach (var table in slide.getTables())
             WriteTableGraphicFrame(w, table);
 
+        // Re-emit unknown spTree children (group shapes, connectors, etc.) verbatim
+        foreach (var raw in slide.getPreservedRawElements())
+            w.WriteRaw(raw);
+
         w.WriteEndElement(); // p:spTree
         w.WriteEndElement(); // p:cSld
 
@@ -1039,10 +1043,22 @@ public sealed class XMLSlideShow : IDisposable
         XSLFTextRun? tableCurrentRun = null;
         long tableX = 0, tableY = 0, tableCx = 0, tableCy = 0;
 
-        while (reader.Read())
+        bool inSpTree = false;
+        int spTreeDepth = -1;
+        bool skipRead = false;
+        while (skipRead || reader.Read())
         {
+            skipRead = false;
             if (reader.NodeType == XmlNodeType.Element)
             {
+                // --- track p:spTree entry ---
+                if (reader.NamespaceURI == NsP && reader.LocalName == "spTree")
+                {
+                    inSpTree = true;
+                    spTreeDepth = reader.Depth;
+                    continue;
+                }
+
                 // --- picture elements ---
                 if (reader.NamespaceURI == NsP && reader.LocalName == "pic")
                 {
@@ -1286,9 +1302,24 @@ public sealed class XMLSlideShow : IDisposable
                         }
                     }
                 }
+                // --- preserve unknown p:* direct children of p:spTree (grpSp, cxnSp, etc.) ---
+                if (inSpTree && reader.Depth == spTreeDepth + 1 && reader.NamespaceURI == NsP
+                    && reader.LocalName is not ("nvGrpSpPr" or "grpSpPr" or "pic" or "sp" or "graphicFrame"))
+                {
+                    slide.addPreservedRawElement(reader.ReadOuterXml());
+                    skipRead = true;
+                    continue;
+                }
             }
             else if (reader.NodeType == XmlNodeType.EndElement)
             {
+                // --- track p:spTree exit ---
+                if (reader.NamespaceURI == NsP && reader.LocalName == "spTree")
+                {
+                    inSpTree = false;
+                    continue;
+                }
+
                 // --- picture end ---
                 if (reader.NamespaceURI == NsP && reader.LocalName == "pic" && inPic)
                 {

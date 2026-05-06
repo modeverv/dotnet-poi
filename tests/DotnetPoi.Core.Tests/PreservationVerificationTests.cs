@@ -137,9 +137,9 @@ public class PreservationVerificationTests
     public void Pptx_RoundTrip_VerifyEntryPreservation()
     {
         // Group shapes (<p:grpSp>) and connectors (<p:cxnSp>) are inside
-        // ppt/slides/slideN.xml which the model rewrites → lost.
-        // Notes slides should survive.
-        var path = Path.Combine(PoiTestData, "slideshow/2411-Performance_Up.pptx");
+        // ppt/slides/slideN.xml which the model rewrites → would be lost.
+        // Use a file confirmed to have actual group shapes.
+        var path = Path.Combine(PoiTestData, "slideshow/sample_pptx_grouping_issues.pptx");
         Assert.True(File.Exists(path), $"File not found: {path}");
 
         var raw = File.ReadAllBytes(path);
@@ -149,6 +149,18 @@ public class PreservationVerificationTests
             Console.WriteLine($"    {n}");
 
         using var prs = new XMLSlideShow(new MemoryStream(raw));
+
+        // Check that group shapes were captured during load
+        int totalPreserved = 0;
+        foreach (var slide in prs.getSlides())
+        {
+            totalPreserved += slide.getPreservedRawElements().Count;
+        }
+        Console.WriteLine($"  Preserved raw elements across all slides: {totalPreserved}");
+        Assert.True(totalPreserved > 0,
+            $"Expected at least one group shape/connector to be preserved, got {totalPreserved}. "
+            + "Did 2411-Performance_Up.pptx have group shapes in slide xml?");
+
         using var ms = new MemoryStream();
         prs.write(ms);
         var after = GetZipEntries(ms.ToArray());
@@ -156,7 +168,27 @@ public class PreservationVerificationTests
         DumpLostEntries("pptx round-trip", before, after);
 
         Assert.Contains("ppt/slides/slide1.xml", after);
-        Assert.Contains("ppt/slides/slide2.xml", after);
+
+        // Verify group shapes are actually in the output slide XML
+        ms.Position = 0;
+        using var verifyArchive = new ZipArchive(ms, ZipArchiveMode.Read, leaveOpen: false);
+        int slidesWithGroupShapes = 0;
+        foreach (var entry in verifyArchive.Entries
+            .Where(e => e.FullName.StartsWith("ppt/slides/slide", StringComparison.OrdinalIgnoreCase)
+                        && e.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)))
+        {
+            using var r = new StreamReader(entry.Open());
+            var content = r.ReadToEnd();
+            if (content.Contains("p:grpSp", StringComparison.Ordinal) ||
+                content.Contains("p:cxnSp", StringComparison.Ordinal))
+            {
+                slidesWithGroupShapes++;
+            }
+        }
+        Console.WriteLine($"  Slides containing group shapes / connectors: {slidesWithGroupShapes}");
+        Assert.True(slidesWithGroupShapes > 0,
+            "No group shapes or connectors found in output slide XML. "
+            + "The preservation mechanism may not be working.");
     }
 
     private static HashSet<string> GetZipEntries(byte[] data)

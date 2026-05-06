@@ -60,7 +60,7 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Text | multiple paragraphs, run formatting | ✅ | bold, italic, underline, size, font, color |
 | Shapes | images with position, size, rotation | ✅ | Round-trip verified |
 | Shapes | tables (p:graphicFrame/a:tbl) | ✅ | Round-trip verified |
-| Shapes | grouping, connectors, lines | ❌ | |
+| Shapes | grouping, connectors, lines | 🔵 | Unknown `p:spTree` children (grpSp, cxnSp, etc.) preserved verbatim via raw XML capture/re-emission |
 | Shapes | SmartArt, charts | 🔵 | Preserved as unknown parts |
 | Media | video/audio embedding | 🔵 | Non-image `ppt/media/*` round-trip via `_preservedEntries` |
 | Animation | animations, transitions | 🔵 | Preserved as unknown parts |

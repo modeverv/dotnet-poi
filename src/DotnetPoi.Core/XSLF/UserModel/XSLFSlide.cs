@@ -60,4 +60,16 @@ public sealed class XSLFSlide
     }
 
     internal void AttachTable(XSLFTable table) => _tables.Add(table);
+
+    // ---- Raw XML preservation for unknown spTree children (group shapes, connectors, etc.) ----
+
+    private readonly List<string> _preservedRawElements = new();
+
+    /// <summary>
+    /// Raw XML strings of unknown child elements inside p:spTree that the model does not handle
+    /// (e.g. p:grpSp, p:cxnSp). These are emitted verbatim during write so they survive round-trip.
+    /// </summary>
+    public IReadOnlyList<string> getPreservedRawElements() => _preservedRawElements;
+
+    internal void addPreservedRawElement(string rawXml) => _preservedRawElements.Add(rawXml);
 }
