@@ -63,14 +63,14 @@ internal static class Biff8Workbook
         {
             Span<byte> buffer = stackalloc byte[2];
             BinaryPrimitives.WriteUInt16LittleEndian(buffer, 1200);
-            payload.Write(buffer);
+            payload.Write(buffer.ToArray(), 0, buffer.Length);
         });
         WriteRecord(stream, Window1, payload =>
         {
             Span<byte> buffer = stackalloc byte[18];
             buffer.Clear();
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer[8..], 0x38);
-            payload.Write(buffer);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(8), 0x38);
+            payload.Write(buffer.ToArray(), 0, buffer.Length);
         });
 
         var boundSheetOffsetPositions = new List<long>();
@@ -154,7 +154,7 @@ internal static class Biff8Workbook
         }
 
         var cell = GetOrCreateCell(sheet, ReadUInt16(data, 0), ReadUInt16(data, 2));
-        var index = BinaryPrimitives.ReadUInt32LittleEndian(data[6..]);
+        var index = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(6));
         cell.setCellValue(index < sharedStrings.Count ? sharedStrings[(int)index] : string.Empty);
     }
 
@@ -178,7 +178,7 @@ internal static class Biff8Workbook
         }
 
         var cell = GetOrCreateCell(sheet, ReadUInt16(data, 0), ReadUInt16(data, 2));
-        cell.setCellValue(BitConverter.Int64BitsToDouble(BinaryPrimitives.ReadInt64LittleEndian(data[6..])));
+        cell.setCellValue(BitConverter.Int64BitsToDouble(BinaryPrimitives.ReadInt64LittleEndian(data.AsSpan(6))));
     }
 
     private static void ReadRk(HSSFSheet sheet, ReadOnlySpan<byte> data)
@@ -189,7 +189,7 @@ internal static class Biff8Workbook
         }
 
         var cell = GetOrCreateCell(sheet, ReadUInt16(data, 0), ReadUInt16(data, 2));
-        cell.setCellValue(DecodeRk(BinaryPrimitives.ReadInt32LittleEndian(data[6..])));
+        cell.setCellValue(DecodeRk(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(6))));
     }
 
     private static void ReadBoolErr(HSSFSheet sheet, ReadOnlySpan<byte> data)
@@ -267,7 +267,7 @@ internal static class Biff8Workbook
             return strings;
         }
 
-        var uniqueCount = BinaryPrimitives.ReadUInt32LittleEndian(data[4..]);
+        var uniqueCount = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(4));
         var pos = 8;
         for (var i = 0; i < uniqueCount && pos < data.Length; i++)
         {
@@ -303,8 +303,8 @@ internal static class Biff8Workbook
         }
 
         var value = isUtf16
-            ? Encoding.Unicode.GetString(data.Slice(pos, byteCount))
-            : Encoding.Latin1.GetString(data.Slice(pos, byteCount));
+            ? Encoding.Unicode.GetString(data.Slice(pos, byteCount).ToArray())
+            : Encoding.GetEncoding("ISO-8859-1").GetString(data.Slice(pos, byteCount).ToArray());
         pos += byteCount;
         pos += Math.Min(richRuns * 4, Math.Max(0, data.Length - pos));
         pos += (int)Math.Min(extSize, (uint)Math.Max(0, data.Length - pos));
@@ -337,8 +337,8 @@ internal static class Biff8Workbook
         {
             Span<byte> header = stackalloc byte[8];
             BinaryPrimitives.WriteUInt32LittleEndian(header, (uint)strings.Count);
-            BinaryPrimitives.WriteUInt32LittleEndian(header[4..], (uint)strings.Count);
-            payload.Write(header);
+            BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4), (uint)strings.Count);
+            payload.Write(header.ToArray(), 0, header.Length);
 
             foreach (var value in strings.OrderBy(kv => kv.Value).Select(kv => kv.Key))
             {
@@ -361,7 +361,7 @@ internal static class Biff8Workbook
                     {
                         Span<byte> index = stackalloc byte[4];
                         BinaryPrimitives.WriteUInt32LittleEndian(index, (uint)strings[cell.getStringCellValue()]);
-                        payload.Write(index);
+                        payload.Write(index.ToArray(), 0, index.Length);
                     });
                     break;
                 case CellType.Numeric:
@@ -369,7 +369,7 @@ internal static class Biff8Workbook
                     {
                         Span<byte> value = stackalloc byte[8];
                         BinaryPrimitives.WriteInt64LittleEndian(value, BitConverter.DoubleToInt64Bits(cell.getNumericCellValue()));
-                        payload.Write(value);
+                        payload.Write(value.ToArray(), 0, value.Length);
                     });
                     break;
                 case CellType.Boolean:
@@ -397,8 +397,8 @@ internal static class Biff8Workbook
             Span<byte> buffer = stackalloc byte[18];
             buffer.Clear();
             BinaryPrimitives.WriteUInt16LittleEndian(buffer, 0x06B6);
-            BinaryPrimitives.WriteUInt32LittleEndian(buffer[6..], 0x40);
-            payload.Write(buffer);
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(6), 0x40);
+            payload.Write(buffer.ToArray(), 0, buffer.Length);
         });
     }
 
@@ -408,7 +408,7 @@ internal static class Biff8Workbook
         {
             Span<byte> buffer = stackalloc byte[9];
             buffer.Clear();
-            payload.Write(buffer);
+            payload.Write(buffer.ToArray(), 0, buffer.Length);
         });
     }
 
@@ -426,10 +426,10 @@ internal static class Biff8Workbook
             Span<byte> buffer = stackalloc byte[14];
             buffer.Clear();
             BinaryPrimitives.WriteUInt32LittleEndian(buffer, (uint)firstRow);
-            BinaryPrimitives.WriteUInt32LittleEndian(buffer[4..], (uint)lastRow);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer[8..], (ushort)firstCol);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer[10..], (ushort)lastCol);
-            payload.Write(buffer);
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(4), (uint)lastRow);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(8), (ushort)firstCol);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(10), (ushort)lastCol);
+            payload.Write(buffer.ToArray(), 0, buffer.Length);
         });
     }
 
@@ -439,9 +439,9 @@ internal static class Biff8Workbook
         {
             Span<byte> prefix = stackalloc byte[6];
             BinaryPrimitives.WriteUInt16LittleEndian(prefix, (ushort)cell.getRowIndex());
-            BinaryPrimitives.WriteUInt16LittleEndian(prefix[2..], (ushort)cell.getColumnIndex());
-            BinaryPrimitives.WriteUInt16LittleEndian(prefix[4..], 0);
-            payload.Write(prefix);
+            BinaryPrimitives.WriteUInt16LittleEndian(prefix.AsSpan(2), (ushort)cell.getColumnIndex());
+            BinaryPrimitives.WriteUInt16LittleEndian(prefix.AsSpan(4), 0);
+            payload.Write(prefix.ToArray(), 0, prefix.Length);
             writeRemainder(payload);
         });
     }
@@ -453,7 +453,7 @@ internal static class Biff8Workbook
             Span<byte> buffer = stackalloc byte[6];
             buffer.Clear();
             BinaryPrimitives.WriteUInt32LittleEndian(buffer, offset);
-            payload.Write(buffer);
+            payload.Write(buffer.ToArray(), 0, buffer.Length);
             WriteUnicodeString(payload, name, shortLength: true);
         });
     }
@@ -464,12 +464,12 @@ internal static class Biff8Workbook
         {
             Span<byte> buffer = stackalloc byte[16];
             BinaryPrimitives.WriteUInt16LittleEndian(buffer, 0x0600);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer[2..], type);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer[4..], 0x0DBB);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer[6..], 0x07CC);
-            BinaryPrimitives.WriteUInt32LittleEndian(buffer[8..], 0x00000041);
-            BinaryPrimitives.WriteUInt32LittleEndian(buffer[12..], 0x00000006);
-            payload.Write(buffer);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(2), type);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(4), 0x0DBB);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(6), 0x07CC);
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(8), 0x00000041);
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(12), 0x00000006);
+            payload.Write(buffer.ToArray(), 0, buffer.Length);
         });
     }
 
@@ -485,9 +485,9 @@ internal static class Biff8Workbook
 
         Span<byte> header = stackalloc byte[4];
         BinaryPrimitives.WriteUInt16LittleEndian(header, sid);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[2..], (ushort)data.Length);
-        stream.Write(header);
-        stream.Write(data);
+        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(2), (ushort)data.Length);
+        stream.Write(header.ToArray(), 0, header.Length);
+        stream.Write(data, 0, data.Length);
     }
 
     private static void WriteUnicodeString(Stream stream, string value, bool shortLength)
@@ -501,11 +501,11 @@ internal static class Biff8Workbook
         {
             Span<byte> length = stackalloc byte[2];
             BinaryPrimitives.WriteUInt16LittleEndian(length, (ushort)Math.Min(value.Length, ushort.MaxValue));
-            stream.Write(length);
+            stream.Write(length.ToArray(), 0, length.Length);
         }
 
         stream.WriteByte(compressed ? (byte)0 : (byte)1);
-        stream.Write(compressed ? Encoding.Latin1.GetBytes(value) : Encoding.Unicode.GetBytes(value));
+        stream.Write(compressed ? Encoding.GetEncoding("ISO-8859-1").GetBytes(value) : Encoding.Unicode.GetBytes(value), 0, (compressed ? Encoding.GetEncoding("ISO-8859-1").GetBytes(value) : Encoding.Unicode.GetBytes(value)).Length);
     }
 
     private static void PatchUInt32(Stream stream, long position, uint value)
@@ -514,7 +514,7 @@ internal static class Biff8Workbook
         stream.Position = position;
         Span<byte> buffer = stackalloc byte[4];
         BinaryPrimitives.WriteUInt32LittleEndian(buffer, value);
-        stream.Write(buffer);
+        stream.Write(buffer.ToArray(), 0, buffer.Length);
         stream.Position = current;
     }
 
@@ -528,7 +528,7 @@ internal static class Biff8Workbook
         else
         {
             Span<byte> bytes = stackalloc byte[8];
-            BinaryPrimitives.WriteInt32LittleEndian(bytes[4..], rk & unchecked((int)0xFFFFFFFC));
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(4), rk & unchecked((int)0xFFFFFFFC));
             value = BitConverter.Int64BitsToDouble(BinaryPrimitives.ReadInt64LittleEndian(bytes));
         }
 
@@ -536,18 +536,18 @@ internal static class Biff8Workbook
     }
 
     private static ushort ReadUInt16(ReadOnlySpan<byte> data, int offset) =>
-        BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+        BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(offset));
 
     private static ushort ReadUInt16AndAdvance(ReadOnlySpan<byte> data, ref int pos)
     {
-        var value = BinaryPrimitives.ReadUInt16LittleEndian(data[pos..]);
+        var value = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(pos));
         pos += 2;
         return value;
     }
 
     private static uint ReadUInt32AndAdvance(ReadOnlySpan<byte> data, ref int pos)
     {
-        var value = BinaryPrimitives.ReadUInt32LittleEndian(data[pos..]);
+        var value = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(pos));
         pos += 4;
         return value;
     }

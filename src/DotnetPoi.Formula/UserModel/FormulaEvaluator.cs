@@ -404,7 +404,7 @@ public sealed class FormulaEvaluator : IFormulaEvaluator
             for (var i = 0; i < split; i++)
                 column = column * 26 + (char.ToUpperInvariant(token[i]) - 'A' + 1);
 
-            var row = int.Parse(token[split..], CultureInfo.InvariantCulture);
+            var row = int.Parse(token.Substring(split), CultureInfo.InvariantCulture);
             return new CellRef(row - 1, column - 1);
         }
 
@@ -413,7 +413,7 @@ public sealed class FormulaEvaluator : IFormulaEvaluator
             var start = _pos;
             while (_pos < _formula.Length && (char.IsLetterOrDigit(_formula[_pos]) || _formula[_pos] == '_' || _formula[_pos] == '.'))
                 _pos++;
-            return _formula[start.._pos];
+            return _formula.Substring(start, _pos - start);
         }
 
         private string ParseString()
@@ -424,7 +424,7 @@ public sealed class FormulaEvaluator : IFormulaEvaluator
                 _pos++;
             if (_pos >= _formula.Length)
                 throw new InvalidOperationException("Unterminated string literal.");
-            var text = _formula[start.._pos];
+            var text = _formula.Substring(start, _pos - start);
             Expect('"');
             return text;
         }
@@ -434,7 +434,7 @@ public sealed class FormulaEvaluator : IFormulaEvaluator
             var start = _pos;
             while (_pos < _formula.Length && (char.IsDigit(_formula[_pos]) || _formula[_pos] == '.'))
                 _pos++;
-            return double.Parse(_formula[start.._pos], CultureInfo.InvariantCulture);
+            return double.Parse(_formula.Substring(start, _pos - start), CultureInfo.InvariantCulture);
         }
 
         private void SkipWhitespace()

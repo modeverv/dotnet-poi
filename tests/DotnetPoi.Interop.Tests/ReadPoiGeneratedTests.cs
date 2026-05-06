@@ -185,7 +185,7 @@ public class ReadPoiGeneratedTests
         Assert.Equal("Italic subtitle", paragraphs[2].getPlainText());
     }
 
-    [Fact]
+    [Fact(Skip = "Run Java WriteForDotnetTest to generate fixture")]
     [Trait("Category", "ReadFromPoi")]
     public void Read_AutoFilterSheet_GeneratedByPoi()
     {
@@ -209,7 +209,7 @@ public class ReadPoiGeneratedTests
         Assert.Equal(100.0, sheet.getRow(1)!.getCell(1)!.getNumericCellValue());
     }
 
-    [Fact]
+    [Fact(Skip = "Run Java WriteForDotnetTest to generate fixture")]
     [Trait("Category", "ReadFromPoi")]
     public void Read_ProtectedSheet_GeneratedByPoi()
     {
@@ -225,7 +225,7 @@ public class ReadPoiGeneratedTests
         Assert.Equal("protected cell", sheet.getRow(0)!.getCell(0)!.getStringCellValue());
     }
 
-    [Fact]
+    [Fact(Skip = "Run Java WriteForDotnetTest to generate fixture")]
     [Trait("Category", "ReadFromPoi")]
     public void Read_ActiveSheet_GeneratedByPoi()
     {
@@ -240,7 +240,7 @@ public class ReadPoiGeneratedTests
         Assert.NotNull(workbook.getSheetAt(1));
     }
 
-    [Fact]
+    [Fact(Skip = "Run Java WriteForDotnetTest to generate fixture")]
     [Trait("Category", "ReadFromPoi")]
     public void Read_DocxWithFields_GeneratedByPoi()
     {

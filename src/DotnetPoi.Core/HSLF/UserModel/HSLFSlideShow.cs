@@ -25,7 +25,7 @@ public sealed class HSLFSlideShow : IDisposable
 
     public HSLFSlideShow(Stream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         var streams = CompoundFile.ReadStreams(stream);
         if (!streams.TryGetValue(StreamPowerPointDocument, out var pptStream))
             throw new InvalidDataException("Not a valid .ppt file: missing 'PowerPoint Document' stream.");
@@ -83,7 +83,7 @@ public sealed class HSLFSlideShow : IDisposable
             {
                 case RecTypeTextCharsAtom:
                     if (body.Length >= 2)
-                        texts.Add(Encoding.Unicode.GetString(body));
+                        texts.Add(Encoding.Unicode.GetString(body.ToArray()));
                     break;
 
                 case RecTypeTextBytesAtom:
@@ -133,6 +133,6 @@ internal static class LocaleUtil1252Hslf
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             _enc = Encoding.GetEncoding(1252);
         }
-        return _enc.GetString(data);
+        return _enc.GetString(data.ToArray());
     }
 }

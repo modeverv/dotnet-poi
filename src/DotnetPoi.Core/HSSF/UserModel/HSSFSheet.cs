@@ -40,7 +40,7 @@ public sealed class HSSFSheet : ISheet
 
     public void addMergedRegion(CellRangeAddress region)
     {
-        ArgumentNullException.ThrowIfNull(region);
+        Guard.ThrowIfNull(region, nameof(region));
         _mergedRegions.Add(region);
     }
 

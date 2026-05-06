@@ -24,7 +24,7 @@ public sealed class CellRangeAddress
     /// <summary>Parses an OOXML range reference like "A1:B2" or "$A$1:$C$3".</summary>
     public static CellRangeAddress Parse(string refText)
     {
-        ArgumentNullException.ThrowIfNull(refText);
+        Guard.ThrowIfNull(refText, nameof(refText));
 
         var parts = refText.Split(':');
         if (parts.Length != 2)

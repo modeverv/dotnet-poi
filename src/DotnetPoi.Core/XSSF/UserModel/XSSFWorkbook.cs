@@ -75,7 +75,7 @@ public sealed class XSSFWorkbook : IWorkbook
 
     public XSSFWorkbook(Stream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         InitializeDefaultStyles();
         Load(stream);
     }
@@ -165,7 +165,7 @@ public sealed class XSSFWorkbook : IWorkbook
 
     public int addPicture(byte[] pictureData, int format)
     {
-        ArgumentNullException.ThrowIfNull(pictureData);
+        Guard.ThrowIfNull(pictureData, nameof(pictureData));
         ValidatePictureType(format);
 
         var picture = new XSSFPictureData(pictureData, format, _pictures.Count + 1);
@@ -175,7 +175,7 @@ public sealed class XSSFWorkbook : IWorkbook
 
     public int addPicture(Stream stream, int format)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         using var memory = new MemoryStream();
         stream.CopyTo(memory);
         return addPicture(memory.ToArray(), format);
@@ -244,7 +244,7 @@ public sealed class XSSFWorkbook : IWorkbook
 
     public void write(Stream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         EnsureAtLeastOneSheet();
         BuildSharedStrings();
         AssignHyperlinkRelationshipIds();
@@ -302,7 +302,7 @@ public sealed class XSSFWorkbook : IWorkbook
 
     public void writeEncrypted(Stream stream, string password)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         using var package = new MemoryStream();
         write(package);
 
@@ -317,13 +317,13 @@ public sealed class XSSFWorkbook : IWorkbook
 
     public void setVBAProject(byte[] vbaProjectData)
     {
-        ArgumentNullException.ThrowIfNull(vbaProjectData);
+        Guard.ThrowIfNull(vbaProjectData, nameof(vbaProjectData));
         _vbaProjectBin = vbaProjectData.ToArray();
     }
 
     public void setVBAProject(Stream vbaProjectStream)
     {
-        ArgumentNullException.ThrowIfNull(vbaProjectStream);
+        Guard.ThrowIfNull(vbaProjectStream, nameof(vbaProjectStream));
         using var ms = new MemoryStream();
         vbaProjectStream.CopyTo(ms);
         _vbaProjectBin = ms.ToArray();
@@ -1340,7 +1340,7 @@ public sealed class XSSFWorkbook : IWorkbook
                 if (relId is null || target is null) continue;
                 var mediaFile = Path.GetFileNameWithoutExtension(target); // "image1"
                 if (mediaFile.StartsWith("image", StringComparison.OrdinalIgnoreCase)
-                    && int.TryParse(mediaFile["image".Length..], out var oneBasedIndex))
+                    && int.TryParse(mediaFile.Substring("image".Length), out var oneBasedIndex))
                 {
                     pictureIndexByRelId[relId] = oneBasedIndex - 1;
                 }
@@ -1996,7 +1996,7 @@ public sealed class XSSFWorkbook : IWorkbook
             : "xl/" + target;
         var segments = new Stack<string>();
 
-        foreach (var segment in partName.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var segment in partName.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
         {
             if (segment == ".")
             {

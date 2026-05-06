@@ -19,8 +19,8 @@ public static class CompoundFile
 
     public static void Write(Stream output, IReadOnlyDictionary<string, byte[]> streams)
     {
-        ArgumentNullException.ThrowIfNull(output);
-        ArgumentNullException.ThrowIfNull(streams);
+        Guard.ThrowIfNull(output, nameof(output));
+        Guard.ThrowIfNull(streams, nameof(streams));
 
         var entries = BuildDirectory(streams);
         var miniFat = BuildMiniStreams(entries, out var miniStream);
@@ -74,12 +74,12 @@ public static class CompoundFile
 
         foreach (var entry in regularEntries)
         {
-            output.Write(entry.Data);
+            output.Write(entry.Data, 0, entry.Data.Length);
             WritePadding(output, CeilingDiv(entry.Data.Length, SectorSize) * SectorSize - entry.Data.Length);
         }
 
         var directoryBytes = WriteDirectory(entries);
-        output.Write(directoryBytes);
+        output.Write(directoryBytes, 0, directoryBytes.Length);
         WritePadding(output, directorySectors * SectorSize - directoryBytes.Length);
 
         WriteFatLikeSectors(output, miniFat, miniFatSectors);
@@ -88,7 +88,7 @@ public static class CompoundFile
 
     public static Dictionary<string, byte[]> ReadStreams(Stream input)
     {
-        ArgumentNullException.ThrowIfNull(input);
+        Guard.ThrowIfNull(input, nameof(input));
 
         using var memory = new MemoryStream();
         input.CopyTo(memory);
@@ -134,9 +134,9 @@ public static class CompoundFile
     private static List<DirEntry> BuildDirectory(IReadOnlyDictionary<string, byte[]> streams)
     {
         var entries = new List<DirEntry> { new("Root Entry", 5, Array.Empty<byte>()) };
-        foreach (var (name, data) in streams.OrderBy(kv => kv.Key, new PoiPropertyNameComparer()))
+        foreach (var kv in streams.OrderBy(p => p.Key, new PoiPropertyNameComparer()))
         {
-            entries.Add(new DirEntry(name, 2, data));
+            entries.Add(new DirEntry(kv.Key, 2, kv.Value));
         }
 
         for (var i = 0; i < entries.Count; i++)
@@ -169,7 +169,7 @@ public static class CompoundFile
                 miniFat.Add(i == miniSectors - 1 ? EndOfChain : (uint)(entry.StartSector + i + 1));
             }
 
-            mini.Write(entry.Data);
+            mini.Write(entry.Data, 0, entry.Data.Length);
             WritePadding(mini, miniSectors * MiniSectorSize - entry.Data.Length);
         }
 
@@ -214,8 +214,8 @@ public static class CompoundFile
                 children[j].RightSiblingId = children[j + 1].Index;
             }
 
-            children[^1].LeftSiblingId = NoStream;
-            children[^1].RightSiblingId = NoStream;
+            children[children.Length - 1].LeftSiblingId = NoStream;
+            children[children.Length - 1].RightSiblingId = NoStream;
         }
         else
         {
@@ -239,7 +239,7 @@ public static class CompoundFile
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(76), entry.ChildId);
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(116), entry.StartSector);
             BinaryPrimitives.WriteInt64LittleEndian(buffer.AsSpan(120), entry.Size);
-            memory.Write(buffer);
+            memory.Write(buffer, 0, buffer.Length);
         }
 
         return memory.ToArray();
@@ -264,20 +264,20 @@ public static class CompoundFile
 
     private static DirEntry ReadDirectoryEntry(ReadOnlySpan<byte> buffer)
     {
-        var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(buffer[64..]);
+        var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(64));
         var name = string.Empty;
         if (nameLength >= 2)
         {
-            name = Encoding.Unicode.GetString(buffer[..(nameLength - 2)]);
+            name = Encoding.Unicode.GetString(buffer.AsSpan(0, nameLength - 2).ToArray());
         }
 
         return new DirEntry(name, buffer[66], Array.Empty<byte>())
         {
-            LeftSiblingId = BinaryPrimitives.ReadInt32LittleEndian(buffer[68..]),
-            RightSiblingId = BinaryPrimitives.ReadInt32LittleEndian(buffer[72..]),
-            ChildId = BinaryPrimitives.ReadInt32LittleEndian(buffer[76..]),
-            StartSector = BinaryPrimitives.ReadInt32LittleEndian(buffer[116..]),
-            Size = BinaryPrimitives.ReadInt64LittleEndian(buffer[120..])
+            LeftSiblingId = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(68)),
+            RightSiblingId = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(72)),
+            ChildId = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(76)),
+            StartSector = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(116)),
+            Size = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(120))
         };
     }
 
@@ -392,26 +392,26 @@ public static class CompoundFile
         Span<byte> header = stackalloc byte[SectorSize];
         header.Fill(0xFF);
         Signature.CopyTo(header);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[24..], 0x003E);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[26..], 0x0003);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[28..], 0xFFFE);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[30..], 9);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[32..], 6);
-        BinaryPrimitives.WriteInt32LittleEndian(header[40..], 0);
-        BinaryPrimitives.WriteInt32LittleEndian(header[44..], fatSectors);
-        BinaryPrimitives.WriteInt32LittleEndian(header[48..], directoryStart);
-        BinaryPrimitives.WriteInt32LittleEndian(header[52..], 0);
-        BinaryPrimitives.WriteUInt32LittleEndian(header[56..], MiniStreamCutoff);
-        BinaryPrimitives.WriteInt32LittleEndian(header[60..], miniFatStart);
-        BinaryPrimitives.WriteInt32LittleEndian(header[64..], miniFatSectors);
-        BinaryPrimitives.WriteUInt32LittleEndian(header[68..], EndOfChain);
-        BinaryPrimitives.WriteInt32LittleEndian(header[72..], 0);
+        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(24), 0x003E);
+        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(26), 0x0003);
+        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(28), 0xFFFE);
+        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(30), 9);
+        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(32), 6);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(40), 0);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(44), fatSectors);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(48), directoryStart);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(52), 0);
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(56), MiniStreamCutoff);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(60), miniFatStart);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(64), miniFatSectors);
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(68), EndOfChain);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(72), 0);
         for (var i = 0; i < 109; i++)
         {
-            BinaryPrimitives.WriteUInt32LittleEndian(header[(76 + i * 4)..], i < fatSectors ? (uint)(fatStart + i) : FreeSect);
+            BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(76 + i * 4), i < fatSectors ? (uint)(fatStart + i) : FreeSect);
         }
 
-        output.Write(header);
+        output.Write(header.ToArray(), 0, header.Length);
     }
 
     private static void MarkChain(uint[] fat, int startSector, int sectorCount)
@@ -433,7 +433,7 @@ public static class CompoundFile
                 BinaryPrimitives.WriteUInt32LittleEndian(sector.AsSpan(j * sizeof(uint)), index < entries.Count ? entries[index] : FreeSect);
             }
 
-            output.Write(sector);
+            output.Write(sector, 0, sector.Length);
         }
     }
 
@@ -445,7 +445,7 @@ public static class CompoundFile
     {
         if (count > 0)
         {
-            output.Write(new byte[count]);
+            output.Write(new byte[count], 0, count);
         }
     }
 

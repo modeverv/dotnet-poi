@@ -81,7 +81,7 @@ public sealed class XWPFRun
     /// <param name="height">Height in EMU.</param>
     public XWPFPicture addPicture(byte[] pictureData, int pictureType, string filename, int width, int height)
     {
-        ArgumentNullException.ThrowIfNull(pictureData);
+        Guard.ThrowIfNull(pictureData, nameof(pictureData));
         var doc = _paragraph.Document;
         var data = doc.AddPictureData(pictureData, pictureType);
         // rId1 is reserved for settings.xml; images start at rId2 = rId{Index + 1}

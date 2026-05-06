@@ -1,12 +1,41 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>netstandard2.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
         <AssemblyName>DotnetPoi.Core</AssemblyName>
         <RootNamespace>DotnetPoi</RootNamespace>
     </PropertyGroup>
+
+    <!-- ── NuGet package metadata ─────────────────────────────────────── -->
+    <PropertyGroup>
+        <PackageId>DotnetPoi.Core</PackageId>
+        <VersionPrefix>0.1.0</VersionPrefix>
+        <PackageVersion>$(VersionPrefix)</PackageVersion>
+        <Authors>modeverv</Authors>
+        <Description>Faithful .NET port of Apache POI — xlsx, docx, pptx, xls, doc, ppt read/write with zero dependencies.</Description>
+        <Copyright>Copyright (c) 2025 modeverv</Copyright>
+        <PackageProjectUrl>https://github.com/modeverv/dotnet-poi</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/modeverv/dotnet-poi</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageTags>excel;word;powerpoint;xlsx;docx;pptx;xls;doc;ppt;apache-poi;poi;ooxml;ole2;spreadsheet</PackageTags>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.Memory" Version="4.5.5" />
+        <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" Visible="false" />
+    </ItemGroup>
 
 </Project>

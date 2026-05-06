@@ -22,7 +22,7 @@ public sealed class XSSFDrawing
 
     public XSSFPicture createPicture(XSSFClientAnchor anchor, int pictureIndex)
     {
-        ArgumentNullException.ThrowIfNull(anchor);
+        Guard.ThrowIfNull(anchor, nameof(anchor));
         _sheet.getWorkbook().GetPictureData(pictureIndex);
 
         var relationshipId = "rId" + (_pictures.Count + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);

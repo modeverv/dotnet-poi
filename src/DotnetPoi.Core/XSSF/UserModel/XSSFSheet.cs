@@ -94,7 +94,7 @@ public sealed class XSSFSheet : ISheet
 
     public void addMergedRegion(CellRangeAddress region)
     {
-        ArgumentNullException.ThrowIfNull(region);
+        Guard.ThrowIfNull(region, nameof(region));
         _mergedRegions.Add(region);
     }
 
@@ -123,13 +123,13 @@ public sealed class XSSFSheet : ISheet
 
     internal void AddHyperlink(XSSFHyperlink link)
     {
-        ArgumentNullException.ThrowIfNull(link);
+        Guard.ThrowIfNull(link, nameof(link));
         _hyperlinks.Add(link);
     }
 
     public void AddDataValidation(XSSFDataValidation validation)
     {
-        ArgumentNullException.ThrowIfNull(validation);
+        Guard.ThrowIfNull(validation, nameof(validation));
         _dataValidations.Add(validation);
     }
 
@@ -137,7 +137,7 @@ public sealed class XSSFSheet : ISheet
 
     public void AddConditionalFormatting(XSSFConditionalFormatting cf)
     {
-        ArgumentNullException.ThrowIfNull(cf);
+        Guard.ThrowIfNull(cf, nameof(cf));
         _condFormatting.Add(cf);
     }
 
@@ -165,7 +165,7 @@ public sealed class XSSFSheet : ISheet
         return _hiddenColumns.Contains(columnIndex);
     }
 
-    internal IReadOnlySet<int> HiddenColumns => _hiddenColumns;
+    internal IReadOnlyCollection<int> HiddenColumns => _hiddenColumns;
 
     /// <summary>
     /// Gets or sets whether this sheet is protected.
@@ -189,7 +189,7 @@ public sealed class XSSFSheet : ISheet
 
     public void setAutoFilter(CellRangeAddress range)
     {
-        ArgumentNullException.ThrowIfNull(range);
+        Guard.ThrowIfNull(range, nameof(range));
         _autoFilter = range;
     }
 
@@ -226,9 +226,9 @@ public sealed class XSSFSheet : ISheet
     /// <returns>The created XSSFPivotTable.</returns>
     public XSSFPivotTable createPivotTable(string destCell, string sourceRef, string sourceSheetName)
     {
-        ArgumentNullException.ThrowIfNull(destCell);
-        ArgumentNullException.ThrowIfNull(sourceRef);
-        ArgumentNullException.ThrowIfNull(sourceSheetName);
+        Guard.ThrowIfNull(destCell, nameof(destCell));
+        Guard.ThrowIfNull(sourceRef, nameof(sourceRef));
+        Guard.ThrowIfNull(sourceSheetName, nameof(sourceSheetName));
 
         int cacheId = _workbook.AllocatePivotCacheId();
 

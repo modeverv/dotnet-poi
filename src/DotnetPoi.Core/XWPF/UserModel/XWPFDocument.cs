@@ -82,7 +82,7 @@ public sealed class XWPFDocument : IDisposable
 
     public XWPFDocument(Stream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         Load(stream);
     }
 
@@ -109,7 +109,7 @@ public sealed class XWPFDocument : IDisposable
     /// <summary>Returns 0-based index of added picture data.</summary>
     public int addPicture(byte[] pictureData, int format)
     {
-        ArgumentNullException.ThrowIfNull(pictureData);
+        Guard.ThrowIfNull(pictureData, nameof(pictureData));
         var data = AddPictureData(pictureData, format);
         return data.Index - 1;
     }
@@ -174,7 +174,7 @@ public sealed class XWPFDocument : IDisposable
 
     public void write(Stream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
         CollectHyperlinks();
 
@@ -255,7 +255,7 @@ public sealed class XWPFDocument : IDisposable
 
     public void setVBAProject(byte[] vbaProjectData)
     {
-        ArgumentNullException.ThrowIfNull(vbaProjectData);
+        Guard.ThrowIfNull(vbaProjectData, nameof(vbaProjectData));
         _vbaProjectBin = vbaProjectData.ToArray();
         _vbaDataXml = null;
         _vbaProjectBinRels = null;
@@ -263,7 +263,7 @@ public sealed class XWPFDocument : IDisposable
 
     public void setVBAProject(Stream vbaProjectStream)
     {
-        ArgumentNullException.ThrowIfNull(vbaProjectStream);
+        Guard.ThrowIfNull(vbaProjectStream, nameof(vbaProjectStream));
         using var ms = new MemoryStream();
         vbaProjectStream.CopyTo(ms);
         setVBAProject(ms.ToArray());
@@ -806,7 +806,7 @@ public sealed class XWPFDocument : IDisposable
             if (relId is null || target is null) continue;
             var mediaFile = Path.GetFileNameWithoutExtension(target); // "image1"
             if (mediaFile.StartsWith("image", StringComparison.OrdinalIgnoreCase)
-                && int.TryParse(mediaFile["image".Length..], out var oneBasedIndex))
+                && int.TryParse(mediaFile.Substring("image".Length), out var oneBasedIndex))
             {
                 map[relId] = oneBasedIndex - 1;
             }

@@ -34,7 +34,7 @@ public sealed class XSSFDataFormat : IDataFormat
 
     public short getFormat(string format)
     {
-        ArgumentNullException.ThrowIfNull(format);
+        Guard.ThrowIfNull(format, nameof(format));
         var normalizedFormat = string.Equals(format, "text", StringComparison.OrdinalIgnoreCase) ? "@" : format;
         for (var i = 0; i < BuiltinFormats.Length; i++)
         {

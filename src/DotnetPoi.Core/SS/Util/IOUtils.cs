@@ -6,8 +6,8 @@ public static class IOUtils
 {
     public static int ReadFully(Stream stream, byte[] buffer, int offset, int count)
     {
-        ArgumentNullException.ThrowIfNull(stream);
-        ArgumentNullException.ThrowIfNull(buffer);
+        Guard.ThrowIfNull(stream, nameof(stream));
+        Guard.ThrowIfNull(buffer, nameof(buffer));
 
         var totalRead = 0;
         while (totalRead < count)
@@ -26,7 +26,7 @@ public static class IOUtils
 
     public static byte[] PeekFirstNBytes(Stream stream, int limit)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         if (!stream.CanSeek)
         {
             throw new IOException("PeekFirstNBytes requires a seekable stream.");

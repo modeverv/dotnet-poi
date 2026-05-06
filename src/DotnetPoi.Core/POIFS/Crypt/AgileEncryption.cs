@@ -33,7 +33,7 @@ public sealed class EncryptionInfo
 
     public EncryptionInfo(Stream poifsStream)
     {
-        ArgumentNullException.ThrowIfNull(poifsStream);
+        Guard.ThrowIfNull(poifsStream, nameof(poifsStream));
         var streams = CompoundFile.ReadStreams(poifsStream);
         if (!streams.TryGetValue("EncryptionInfo", out var encryptionInfo))
         {
@@ -66,21 +66,21 @@ public sealed class Encryptor
         Span<byte> verifierSalt = stackalloc byte[16];
         Span<byte> verifier = stackalloc byte[16];
         Span<byte> integritySalt = stackalloc byte[20];
-        RandomNumberGenerator.Fill(keySpec);
-        RandomNumberGenerator.Fill(keySalt);
-        RandomNumberGenerator.Fill(verifierSalt);
-        RandomNumberGenerator.Fill(verifier);
-        RandomNumberGenerator.Fill(integritySalt);
+        NetsStandardCrypto.Fill(keySpec);
+        NetsStandardCrypto.Fill(keySalt);
+        NetsStandardCrypto.Fill(verifierSalt);
+        NetsStandardCrypto.Fill(verifier);
+        NetsStandardCrypto.Fill(integritySalt);
         confirmPassword(password, keySpec.ToArray(), keySalt.ToArray(), verifier.ToArray(), verifierSalt.ToArray(), integritySalt.ToArray());
     }
 
     public void confirmPassword(string password, byte[] keySpec, byte[] keySalt, byte[] verifier, byte[] verifierSalt, byte[] integritySalt)
     {
-        ArgumentNullException.ThrowIfNull(keySpec);
-        ArgumentNullException.ThrowIfNull(keySalt);
-        ArgumentNullException.ThrowIfNull(verifier);
-        ArgumentNullException.ThrowIfNull(verifierSalt);
-        ArgumentNullException.ThrowIfNull(integritySalt);
+        Guard.ThrowIfNull(keySpec, nameof(keySpec));
+        Guard.ThrowIfNull(keySalt, nameof(keySalt));
+        Guard.ThrowIfNull(verifier, nameof(verifier));
+        Guard.ThrowIfNull(verifierSalt, nameof(verifierSalt));
+        Guard.ThrowIfNull(integritySalt, nameof(integritySalt));
 
         if (keySpec.Length != _parameters.KeySizeBytes || keySalt.Length != _parameters.BlockSize
             || verifier.Length != _parameters.BlockSize || verifierSalt.Length != _parameters.BlockSize
@@ -95,7 +95,7 @@ public sealed class Encryptor
 
         var pwHash = AgileCrypto.HashPassword(password, verifierSalt, _parameters.SpinCount);
         _parameters.EncryptedVerifierHashInput = AgileCrypto.HashInput(_parameters, pwHash, AgileCrypto.VerifierInputBlock, verifier, encrypt: true);
-        _parameters.EncryptedVerifierHashValue = AgileCrypto.HashInput(_parameters, pwHash, AgileCrypto.HashedVerifierBlock, SHA1.HashData(verifier), encrypt: true);
+        _parameters.EncryptedVerifierHashValue = AgileCrypto.HashInput(_parameters, pwHash, AgileCrypto.HashedVerifierBlock, NetsStandardCrypto.HashSha1(verifier), encrypt: true);
         _parameters.EncryptedKeyValue = AgileCrypto.HashInput(_parameters, pwHash, AgileCrypto.CryptoKeyBlock, keySpec, encrypt: true);
 
         var hmacKeyIv = AgileCrypto.GenerateIv(_parameters.KeySalt, AgileCrypto.IntegrityKeyBlock, _parameters.BlockSize);
@@ -107,8 +107,8 @@ public sealed class Encryptor
 
     public void encryptPackage(byte[] packageBytes, Stream output)
     {
-        ArgumentNullException.ThrowIfNull(packageBytes);
-        ArgumentNullException.ThrowIfNull(output);
+        Guard.ThrowIfNull(packageBytes, nameof(packageBytes));
+        Guard.ThrowIfNull(output, nameof(output));
 
         if (_parameters.SecretKey is null || _parameters.IntegritySalt is null)
         {
@@ -147,9 +147,9 @@ public sealed class Decryptor
     {
         var pwHash = AgileCrypto.HashPassword(password, _parameters.VerifierSalt, _parameters.SpinCount);
         var verifierInput = AgileCrypto.HashInput(_parameters, pwHash, AgileCrypto.VerifierInputBlock, _parameters.EncryptedVerifierHashInput, encrypt: false);
-        var verifierHash = SHA1.HashData(verifierInput);
+        var verifierHash = NetsStandardCrypto.HashSha1(verifierInput);
         var verifierHashDec = AgileCrypto.GetBlock0(AgileCrypto.HashInput(_parameters, pwHash, AgileCrypto.HashedVerifierBlock, _parameters.EncryptedVerifierHashValue, encrypt: false), _parameters.HashSize);
-        if (!CryptographicOperations.FixedTimeEquals(verifierHash, verifierHashDec))
+        if (!NetsStandardCrypto.FixedTimeEquals(verifierHash, verifierHashDec))
         {
             return false;
         }
@@ -182,11 +182,11 @@ internal sealed class AgileEncryptionParameters
     private const string EncNs = "http://schemas.microsoft.com/office/2006/encryption";
     private const string PassNs = "http://schemas.microsoft.com/office/2006/keyEncryptor/password";
 
-    public int BlockSize { get; private init; } = 16;
-    public int KeyBits { get; private init; } = 128;
+    public int BlockSize { get; set; } = 16;
+    public int KeyBits { get; set; } = 128;
     public int KeySizeBytes => KeyBits / 8;
-    public int HashSize { get; private init; } = 20;
-    public int SpinCount { get; private init; } = 100000;
+    public int HashSize { get; set; } = 20;
+    public int SpinCount { get; set; } = 100000;
 
     public byte[] KeySalt { get; set; } = Array.Empty<byte>();
     public byte[] VerifierSalt { get; set; } = Array.Empty<byte>();
@@ -263,13 +263,13 @@ internal sealed class AgileEncryptionParameters
         using var memory = new MemoryStream();
         Span<byte> header = stackalloc byte[8];
         BinaryPrimitives.WriteUInt16LittleEndian(header, EncryptionInfo.AgileMajor);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[2..], EncryptionInfo.AgileMinor);
-        BinaryPrimitives.WriteUInt32LittleEndian(header[4..], EncryptionInfo.AgileFlags);
-        memory.Write(header);
+        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(2), EncryptionInfo.AgileMinor);
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4), EncryptionInfo.AgileFlags);
+        memory.Write(header.ToArray(), 0, header.Length);
 
         var xml = BuildEncryptionInfoXml();
         var xmlBytes = Encoding.UTF8.GetBytes(xml);
-        memory.Write(xmlBytes);
+        memory.Write(xmlBytes, 0, xmlBytes.Length);
 
         return memory.ToArray();
     }
@@ -515,7 +515,7 @@ internal static class AgileCrypto
             BinaryPrimitives.WriteInt32LittleEndian(blockKey, block);
             var iv = GenerateIv(p.KeySalt, blockKey, p.BlockSize);
             var transformed = TransformPackageChunk(p.SecretKey, iv, chunk, encrypt, last);
-            output.Write(transformed);
+            output.Write(transformed, 0, transformed.Length);
 
             offset += chunkLength;
             block++;

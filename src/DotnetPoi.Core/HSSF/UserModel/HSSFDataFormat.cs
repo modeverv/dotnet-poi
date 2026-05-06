@@ -16,7 +16,7 @@ public sealed class HSSFDataFormat : IDataFormat
 
     public short getFormat(string format)
     {
-        ArgumentNullException.ThrowIfNull(format);
+        Guard.ThrowIfNull(format, nameof(format));
         if (_formatsByString.TryGetValue(format, out var existing))
         {
             return existing;
@@ -28,5 +28,6 @@ public sealed class HSSFDataFormat : IDataFormat
         return index;
     }
 
-    public string? getFormat(short index) => _formatsByIndex.GetValueOrDefault(index);
+    public string? getFormat(short index) =>
+        _formatsByIndex.TryGetValue(index, out var fmt) ? fmt : null;
 }

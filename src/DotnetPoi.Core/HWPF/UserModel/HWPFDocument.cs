@@ -30,7 +30,7 @@ public sealed class HWPFDocument : IDisposable
 
     public HWPFDocument(Stream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         var streams = CompoundFile.ReadStreams(stream);
         if (!streams.TryGetValue(StreamWordDocument, out var mainStream))
             throw new InvalidDataException("Not a valid .doc file: missing WordDocument stream.");

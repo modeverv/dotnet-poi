@@ -129,7 +129,7 @@ public sealed class XMLSlideShow : IDisposable
 
     public XMLSlideShow(Stream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         Load(stream);
     }
 
@@ -145,7 +145,7 @@ public sealed class XMLSlideShow : IDisposable
     /// <summary>Adds picture bytes and returns the 0-based picture index.</summary>
     public int addPicture(byte[] data, int format)
     {
-        ArgumentNullException.ThrowIfNull(data);
+        Guard.ThrowIfNull(data, nameof(data));
         var existing = _pictures.FirstOrDefault(p => p.Format == format && p.Data.SequenceEqual(data));
         if (existing is not null) return existing.Index - 1;
         var pic = new XSLFPictureData(data, format, _pictures.Count + 1);
@@ -158,7 +158,7 @@ public sealed class XMLSlideShow : IDisposable
     /// </summary>
     public XSLFPictureShape createPicture(XSLFSlide slide, int pictureIndex)
     {
-        ArgumentNullException.ThrowIfNull(slide);
+        Guard.ThrowIfNull(slide, nameof(slide));
         if ((uint)pictureIndex >= (uint)_pictures.Count)
             throw new ArgumentOutOfRangeException(nameof(pictureIndex));
         var data  = _pictures[pictureIndex];
@@ -182,7 +182,7 @@ public sealed class XMLSlideShow : IDisposable
 
     public void write(Stream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
 
         // Emit preserved (non-model) entries first, so model entries overwrite them
@@ -218,8 +218,8 @@ public sealed class XMLSlideShow : IDisposable
 
     public void writeEncrypted(Stream stream, string password)
     {
-        ArgumentNullException.ThrowIfNull(stream);
-        ArgumentNullException.ThrowIfNull(password);
+        Guard.ThrowIfNull(stream, nameof(stream));
+        Guard.ThrowIfNull(password, nameof(password));
         using var package = new MemoryStream();
         write(package);
 
@@ -233,13 +233,13 @@ public sealed class XMLSlideShow : IDisposable
 
     public void setVBAProject(byte[] vbaProjectData)
     {
-        ArgumentNullException.ThrowIfNull(vbaProjectData);
+        Guard.ThrowIfNull(vbaProjectData, nameof(vbaProjectData));
         _vbaProjectBin = vbaProjectData.ToArray();
     }
 
     public void setVBAProject(Stream vbaProjectStream)
     {
-        ArgumentNullException.ThrowIfNull(vbaProjectStream);
+        Guard.ThrowIfNull(vbaProjectStream, nameof(vbaProjectStream));
         using var ms = new MemoryStream();
         vbaProjectStream.CopyTo(ms);
         _vbaProjectBin = ms.ToArray();

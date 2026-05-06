@@ -21,7 +21,7 @@ public sealed class HSSFWorkbook : IWorkbook
     public HSSFWorkbook(Stream stream)
         : this()
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         Load(stream);
     }
 
@@ -79,7 +79,7 @@ public sealed class HSSFWorkbook : IWorkbook
 
     public int addPicture(Stream stream, int format)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         using var memory = new MemoryStream();
         stream.CopyTo(memory);
         return addPicture(memory.ToArray(), format);
@@ -107,7 +107,7 @@ public sealed class HSSFWorkbook : IWorkbook
 
     public void write(Stream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        Guard.ThrowIfNull(stream, nameof(stream));
         var workbookStream = Biff8Workbook.WriteWorkbook(_sheets);
         CompoundFile.Write(stream, new Dictionary<string, byte[]>(StringComparer.Ordinal)
         {

@@ -1,0 +1,167 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"   # e.g. v0.1.0, v1.0.0, v1.2.3-beta1
+
+jobs:
+  # ── Job 1: Full test suite ─────────────────────────────────────────
+  test:
+    name: Test (unit + interop)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Setup Java 11 (for interop fixtures)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: maven
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/DotnetPOI.sln') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build solution (Release)
+        run: dotnet build DotnetPOI.sln --no-incremental -c Release
+
+      # ── Core + Formula tests ───────────────────────────────────────
+      - name: "Test — Core (all formats)"
+        run: dotnet test tests/DotnetPoi.Core.Tests/ --no-build -c Release
+
+      - name: "Test — Formula"
+        run: dotnet test tests/DotnetPoi.Formula.Tests/ --no-build -c Release
+
+      # ── Direction A: Java writes → C# reads ────────────────────────
+      - name: "[A] Java writes fixtures"
+        run: >
+          mvn test
+          -f tests/DotnetPoi.Interop.Tests/java/pom.xml
+          -Dtest=WriteForDotnetTest
+          -B --no-transfer-progress
+
+      - name: "[A] C# reads Java fixtures"
+        run: >
+          dotnet test tests/DotnetPoi.Interop.Tests/
+          --no-build -c Release
+          --filter "Category=ReadFromPoi"
+
+      # ── Direction B: C# writes → Java reads ────────────────────────
+      - name: "[B] C# writes fixtures"
+        run: >
+          dotnet test tests/DotnetPoi.Interop.Tests/
+          --no-build -c Release
+          --filter "Category=WriteForPoi"
+
+      - name: "[B] Java reads C# fixtures"
+        run: >
+          mvn test
+          -f tests/DotnetPoi.Interop.Tests/java/pom.xml
+          -Dtest=ReadFromDotnetTest
+          -B --no-transfer-progress
+
+  # ── Job 2: Pack and publish to NuGet + GitHub Release ──────────────
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed for release notes / changelog
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"          # strip leading "v" → "0.1.0"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Pack NuGet packages
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          dotnet pack src/DotnetPoi.Core/DotnetPoi.Core.csproj \
+            -c Release \
+            -p:PackageVersion="$VERSION" \
+            -o /tmp/nuget-publish
+
+          dotnet pack src/DotnetPoi.Formula/DotnetPoi.Formula.csproj \
+            -c Release \
+            -p:PackageVersion="$VERSION" \
+            -o /tmp/nuget-publish
+
+      - name: Push to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push /tmp/nuget-publish/DotnetPoi.Core.*.nupkg \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+          dotnet nuget push /tmp/nuget-publish/DotnetPoi.Formula.*.nupkg \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > /tmp/release-notes.md << 'EOF'
+          ## DotnetPoi.Core ${{ steps.version.outputs.version }} / DotnetPoi.Formula ${{ steps.version.outputs.version }}
+
+          See [CHANGELOG / CHECKPOINT](https://github.com/${{ github.repository }}/blob/master/CHECKPOINT.md) for detailed working notes.
+
+          ### NuGet packages
+          - `DotnetPoi.Core` — ${{ steps.version.outputs.version }}
+          - `DotnetPoi.Formula` — ${{ steps.version.outputs.version }}
+
+          ### Installation
+          ```shell
+          dotnet add package DotnetPoi.Core --version ${{ steps.version.outputs.version }}
+          dotnet add package DotnetPoi.Formula --version ${{ steps.version.outputs.version }}
+          ```
+
+          ### Test results
+          - Core: 228+ tests
+          - Formula: 10 tests
+          - Interop: 55+ tests (bidirectional Java↔.NET)
+          EOF
+
+          echo "notes_path=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "v${{ steps.version.outputs.version }}"
+          body_path: ${{ steps.release_notes.outputs.notes_path }}
+          files: |
+            /tmp/nuget-publish/DotnetPoi.Core.*.nupkg
+            /tmp/nuget-publish/DotnetPoi.Core.*.snupkg
+            /tmp/nuget-publish/DotnetPoi.Formula.*.nupkg
+            /tmp/nuget-publish/DotnetPoi.Formula.*.snupkg
+          fail_on_unmatched_files: false
