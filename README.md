@@ -82,23 +82,30 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 
 | Category | Feature | Status | Notes |
 |---|---|---|---|
-| Paragraphs/runs | text, font name/size/color, bold, italic, underline, strikeout | ✅ | Round-trip covered. |
-| Paragraphs | alignment, indents, spacing, bullet/numbered lists | ✅ | OOXML numbering is implemented. |
+| Paragraphs/Runs | text read/write | ✅ | |
+| 〃 | font (bold/italic/underline/strikeout/name/size/color) | ✅ | Round-trip covered. |
+| 〃 | alignment (left/center/right/both) | ✅ | |
+| 〃 | indentation (left/right/firstLine/hanging) | ✅ | |
+| 〃 | spacing (before/after/line) | ✅ | |
+| 〃 | bullet/numbered lists | ✅ | OOXML numbering is implemented. |
 | Tables | create/read tables, rows, cells | ✅ | Round-trip covered. |
-| Tables | cell merge and table borders | 🔵 | Existing merge/borders preserved via raw XML; API-level creation not modeled. |
-| Sections | page setup, headers, footers | ✅ | Rich content (images, formatting) in headers/footers preserved via `_preservedEntries` when not modified via API. |
-| Sections | columns | ✅ | `setColumns()`/`getColumnCount()`/`getColumnSpacing()` API, round-trip verified |
+| 〃 | cell merge and table borders | 🔵 | Existing merge/borders preserved via raw XML; API-level creation not modeled. |
+| Sections | page setup (size/margins/orientation) | ✅ | |
+| 〃 | headers/footers | ✅ | Rich content (images, formatting) in headers/footers preserved via `_preservedEntries` when not modified via API. |
+| 〃 | columns | ✅ | `setColumns()`/`getColumnCount()`/`getColumnSpacing()` API, round-trip verified |
 | Links | external hyperlinks | ✅ | |
 | Images | inline images and rotation | ✅ | |
-| Images | floating (anchored) images | 🔵 | `<wp:anchor>` elements preserved via raw XML capture/re-emission. | |
-| Images | Word text boxes (`w:txbxContent`) | ❌ | Text inside Word text boxes is not read. |
-| Review | comments, footnotes, endnotes | 🔵 | Existing parts round-trip via `_preservedEntries`; API-level creation/editing is not modeled. |
+| 〃 | floating (anchored) images | 🔵 | `<wp:anchor>` elements preserved via raw XML capture/re-emission. |
+| 〃 | text boxes (`w:txbxContent`) | ❌ | Text inside Word text boxes is not read. |
+| Review | comments | 🔵 | Existing comments round-trip via `_preservedEntries`; API creation/editing not modeled. |
+| 〃 | footnotes/endnotes | 🔵 | Existing parts round-trip via `_preservedEntries`; API creation/editing not modeled. |
 | Fields | TOC, page numbers, mail merge-style fields | ✅ | Write/read/round-trip covered. |
+| Content Controls | SDT (structured document tags) | 🔵 | Block-level and inline SDT preserved via raw XML capture/re-emission. |
 | Styles | paragraph, character, and table styles | ❌ | Direct formatting is supported; style model parity is not. |
-| Other | docm macro preservation, unknown part preservation | ✅ | |
-| Other | content controls (SDT) | 🔵 | Block-level `w:sdt` in `w:body` and inline `w:sdt` inside `w:p` are preserved via raw XML capture/re-emission. Text boxes (`w:txbxContent`) are deeply nested inside DrawingML and not yet covered. |
-| Other | tracked changes (ins/del/move) | ❌ | |
-| Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries`. |
+| Track Changes | insertions/deletions/moves | ❌ | |
+| Other | docm macro preservation | ✅ | VBA byte preservation. |
+| 〃 | unknown part preservation | ✅ | `_preservedEntries` mechanism implemented. |
+| 〃 | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries`. |
 
 #### pptx / XSLF (~40%)
 
@@ -107,12 +114,12 @@ Simple presentation creation and editing is usable: create/read slides, text box
 | Category | Feature | Status | Notes |
 |---|---|---|---|
 | Slides | create/read slides, slide size | ✅ | |
-| Slides | notes slides | 🔵 | Existing notes slide parts round-trip via `_preservedEntries`; API-level creation/editing is not modeled. |
+| 〃 | notes slides | 🔵 | Existing notes slide parts round-trip via `_preservedEntries`; API-level creation/editing is not modeled. |
 | Text | text boxes, multiple paragraphs, run formatting | ✅ | Bold, italic, underline, strikeout, size, font, and color are covered. |
 | Shapes | pictures, anchors, size, rotation | ✅ | Round-trip covered. |
-| Shapes | tables | ✅ | `p:graphicFrame` / `a:tbl` write/read is implemented. |
-| Shapes | group shapes, connectors | 🔵 | Unknown `p:spTree` children preserved verbatim via raw XML capture/re-emission. |
-| Shapes | SmartArt, charts | 🔵 | Existing parts are preserved, but not modeled. |
+| 〃 | tables | ✅ | `p:graphicFrame` / `a:tbl` write/read is implemented. |
+| 〃 | group shapes, connectors | 🔵 | Unknown `p:spTree` children preserved verbatim via raw XML capture/re-emission. |
+| 〃 | SmartArt, charts | 🔵 | Existing parts are preserved, but not modeled. |
 | Media | video/audio embedding | 🔵 | Non-image `ppt/media/*` parts round-trip via `_preservedEntries`; API-level embedding is not modeled. |
 | Animation | animations and transitions | 🔵 | Preserved as unknown parts where present. |
 | Theme | layouts, masters, themes | 🔵 | Preserved, not editable. |
