@@ -1,10 +1,12 @@
 # xls (HSSF) Overview
 
-HSSF provides read and write support for the legacy xls (BIFF) format. Coverage is ~10%.
+HSSF provides read and write support for the legacy xls (BIFF8) format. Coverage is ~35%.
 
 ## Status
 
-HSSF is the oldest and least complete format implementation in dotnet-poi. It supports basic cell read/write operations but most advanced features (styles, images, charts, formulas, data validation, filters, pivot tables) are not implemented.
+HSSF has grown beyond the original bootstrap reader/writer. It now supports practical basic workbook operations: common cell types, multiple sheets, basic styles, layout records, representative Apache POI fixture loading, Java POI interop slices, and preservation of non-workbook OLE streams, VBA streams, and unknown BIFF records during light edits.
+
+It is still not a full Apache POI HSSF port. Images, shapes, chart creation, comment editing, filters, pivots, and new BIFF formula token writing are not modeled through public APIs.
 
 ## Basic Read and Write
 
@@ -31,6 +33,8 @@ var value = wb2.getSheetAt(0).getRow(0).getCell(0).getStringCellValue();
 - You need to read or update existing xls files without style changes
 - You have a legacy workflow that requires xls output
 - You are migrating from xls to xlsx and need a transitional solution
+- You need to extract values from old xls files for indexing or migration
+- You need light edits while preserving unmodeled OLE/BIFF content as much as possible
 
 ## When to Use XSSF Instead
 
@@ -39,17 +43,27 @@ var value = wb2.getSheetAt(0).getRow(0).getCell(0).getStringCellValue();
 - Excel can open xlsx files from Excel 2007 onwards
 - LibreOffice/OpenOffice handles xlsx as well as xls
 
+## Supported Today
+
+- String, numeric, boolean, blank, and error cells
+- Multiple sheets, sparse rows/cells, and high column indexes
+- Basic font and cell style round-trips: font name/size/bold/italic/color, data formats, alignment, wrap, borders, fills
+- Column width, row height, hidden rows/columns, merged regions, freeze panes
+- Reading formula text and cached formula values from existing files
+- Representative Apache POI `.xls` fixture loading
+- Java POI interop fixtures for basic, styles, layout, unicode, and comprehensive workbooks
+- Preservation of non-Workbook OLE streams, macro/VBA streams, directory metadata, and unknown BIFF records
+
 ## Limitations
 
-- No formula support
-- No image support
-- No style support (fonts, fills, borders, number formats)
+- No formula evaluation
+- No new BIFF formula token writing
+- No image or drawing usermodel
+- No chart creation/editing
+- No comment or hyperlink editing API
 - No data validation
-- No conditional formatting
 - No auto filter
 - No pivot tables
-- No protection
-- No chart support
 - No rich text
 
 HSSF is maintained for compatibility but is not a priority for new development.

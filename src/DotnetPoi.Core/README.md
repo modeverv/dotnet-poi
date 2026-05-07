@@ -8,7 +8,7 @@
 ![Platform](https://img.shields.io/badge/platform-.NET%20%7C%20.NET%20Framework%20%7C%20Mono%20%7C%20Unity-512BD4)
 ![Tests](https://img.shields.io/badge/tests-244%20passing-brightgreen)
 
-**Faithful .NET port of Apache POI — read/write xlsx, docx, pptx, xls, doc, ppt with zero dependencies.**
+**Faithful .NET port of Apache POI — practical OOXML read/write, growing legacy xls/doc support, and a minimal ppt reader with zero dependencies.**
 
 > ⚠️ This is an **unofficial** port and is **not affiliated with the Apache Software Foundation**. Apache POI is a registered trademark of the Apache Software Foundation.
 
@@ -48,7 +48,7 @@ Full documentation is available at the **[dotnet-poi documentation site](https:/
 | Package | Contents | Dependencies |
 |---|---|---|
 | **`DotnetPoi.Core`** (this package) | XSSF (xlsx), HSSF (xls), XWPF (docx), XSLF (pptx), HWPF (doc), HSLF (ppt), POIFS OLE2 container, common SS interfaces, `PoiXmlWriter`, OOXML Agile Encryption | **Zero** |
-| `DotnetPoi.Formula` | Formula evaluator — add when you need `createFormulaEvaluator()` | References Core |
+| `DotnetPoi.Formula` | Limited formula evaluator — add when you need `createFormulaEvaluator()` for the supported subset | References Core |
 
 `DotnetPoi.Core` contains **everything except formula evaluation**. Formulas are preserved as text and cached values are read/written, but the evaluator engine lives in the separate `DotnetPoi.Formula` package. When `DotnetPoi.Formula` is referenced, `createFormulaEvaluator()` is automatically enabled via lazy assembly discovery at runtime.
 
@@ -210,19 +210,40 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, not edi
 | **Theme** | layouts, masters, themes | 🔵 preserved, not editable |
 | **Other** | macro-enabled (pptm) | ✅ |
 
-### xls / HSSF (~10%)
+### xls / HSSF (~35%)
 
 | Category | Feature | Status |
 |---|---|---|
-| **Basic** | read/write cell values | ⚠️ in progress |
-| **Everything else** | BIFF records, styles, formulas, images, filters, pivots | ❌ |
+| **Cell values** | string, numeric, boolean, blank, error | ✅ |
+| **Sheets** | multiple sheets, sparse rows/cells, high column indexes | ✅ |
+| **Styles** | fonts, data formats, alignment, wrap, borders, fills | ⚠️ partial |
+| **Layout** | column width, row height, hidden rows/columns, merged regions, freeze panes | ✅ |
+| **Formulas** | formula text + cached value read | ⚠️ read-focused |
+| **Compatibility** | representative Apache POI `.xls` fixtures load | ✅ |
+| **Interop** | Java POI bidirectional basic/styles/layout/unicode/comprehensive fixtures | ⚠️ partial |
+| **Preservation** | non-Workbook OLE streams, VBA streams, unknown BIFF records | ✅ |
+| **Not modeled** | images/shapes/charts/comments/hyperlink editing/filters/pivots | ❌ |
 
-### Legacy binary
+### doc / HWPF (~20%)
 
-| Format | Status |
+| Category | Feature | Status |
 |---|---|
-| doc (HWPF) | ~5% read-only MVP |
-| ppt (HSLF) | ~5% read-only MVP |
+| **Reading** | OLE2 `.doc` open, FIB/table stream parsing | ✅ |
+| **Text** | main body text extraction from CLX/piece table | ✅ |
+| **UserModel** | Range, Paragraph, CharacterRun | ⚠️ partial |
+| **Formatting** | selected character and paragraph properties | ⚠️ partial |
+| **Editing** | no-op write, append paragraph, simple text replacement | ⚠️ limited |
+| **Preservation** | OLE streams/storages, embedded OLE | ✅ |
+| **Interop** | Java POI reads dotnet-poi no-op saved `.doc` | ⚠️ partial |
+| **Not modeled** | tables/images/header-footer/footnotes/comments/fields API | ❌ |
+
+### ppt / HSLF (~5%)
+
+| Category | Feature | Status |
+|---|---|
+| **Reading** | open OLE2 `.ppt` and scan `PowerPoint Document` | ⚠️ minimal |
+| **Text** | TextChars/TextBytes extraction | ⚠️ early |
+| **Writing/editing** | no-op preservation, interop, public editing APIs | ❌ planned |
 
 ---
 
@@ -230,10 +251,10 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, not edi
 
 | # | Gap | Why it matters |
 |---|---|---|
-| 1 | Formula evaluation | Template fill → save → open in Excel works, but programmatic access to freshly calculated values needs DotnetPoi.Formula |
+| 1 | Formula evaluation | Template fill → save → open in Excel works; only a small evaluator subset exists in DotnetPoi.Formula |
 | 2 | Chart creation | Reports and presentations commonly need charts from data |
 | 3 | docx styles | Word documents rely on named styles (Normal, Heading1…) for formatting |
-| 4 | HSSF `.xls` depth | Legacy format support is still minimal |
+| 4 | HSSF/HWPF depth | Legacy `.xls` and `.doc` now have useful foundations, but advanced model/edit coverage remains limited |
 | 5 | docx text boxes | Word text inside `w:txbxContent` elements is not read |
 
 ---

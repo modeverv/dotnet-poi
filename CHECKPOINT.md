@@ -2490,3 +2490,106 @@ Notes:
   - 編集機能は preservation と interop が安定するまで深追いせず、最初は text extraction と no-op write を優先する方針を明記。
 - Verification:
   - ドキュメントのみの更新。テストは未実行。
+
+## 2026-05-07 JST — README/docs_src sync from NOW.md
+
+- Task: `NOW.md` の現在カバレッジに合わせて、ルート README、`src` 配下の package README、`docs_src` を更新。
+- Implementation:
+  - `README.md`: HSSF を `~35%`、HWPF を `~20%`、HSLF を `~5%` として機能表を更新。Formula package を limited evaluator と明記。
+  - `src/DotnetPoi.Core/README.md`: package summary、coverage、practical gaps を NOW.md に合わせて更新。
+  - `src/DotnetPoi.Formula/README.md`: full evaluator ではなく、限定 subset evaluator であることを明確化。
+  - `docs_src/content/compatibility/format-coverage.md`: xls/doc/ppt の表を NOW.md ベースへ更新。
+  - `docs_src/content/compatibility/{limitations,interop,package-split}.md`: HSSF/HWPF の基礎対応と HSLF の未成熟、Formula の限定範囲を反映。
+  - `docs_src/content/guides/xls/overview.md`: HSSF の現状、対応済み、制限を更新。
+  - `docs_src/content/guides/doc/overview.md` と `docs_src/content/guides/ppt/overview.md` を新規追加し、`docs_src/site.json` のナビに追加。
+  - `docs_src/content/guides/xlsx/formulas.md`: Formula 記述の typo と過大表現を修正。
+- Verification:
+  - `rg` で旧 `~10%`, `read-only MVP`, `Read stub only`, `minimal support` などの古い主要表現が対象ドキュメントから消えていることを確認。
+  - ドキュメントのみの更新。テストと docs HTML 生成は未実行。
+
+## 2026-05-07 JST — Phase 15 実装順 1: HSLF fixture survey completed
+
+- Task: Phase 15 実装順 1「HSLF fixture survey を行う」を完了。3 つのサブタスクを全て実施。
+
+### サブタスク 1: 代表 fixture の確認
+
+POI `test-data/slideshow/` から 13 個の代表 fixture を選定:
+
+| # | Fixture | POI slide count | Special elements | dotnet-poi status |
+|---|---------|----------------|-----------------|-------------------|
+| 1 | `basic_test_ppt_file.ppt` | 2 | Slide + notes text | ✅ Opens, 2 slides, text extracted |
+| 2 | `SampleShow.ppt` | 2 | Italic text, notes, bullets | ✅ Opens, 2 slides |
+| 3 | `with_textbox.ppt` | 1 | Text boxes, Times New Roman | ✅ Opens, 1 slide, text extracted |
+| 4 | `text_shapes.ppt` | 2 (from TestSheet) | Text shapes | ✅ Opens, 2 slides |
+| 5 | `headers_footers.ppt` | 1 | Header/footer on notes | ✅ Opens, 1 slide |
+| 6 | `WithComments.ppt` | 1 | Comments ("This is a test comment") | ✅ Opens, 1 slide |
+| 7 | `pictures.ppt` | 2 | 5 embedded pictures | ✅ Opens, 2 slides |
+| 8 | `testPPT_oleWorkbook.ppt` | 1 | OLE embedding | ✅ Opens, 1 slide |
+| 9 | `54880_chinese.ppt` | 1 | Chinese/Unicode text | ✅ Opens, 1 slide, "Single byte" found |
+| 10 | `PPT95.ppt` | 1 | PPT95 legacy format | ⚠️ Opens but 0 slides (old recType) |
+| 11 | `empty_textbox.ppt` | 1 | Empty text boxes | ✅ Opens, 1 slide |
+| 12 | `backgrounds.ppt` | 2 | Backgrounds (no text per TestSheet) | ✅ Opens, 2 slides |
+| 13 | `incorrect_slide_order.ppt` | 3 | Non-sequential slide order | ✅ Opens, 3 slides (order unreliable) |
+
+### サブタスク 2: POI 側期待値の記録
+
+POI test expectations extracted from:
+- `TestExtractor.java`: `basic_test_ppt_file.ppt` expects 2 slides, text = "This is a test title\nThis is a test subtitle\n\nThis is on page 1\n" + "This is the title on page 2\nThis is page two\n\nIt has several blocks of text\n\nNone of them have formatting\n"
+- `TestExtractor.java`: `with_textbox.ppt` expects 1 slide, text = "Hello, World!!!\nI am just a poor boy\nThis is Times New Roman\nPlain Text \n"
+- `TestSheet.java`: `SampleShow.ppt`, `backgrounds.ppt`, `text_shapes.ppt`, `pictures.ppt` all parse without exception
+- `TestCounts.java`: `basic_test_ppt_file.ppt` — slideRefIds 4,6; sheetNumbers 256,257
+- `TestExtractor.java`: `54880_chinese.ppt` contains "Single byte", "Mix", "表", "ﾊﾝﾀ" 
+- `TestExtractor.java`: `WithComments.ppt` contains comment text "This is a test comment" (extracted via setCommentsByDefault)
+- `SampleShow.txt`: Slide 1 = "Title of the first slide\n\nSubtitle of the first slide\n\nThis bit is in italic green\n"; Slide 2 = "This is the second slide\n\n* It has bullet points on it\n* They're fun, aren't they?\n* Especially in a different font like Arial Black at 16 point!\n"
+
+Known gaps in current implementation:
+- **Slide count**: Current parser walks record tree for `recType==1006 (Slide)`, which works for most but:
+  - `PPT95.ppt` uses different record structure → 0 slides
+  - `incorrect_slide_order.ppt` finds correct count but order is record appearance order, not persist pointer order
+  - `pictures.ppt` finds 2 slides but POI reports complex internal structure
+- **Text extraction**: Simplified (all TextCharsAtom/TextBytesAtom collected per slide container), no distinction between title/body/notes
+- **No notes extraction**: POI's `getNotes()` returns notes; current parser doesn't model notes
+- **No comment extraction**: `WithComments.ppt` has comments not extracted
+- **No OLE/stream inventory**: `testPPT_oleWorkbook.ppt` has OLE storage but parser ignores non-record streams
+
+### サブタスク 3: 既存 HSLFSlideShowTests の拡張
+
+- Old tests (4 x [Fact]): replaced with Theory-based fixture survey
+- New test structure:
+  - `Open_NonOle2Stream_ThrowsInvalidDataException` (1 Fact)
+  - `Open_Fixture_DoesNotThrow` (13 Theory) — verifies all fixtures open without exception
+  - `Open_Fixture_SlideCountBaseline` (13 Theory) — records actual slide count vs expected
+  - `Open_Fixture_TextExtractionDoesNotThrow` (13 Theory) — verifies text access doesn't throw
+  - `Open_Fixture_TitleAccessDoesNotThrow` (13 Theory) — verifies title access doesn't throw
+- Total: 53 tests, all passing
+- Fixture links added to `DotnetPoi.Core.Tests.csproj` under `hslf-fixtures/` prefix (13 fixture links)
+- Test results: All 387 Core.Tests pass (339 old + 48 new HSLF fixture survey).
+
+## 2026-05-07 JST — Phase 16 project/package split plan added
+
+- Task: 次フェーズとして、OOXML と Legacy binary formats を別 project / test suite / package 境界で扱う方針を `agents.md` に追記。
+- Decision:
+  - Phase 16 を `Separate projects and packages` として定義。
+  - 目標 source projects:
+    - `DotnetPoi.Common`: SS interfaces, shared enums/exceptions/utilities
+    - `DotnetPoi.POIFS`: OLE2/CFB, HPSF, encryption/container helpers
+    - `DotnetPoi.Ooxml`: OPC, XSSF, XWPF, XSLF
+    - `DotnetPoi.Legacy`: HSSF, HWPF, HSLF
+    - `DotnetPoi.Formula`: evaluator only
+    - `DotnetPoi.All`: all-in-one meta/facade package
+  - 目標 test projects:
+    - `DotnetPoi.Common.Tests`
+    - `DotnetPoi.POIFS.Tests`
+    - `DotnetPoi.Ooxml.Tests`
+    - `DotnetPoi.Legacy.Tests`
+    - `DotnetPoi.Formula.Tests`
+    - `DotnetPoi.All.Tests`
+    - `DotnetPoi.Interop.Tests`
+  - `DotnetPoi.Interop.Tests` は PascalCase に統一する方針。
+- Implementation notes:
+  - 一度に全移動せず、project shell 作成 → tests 分割 → Common → POIFS → OOXML → Legacy → Formula cleanup → interop/package smoke の順に小さく進める。
+  - `Common` は太らせず、format-specific implementation を入れない。
+  - `All.Tests` は全テスト再実行の場所ではなく、package/facade smoke tests に限定する。
+  - OOXML stable CI と Legacy development CI を分け、Legacy が開発中で揺れても OOXML の sample/docs/release 作業を進められるようにする。
+- Verification:
+  - ドキュメントのみの更新。テストは未実行。

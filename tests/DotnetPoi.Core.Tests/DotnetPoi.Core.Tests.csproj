@@ -24,6 +24,20 @@
 
     <ItemGroup>
         <!-- Test data files (from various formats) -->
+        <!-- HSLF/slideshow fixture survey -->
+        <Content Include="../../poi/test-data/slideshow/basic_test_ppt_file.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/basic_test_ppt_file.ppt" />
+        <Content Include="../../poi/test-data/slideshow/SampleShow.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/SampleShow.ppt" />
+        <Content Include="../../poi/test-data/slideshow/with_textbox.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/with_textbox.ppt" />
+        <Content Include="../../poi/test-data/slideshow/text_shapes.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/text_shapes.ppt" />
+        <Content Include="../../poi/test-data/slideshow/headers_footers.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/headers_footers.ppt" />
+        <Content Include="../../poi/test-data/slideshow/WithComments.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/WithComments.ppt" />
+        <Content Include="../../poi/test-data/slideshow/pictures.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/pictures.ppt" />
+        <Content Include="../../poi/test-data/slideshow/testPPT_oleWorkbook.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/testPPT_oleWorkbook.ppt" />
+        <Content Include="../../poi/test-data/slideshow/54880_chinese.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/54880_chinese.ppt" />
+        <Content Include="../../poi/test-data/slideshow/PPT95.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/PPT95.ppt" />
+        <Content Include="../../poi/test-data/slideshow/empty_textbox.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/empty_textbox.ppt" />
+        <Content Include="../../poi/test-data/slideshow/backgrounds.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/backgrounds.ppt" />
+        <Content Include="../../poi/test-data/slideshow/incorrect_slide_order.ppt" CopyToOutputDirectory="PreserveNewest" Link="hslf-fixtures/incorrect_slide_order.ppt" />
         <Content Include="../../poi/test-data/hpsf/Test_Humor-Generation.ppt" CopyToOutputDirectory="PreserveNewest" Link="Test_Humor-Generation.ppt" />
         <Content Include="../../poi/test-data/slideshow/45776.ppt" CopyToOutputDirectory="PreserveNewest" Link="45776.ppt" />
         <Content Include="../../poi/test-data/hpsf/TestMickey.doc" CopyToOutputDirectory="PreserveNewest" Link="TestMickey.doc" />

@@ -37,6 +37,8 @@ docx tables support basic creation, width, grid columns, row height, header rows
 | Notes slides | pptx | Existing notes slides are preserved but cannot be created or read through a public API |
 | Sparklines | xlsx | In-cell sparkline charts not supported |
 | External data connections | xlsx | Existing connection parts are preserved but cannot be edited through a public API |
+| HSSF advanced object model | xls | Basic workbook values, styles/layout slices, interop, and preservation exist, but images, charts, comment editing, filters, pivots, and new formula writing are not modeled |
+| HWPF advanced object model | doc | Body text extraction and limited body edits work, but tables, images, header/footer stories, footnotes, comments, and fields are not modeled through public APIs |
 
 ## Minor Gaps
 
@@ -47,7 +49,7 @@ docx tables support basic creation, width, grid columns, row height, header rows
 | Animations/transitions editing | pptx | Preserved as unknown parts |
 | Theme editing | pptx | Layout/master/theme preserved but not editable |
 | Password hashing | xlsx | Protection on/off works; password hash not implemented |
-| xls (HSSF) | xls | Legacy format; minimal support |
+| ppt (HSLF) | ppt | Minimal reader only; no no-op write/interoperability track completed yet |
 
 ## When to Use Java POI Instead
 
@@ -56,5 +58,6 @@ If your project depends on any of the following, consider using Apache POI (Java
 - Programmatic formula evaluation (Excel calculation engine)
 - Chart creation from data
 - Editing character/table styles or resolving complex Word style inheritance
-- Full xls (BIFF) support
-- Legacy doc (HWPF) or ppt (HSLF) formats
+- Full xls (BIFF) support beyond the current basic values/styles/layout/preservation slices
+- Legacy doc (HWPF) features beyond body text extraction and limited body edits
+- Legacy ppt (HSLF) workflows beyond the minimal reader

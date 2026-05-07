@@ -497,23 +497,23 @@ XML output parity is the lowest layer of the entire port. If this layer has dive
 実装順:
 
 1. HSLF fixture survey を行う。
-   - [ ] POI HSLF tests から `SampleShow.ppt`, `with_textbox.ppt`, `text_shapes.ppt`, `headers_footers.ppt`, `WithComments.ppt`, `pictures.ppt`, `testPPT_oleWorkbook.ppt`, `54880_chinese.ppt`, `PPT95.ppt` などの代表候補を確認する。
-   - [ ] 各 fixture の POI 側期待値（slide count、抽出 text、特殊要素）を `CHECKPOINT.md` に記録する。
-   - [ ] 既存 `HSLFSlideShowTests` を代表 fixture theory に拡張し、現状で open/text extraction できる範囲を固定する。
+   - [x] POI HSLF tests から `SampleShow.ppt`, `with_textbox.ppt`, `text_shapes.ppt`, `headers_footers.ppt`, `WithComments.ppt`, `pictures.ppt`, `testPPT_oleWorkbook.ppt`, `54880_chinese.ppt`, `PPT95.ppt` などの代表候補を確認する。
+   - [x] 各 fixture の POI 側期待値（slide count、抽出 text、特殊要素）を `CHECKPOINT.md` に記録する。
+   - [x] 既存 `HSLFSlideShowTests` を代表 fixture theory に拡張し、現状で open/text extraction できる範囲を固定する。
 
 2. HSLF read-side stream inventory を追加する。
-   - [ ] `HSLFSlideShow` が読み込んだ `CompoundFileDocument` を保持し、`getStreamNames()` / `hasStream()` / `hasStorage()` / `hasEntry()` 相当を追加する。
-   - [ ] `PowerPoint Document`, `Current User`, summary streams, embedded storages の存在を fixture で確認する。
-   - [ ] HSLF 側では POIFS/HSSF/HWPF の既存 preservation 実装を壊さない。
+   - [x] `HSLFSlideShow` が読み込んだ `CompoundFileDocument` を保持し、`getStreamNames()` / `hasStream()` / `hasStorage()` / `hasEntry()` 相当を追加する。
+   - [x] `PowerPoint Document`, `Current User`, summary streams, embedded storages の存在を fixture で確認する。
+   - [x] HSLF 側では POIFS/HSSF/HWPF の既存 preservation 実装を壊さない。
 
 3. record tree parser を POI 構造に寄せる。
-   - [ ] flat recursive scan だけで slide count を数える現状から、record header + container tree を保持する構造へ拡張する。
-   - [ ] `recType`, `recInstance`, `recLen`, offset, raw bytes を保持し、unknown record を失わない。
-   - [ ] `TextCharsAtom` / `TextBytesAtom` の抽出は既存挙動を維持しながら、record location と slide association を改善する。
+   - [x] flat recursive scan だけで slide count を数える現状から、record header + container tree を保持する構造へ拡張する。
+   - [x] `recType`, `recInstance`, `recLen`, offset, raw bytes を保持し、unknown record を失わない。
+   - [x] `TextCharsAtom` / `TextBytesAtom` の抽出は既存挙動を維持しながら、record location と slide association を改善する。
 
 4. slide order / slide count を persist pointer 経由で固める。
-   - [ ] POI の `HSLFSlideShowImpl`, `CurrentUserAtom`, `UserEditAtom`, `PersistPtrHolder` 周辺を読み、dotnet-poi の最小モデルを設計する。
-   - [ ] `incorrect_slide_order.ppt` など slide order 系 fixture を使い、record 出現順ではなく実際の順序で `getSlides()` できることを目標にする。
+   - [x] POI の `HSLFSlideShowImpl`, `CurrentUserAtom`, `UserEditAtom`, `PersistPtrHolder` 周辺を読み、dotnet-poi の最小モデル (HSLFPersistPtrHolder) を設計する。
+   - [x] `incorrect_slide_order.ppt` で 3 スライドを正しい順序 ("Slide 1", "Slide 2", "Slide 3") で返す。`basic_test_ppt_file.ppt` など他の fixture で従来の挙動を維持する。
 
 5. text extraction を実用化する。
    - [ ] slide ごとに title/body text を分離できる範囲を増やす。
@@ -543,7 +543,161 @@ XML output parity is the lowest layer of the entire port. If this layer has dive
 - 画像、コメント、OLE、header/footer など未対応要素を、API で触らない限り可能な範囲で保持する。
 - C# round-trip tests、Java POI interop Direction B、POIFS preservation tests、Phase 11 manual verification 対象を追加する。
 
+#### Phase 16 — Separate projects and packages
 
+目標: 現行の `DotnetPoi.Core` 1 project に全 format 実装を集約した構成から、Office 2007+ OOXML と Office 97-2003 legacy binary formats を別 project / 別 test suite / 将来の別 NuGet package として扱える構成へ段階移行する。OOXML 側を安定化・sample 追加・release 準備しながら、Legacy 側の HSSF/HWPF/HSLF を開発中状態として安全に進められるようにする。
+
+この Phase は大規模リファクタリングなので、**一度に全移動しない**。compile green を維持できる小さい単位で project を追加し、namespace と public API の互換性をできるだけ保つ。Apache POI との fidelity を変える phase ではなく、build/package/test の所有境界を整理する phase とする。
+
+目標 project 構成:
+
+```text
+src/
+  DotnetPoi.Common/
+    SS interfaces, shared enums, common exceptions, small utilities
+
+  DotnetPoi.POIFS/
+    OLE2/CFB container, HPSF, encryption/container helpers where needed
+
+  DotnetPoi.Ooxml/
+    OPC/openxml package, XSSF, XWPF, XSLF
+    depends on Common
+    may depend on POIFS for encryption/OLE-package integration
+
+  DotnetPoi.Legacy/
+    HSSF, HWPF, HSLF
+    depends on Common and POIFS
+
+  DotnetPoi.Formula/
+    evaluator only
+    depends on Common plus the minimum workbook abstractions needed
+    must not force Legacy onto OOXML-only users unless explicitly required
+
+  DotnetPoi.All/
+    meta/facade package for users who want everything
+    depends on Common, POIFS, Ooxml, Legacy, Formula
+```
+
+目標 test 構成:
+
+```text
+tests/
+  DotnetPoi.Common.Tests/
+    SS interfaces, shared utilities, exceptions, common XML writer behavior
+
+  DotnetPoi.POIFS.Tests/
+    OLE2/CFB, HPSF, encryption container, stream/storage preservation
+
+  DotnetPoi.Ooxml.Tests/
+    OPC, XSSF, XWPF, XSLF, .xlsx/.docx/.pptx
+
+  DotnetPoi.Legacy.Tests/
+    HSSF, HWPF, HSLF, .xls/.doc/.ppt
+
+  DotnetPoi.Formula.Tests/
+    formula evaluator only
+
+  DotnetPoi.All.Tests/
+    all-in-one package/facade smoke tests only
+
+  DotnetPoi.Interop.Tests/
+    Java POI compatibility and cross-package fixtures
+```
+
+依存ルール:
+
+- `Common` は最小に保つ。format-specific implementation を入れない。
+- `POIFS` は `Common` にのみ依存する。
+- `Ooxml` は `Common` に依存し、暗号化 OOXML / OLE embedding で必要な場合のみ `POIFS` に依存する。
+- `Legacy` は `Common` と `POIFS` に依存する。
+- `Formula` は evaluator 実装だけを持つ。`Core` 時代と同じく、非 evaluator 機能（formula text read/write、cached value preservation、`setCellFormula`, `getCellFormula`, fullCalcOnLoad など）は format 側に残す。
+- `All` は code duplication しない。原則として package dependency / facade / smoke surface のみ。
+- Project split 後も public namespace は原則 `DotnetPoi.XSSF`, `DotnetPoi.HSSF` など既存互換を維持する。assembly 名と namespace を無理に一致させるための breaking change は避ける。
+
+実装順:
+
+1. **Baseline inventory**
+   - [ ] 現行 `DotnetPoi.Core` 内の top-level folders (`SS`, `POIFS`, `XSSF`, `XWPF`, `XSLF`, `HSSF`, `HWPF`, `HSLF`) と project references を棚卸しする。
+   - [ ] `internal` 型、friend assembly、resource/fixture path、generated files、package metadata の移動リスクを `CHECKPOINT.md` に記録する。
+   - [ ] `dotnet test` の現状 baseline と known failing/slow tests を記録する。
+
+2. **Create project shells**
+   - [ ] `DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, `DotnetPoi.All` の csproj を追加する。
+   - [ ] 既存 `DotnetPoi.Formula` は残し、参照先の移行計画を決める。
+   - [ ] solution file / Directory.Build.props / package metadata / nullable/langversion/analyzers を既存 project と揃える。
+   - [ ] この段階ではできるだけ file move をせず、empty project が build できることを確認する。
+
+3. **Split tests first where cheap**
+   - [ ] `DotnetPoi.Common.Tests`, `DotnetPoi.POIFS.Tests`, `DotnetPoi.Ooxml.Tests`, `DotnetPoi.Legacy.Tests`, `DotnetPoi.All.Tests` を追加する。
+   - [ ] 新規 tests から分割先に追加し、既存 `DotnetPoi.Core.Tests` は一時的に残す。
+   - [ ] `All.Tests` は大量テスト置き場にしない。代表 format の create/read と package reference smoke のみに限定する。
+
+4. **Move Common surface**
+   - [ ] `SS` interfaces/enums、共通 exception、共通 utility、XML writer などを `DotnetPoi.Common` に移す。
+   - [ ] `DotnetPoi.Core` 側は移行期間中だけ compatibility facade か project reference として残すか判断する。
+   - [ ] `Formula` が参照する workbook/cell/style abstractions はこの段階で `Common` に寄せる。
+   - [ ] `Common.Tests` を green にしてから次へ進む。
+
+5. **Move POIFS/HPSF foundation**
+   - [ ] `POIFS` と HPSF/encryption container helpers を `DotnetPoi.POIFS` に移す。
+   - [ ] HSSF/HWPF/HSLF から POIFS への参照を project reference 経由に変更する。
+   - [ ] OOXML encryption/OLE embedding が POIFS を必要とする箇所を確認し、必要最小限で `Ooxml -> POIFS` 参照を追加する。
+   - [ ] `POIFS.Tests` と代表 HSSF/HWPF/HSLF preservation tests を実行し、container behavior が変わっていないことを確認する。
+
+6. **Move OOXML formats**
+   - [ ] OPC/openxml package、`XSSF`, `XWPF`, `XSLF` を `DotnetPoi.Ooxml` に移す。
+   - [ ] OOXML tests を `DotnetPoi.Ooxml.Tests` へ段階移動する。
+   - [ ] `.xlsx/.docx/.pptx` samples/docs/tests が Legacy build 状態に依存しないことを確認する。
+   - [ ] OOXML-only CI job を作れる状態にする。
+
+7. **Move Legacy formats**
+   - [ ] `HSSF`, `HWPF`, `HSLF` を `DotnetPoi.Legacy` に移す。
+   - [ ] Legacy tests を `DotnetPoi.Legacy.Tests` へ段階移動する。
+   - [ ] Legacy は開発中扱いとして、CI 上で stable OOXML job と分けられるようにする。allow-failure にするかどうかは release 方針に合わせて決める。
+   - [ ] HSSF/HWPF/HSLF の fixture path と interop output path を整理する。
+
+8. **Formula reference cleanup**
+   - [ ] `DotnetPoi.Formula` が `Common` の abstraction だけで動けるか確認する。
+   - [ ] concrete XSSF/HSSF hooks が必要な場合は、factory registration / reflection / optional adapter を使い、OOXML-only users に Legacy dependency を強制しない。
+   - [ ] `Formula.Tests` を新 project layout に合わせて更新する。
+
+9. **Interop and package smoke**
+   - [ ] `DotnetPoi.Interop.Tests` を新 package layout に合わせて更新する。
+   - [ ] Direction A/B を OOXML と Legacy で filter/category 分割できるようにする。
+   - [ ] `DotnetPoi.All.Tests` で全 package を参照した代表 smoke を追加する。
+   - [ ] NuGet pack smoke を行い、`DotnetPoi.Ooxml` だけ、`DotnetPoi.Legacy` だけ、`DotnetPoi.All` のそれぞれで依存漏れがないことを確認する。
+
+10. **Docs and migration notes**
+   - [ ] README / docs_src / package README を新 package names に更新する。
+   - [ ] 既存 `DotnetPoi.Core` users 向けに migration note を書く。`DotnetPoi.Core` を残す場合は deprecation/facade 方針を明記する。
+   - [ ] stable support matrix を `OOXML`, `Legacy`, `Formula` に分けて表示する。
+   - [ ] Phase 16 の結果、残課題、次に移すべき tests を `CHECKPOINT.md` に追記する。
+
+CI 方針:
+
+```text
+stable:
+  DotnetPoi.Common.Tests
+  DotnetPoi.POIFS.Tests
+  DotnetPoi.Ooxml.Tests
+  DotnetPoi.Formula.Tests
+
+development:
+  DotnetPoi.Legacy.Tests
+
+integration:
+  DotnetPoi.All.Tests
+  DotnetPoi.Interop.Tests
+```
+
+完了条件:
+
+- `DotnetPoi.Ooxml` が Legacy 実装の壊れ具合に依存せず build/test/release できる。
+- `DotnetPoi.Legacy` が `Common` + `POIFS` 上で HSSF/HWPF/HSLF を開発できる。
+- `DotnetPoi.Formula` が evaluator package として独立性を保つ。
+- `DotnetPoi.All` で従来の全部入り利用者向け導線を提供できる。
+- Existing public namespaces and common user code are preserved unless an explicit migration note is written.
+- `DotnetPoi.Interop.Tests` が新 package layout でも Java POI Direction A/B を維持する。
 
 ---
 

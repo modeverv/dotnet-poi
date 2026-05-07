@@ -7,7 +7,7 @@
 ![.NET Standard](https://img.shields.io/badge/.NET%20Standard-2.0-%23820171)
 ![Status](https://img.shields.io/badge/status-early%20beta-yellow)
 
-**Formula evaluator for dotnet-poi — evaluate spreadsheet formulas in xlsx workbooks.**
+**Limited formula evaluator for dotnet-poi — evaluate a small, intentionally bounded subset of spreadsheet formulas in xlsx workbooks.**
 
 > ⚠️ This is an **unofficial** port and is **not affiliated with the Apache Software Foundation**. Apache POI is a registered trademark of the Apache Software Foundation.
 
@@ -38,11 +38,13 @@ dotnet add package DotnetPoi.Formula
 
 | Use DotnetPoi.Formula if you need… | Don't need it if you only… |
 |---|---|
-| `IFormulaEvaluator.evaluate()` / `evaluateAll()` / `evaluateInCell()` | Read/write formula text and cached values |
-| Programmatic access to freshly calculated results | Template fill → save → open in Excel |
-| Use SUM, AVERAGE, COUNT, MIN, MAX, CONCATENATE | Write/save/reload xlsx files without calculation |
+| `IFormulaEvaluator.evaluate()` / `evaluateAll()` / `evaluateInCell()` for the limited supported subset | Read/write formula text and cached values |
+| Programmatic calculation for simple arithmetic and listed functions | Template fill → save → open in Excel |
+| SUM, AVERAGE, COUNT, MIN, MAX, CONCATENATE and basic operators | Full Excel-compatible calculation |
 
 > All formula **text preservation** (`setCellFormula`, `getCellFormula`, cached `<v>` value) lives in **DotnetPoi.Core** and works without this package.
+>
+> Full formula evaluation is not a current project goal. Excel-compatible calculation should be delegated to Excel, LibreOffice, Apache POI, or another calculation engine when accuracy across the full formula language matters.
 
 ---
 
@@ -162,7 +164,7 @@ Accuracy of the formula engine is verified through:
 
 ## Version
 
-This is a **v0.x** package. The supported function set will grow over time independently of `DotnetPoi.Core`, which targets v1.0 stability.
+This is a **v0.x** package with intentionally limited scope. `DotnetPoi.Core` owns formula text/cached-value preservation; this package is only for the small evaluator subset listed above.
 
 ---
 

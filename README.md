@@ -20,7 +20,7 @@ dotnet-poi ships as **two separate NuGet packages** with a clear separation of c
 | Package | Contents | When to use |
 |---|---|---|
 | **DotnetPoi.Core** | All format implementations (XSSF/xlsx, HSSF/xls, XWPF/docx, XSLF/pptx, HWPF/doc, HSLF/ppt, POIFS) + common interfaces + XML writer | Always — required for any read/write operation |
-| **DotnetPoi.Formula** | Formula evaluator (`IFormulaEvaluator`, `FormulaEvaluator`, `CellValue`) | Only when you need spreadsheet formula evaluation |
+| **DotnetPoi.Formula** | Limited formula evaluator (`IFormulaEvaluator`, `FormulaEvaluator`, `CellValue`) | Only when you need the supported small evaluator subset |
 
 **Design principle:** `Core` has zero knowledge of `Formula`. Adding `DotnetPoi.Formula` to your project automatically enables `createFormulaEvaluator()` via lazy assembly discovery at runtime. Without it, the call throws a clear `NotSupportedException`.
 
@@ -35,7 +35,7 @@ dotnet-poi ships as **two separate NuGet packages** with a clear separation of c
 
 **Why this split:**
 - **Core can be stable early** — all spreadsheet read/write/format logic is self-contained. No dependency on the formula engine.
-- **Formula can mature slowly** — evaluation is complex and can be iterated independently without affecting Core.
+- **Formula can stay narrow** — full Excel-compatible evaluation is not a current project goal and can remain separate from Core.
 - **Smaller dependency for simple use cases** — users who only need xlsx read/write don't pull in the entire formula engine.
 - **Security** — applications handling untrusted documents can omit the formula evaluator entirely, reducing the attack surface.
 
@@ -55,7 +55,7 @@ Current status: **practical for covered OOXML workflows** — `DotnetPoi.Core` v
 
 The project has moved beyond the original bootstrap/beta stage for common OOXML work. The strongest format today is **xlsx / XSSF**, with broad support for workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. **docx / XWPF** and **pptx / XSLF** are also useful for practical generation, light editing, and loss-resistant round-trips of many real files.
 
-This does **not** mean the whole Apache POI surface is complete. Advanced OOXML features such as chart creation and comment editing are still limited, some features are preservation-only rather than modeled APIs, formula evaluation remains intentionally narrow, and legacy binary formats (`.xls`, `.doc`, `.ppt`) are still early. In short: **use it today for the supported OOXML workflows shown below; check the matrix before relying on an advanced or legacy feature.**
+This does **not** mean the whole Apache POI surface is complete. Advanced OOXML features such as chart creation and comment editing are still limited, some features are preservation-only rather than modeled APIs, and formula evaluation remains intentionally narrow. Legacy binary formats have improved: `.xls` now has practical basic workbook read/write, styling/layout slices, preservation, and Java POI interop coverage; `.doc` can extract body text and perform limited body edits with preservation. `.ppt` is still at the earliest reader stage. In short: **use it today for the supported workflows shown below; check the matrix before relying on an advanced or legacy feature.**
 
 Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not modeled for creation or editing / ❌ not implemented / — not applicable.
 
@@ -127,19 +127,40 @@ Simple presentation creation and editing is usable: create/read slides, text box
 | Theme | layouts, masters, themes | 🔵 | Preserved, not editable. |
 | Other | pptm macro preservation, unknown part preservation | ✅ | |
 
-#### xls / HSSF (~10%)
+#### xls / HSSF (~35%)
 
 | Category | Feature | Status | Notes |
 |---|---|---|---|
-| Basic workbook | simple read/write of cell values | ⚠️ in progress | Current Phase 4 work. |
-| BIFF/OLE2 | broader records, styles, formulas, images, charts, filters, pivots | ❌ | Legacy format work remains intentionally narrow for now. |
+| Cell values | string, numeric, boolean, blank, error | ✅ | BIFF8 LabelSST/Number/BoolErr/Blank round-trip covered. |
+| Sheets | multiple sheets, sparse rows/cells, high column indexes | ✅ | |
+| Styles | fonts, data formats, alignment, wrap, borders, fills | ⚠️ | Core HSSFFont/HSSFCellStyle round-trip works for common cases; not full BIFF style parity. |
+| Layout | column width, row height, hidden rows/columns, merged regions, freeze panes | ✅ | |
+| Formulas | formula text + cached value read | ⚠️ | Existing POI formula fixtures can be read; new BIFF formula token writing and evaluation are not implemented. |
+| Compatibility | representative POI `.xls` fixture loading | ✅ | Includes basic, styles, formulas, hyperlinks, comments, drawings, images, and macro fixtures as load/preservation cases. |
+| Interop | Java POI bidirectional fixtures | ⚠️ | basic/styles/layout/unicode/comprehensive fixture coverage. |
+| Preservation | non-Workbook OLE streams, VBA streams, unknown BIFF records | ✅ | Light edits preserve unmodeled streams/records where possible. |
+| Not modeled | images/shapes/charts/comments/hyperlink editing/filters/pivots | ❌ | Some are load/preservation fixtures, but not public usermodel creation/edit APIs. |
 
-#### Legacy binary formats
+#### doc / HWPF (~20%)
 
-| Format | Status | Notes |
+| Category | Feature | Status | Notes |
 |---|---|---|
-| doc / HWPF | ~5% | Read-only MVP/stub level. |
-| ppt / HSLF | ~5% | Read-only MVP/stub level. |
+| Reading | OLE2 `.doc` open, FIB/table stream parsing | ✅ | `WordDocument` + `0Table`/`1Table` selection and fallback covered. |
+| Text | main body text extraction | ✅ | CLX/piece table based extraction with compressed and Unicode text pieces. |
+| UserModel | Range, Paragraph, CharacterRun | ⚠️ | Paragraph/run splitting and some offsets/composition covered. |
+| Formatting | character and paragraph properties | ⚠️ | CHPX-derived font name/size/bold/italic/underline/strike and minimal PAPX fields. |
+| Editing | no-op write, append paragraph, simple text replacement | ⚠️ | Limited main-body edit path; not a full Word binary editing engine. |
+| Preservation | OLE streams/storages, embedded OLE | ✅ | Unedited stream/storage content is preserved in representative fixtures. |
+| Interop | Java POI reads dotnet-poi no-op saved `.doc` | ⚠️ | Direction B smoke coverage. |
+| Not modeled | tables/images/header-footer/footnotes/comments/fields API | ❌ | Streams may be preserved, but these are not usermodel creation/edit features. |
+
+#### ppt / HSLF (~5%)
+
+| Category | Feature | Status | Notes |
+|---|---|---|---|
+| Reading | open OLE2 `.ppt` and scan `PowerPoint Document` records | ⚠️ | Minimal reader exists. |
+| Text | slide text extraction from TextChars/TextBytes atoms | ⚠️ | Early recursive scan; slide order/persist-pointer fidelity is still planned. |
+| Writing | no-op preservation / editing | ❌ | Planned next: HSLF stream inventory, no-op write, Java POI interop. |
 
 ### Practical Gaps
 
@@ -147,13 +168,13 @@ Highest priority gaps:
 
 | # | Gap | Formats | Why it matters |
 |---|---|---|---|
-| 1 | Formula evaluation | xlsx | Template fill → save → open in Excel works, but programmatic access to newly calculated results needs a real evaluator. |
+| 1 | Full formula evaluation | xlsx | Template fill → save → open in Excel works; programmatic access to newly calculated results beyond the small DotnetPoi.Formula subset needs a real calculation engine. |
 | 2 | Chart creation | xlsx, pptx | Existing charts can be preserved, but report/presentation generation often needs to create charts from data. |
 | 3 | Comment API model | xlsx, docx | Existing comments survive round-trip through `_preservedEntries`, but API-level read/create/edit support is not implemented. |
-| 4 | HSSF `.xls` depth | xls | Basic values exist, but full BIFF record, style, formula, and drawing support is still in progress. |
-| 5 | docx styles and text boxes | docx | Word documents commonly rely on styles and text boxes for layout and semantics. SDT is now preserved. |
+| 4 | HSSF/HWPF depth | xls, doc | Basic legacy read/write and preservation exist, but images, shapes, advanced formatting, and complete editing are still limited. |
+| 5 | docx text boxes and style depth | docx | Paragraph style references are supported, but text boxes and full character/table style editing remain limited. |
 
-Lower priority gaps include SmartArt, animations, transitions, `xls`/`doc`/`ppt` legacy depth, tracked changes, and sparklines.
+Lower priority gaps include SmartArt, animations, transitions, `ppt` legacy depth, tracked changes, and sparklines.
 
 ### Test Coverage Snapshot
 
@@ -293,11 +314,11 @@ dotnet-poi/
 │   │   ├── SS/                 # Common interfaces, usermodel types, XML writer
 │   │   ├── POIFS/              # OLE2 / CFB container and Agile encryption support
 │   │   ├── XSSF/               # xlsx / xlsm
-│   │   ├── HSSF/               # xls / BIFF bootstrap
+│   │   ├── HSSF/               # xls / BIFF basic workbook + preservation
 │   │   ├── XWPF/               # docx / docm
-│   │   ├── HWPF/               # doc read-only MVP
+│   │   ├── HWPF/               # doc text extraction + limited body editing
 │   │   ├── XSLF/               # pptx / pptm
-│   │   └── HSLF/               # ppt read-only MVP
+│   │   └── HSLF/               # ppt minimal reader
 │   └── DotnetPoi.Formula/      # NuGet: DotnetPoi.Formula
 │       └── UserModel/          # FormulaEvaluator implementation
 ├── tests/
