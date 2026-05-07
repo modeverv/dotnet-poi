@@ -29,6 +29,7 @@ internal static class Biff8Workbook
     private const ushort ColInfo = 0x007D;
     private const ushort MergeCellsRecord = 0x00E5;
     private const ushort PaneRecord = 0x0041;
+    private const ushort StyleRecord = 0x0293;
 
     public static void ReadWorkbook(byte[] workbookStream, HSSFWorkbook workbook)
     {
@@ -52,11 +53,8 @@ internal static class Biff8Workbook
                     ReadFormatRecord(workbook, record.Data);
                     break;
                 case XfRecord:
-                    // XF indices 0-14 are style XF (parent styles), 15+ are cell XF
-                    if (xfCount >= 15)
-                    {
-                        workbook.AddStyleFromBiff(ReadXf(workbook, record.Data, xfCount - 15));
-                    }
+                    // Store all XF records in HSSFWorkbook with 1:1 index mapping
+                    workbook.AddStyleFromBiff(ReadXf(workbook, record.Data, xfCount));
                     xfCount++;
                     break;
                 case BoundSheet8:
@@ -95,26 +93,48 @@ internal static class Biff8Workbook
         workbook.GetOrCreateDataFormat().AddBiffFormat(index, format);
     }
 
+    private static readonly (short index, string format)[] BuiltinFormats = new[]
+    {
+        ((short)5, "General"),
+        ((short)6, "General"),
+        ((short)7, "General"),
+        ((short)8, "General"),
+        ((short)42, "General"),
+        ((short)41, "General"),
+        ((short)44, "General"),
+        ((short)43, "General")
+    };
+
     private static void WriteFormatRecords(Stream stream, HSSFWorkbook workbook)
     {
+        // Write 8 built-in FormatRecord entries (matching POI)
+        foreach (var (idx, format) in BuiltinFormats)
+        {
+            WriteFormatRecord(stream, idx, format);
+        }
+
+        // Write user-defined FormatRecord entries (index >= 164)
         foreach (var kv in workbook.GetOrCreateDataFormat().GetUserDefinedFormats())
         {
-            var idx = kv.Key;
-            var format = kv.Value;
-            WriteRecord(stream, FormatRecord, payload =>
-            {
-                Span<byte> header = stackalloc byte[4];
-                BinaryPrimitives.WriteInt16LittleEndian(header, idx);
-                BinaryPrimitives.WriteUInt16LittleEndian(header.Slice(2), (ushort)Math.Min(format.Length, ushort.MaxValue));
-                payload.Write(header.ToArray(), 0, header.Length);
-                var compressed = format.All(ch => ch <= 0x00FF);
-                payload.WriteByte(compressed ? (byte)0 : (byte)1);
-                var bytes = compressed
-                    ? Encoding.GetEncoding("ISO-8859-1").GetBytes(format)
-                    : Encoding.Unicode.GetBytes(format);
-                payload.Write(bytes, 0, bytes.Length);
-            });
+            WriteFormatRecord(stream, kv.Key, kv.Value);
         }
+    }
+
+    private static void WriteFormatRecord(Stream stream, short index, string format)
+    {
+        WriteRecord(stream, FormatRecord, payload =>
+        {
+            Span<byte> header = stackalloc byte[4];
+            BinaryPrimitives.WriteInt16LittleEndian(header, index);
+            BinaryPrimitives.WriteUInt16LittleEndian(header.Slice(2), (ushort)Math.Min(format.Length, ushort.MaxValue));
+            payload.Write(header.ToArray(), 0, header.Length);
+            var compressed = format.All(ch => ch <= 0x00FF);
+            payload.WriteByte(compressed ? (byte)0 : (byte)1);
+            var bytes = compressed
+                ? Encoding.GetEncoding("ISO-8859-1").GetBytes(format)
+                : Encoding.Unicode.GetBytes(format);
+            payload.Write(bytes, 0, bytes.Length);
+        });
     }
 
     private static HSSFFont ReadFont(ReadOnlySpan<byte> data, int index)
@@ -159,9 +179,15 @@ internal static class Biff8Workbook
 
         var fontIndex = BinaryPrimitives.ReadUInt16LittleEndian(data);
         var formatIndex = BinaryPrimitives.ReadInt16LittleEndian(data.Slice(2));
+        var cellOptions = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(4));
         var alignmentOptions = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(6));
         var borderOptions = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(10));
         var fillPaletteOptions = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(18));
+
+        if ((cellOptions & 0x0004) == 0) // Cell XF
+        {
+            style.setParentIndex((short)(cellOptions >> 4));
+        }
 
         style.setDataFormat(formatIndex);
 
@@ -223,8 +249,11 @@ internal static class Biff8Workbook
         // Write user-defined FormatRecord entries (index >= 164)
         WriteFormatRecords(stream, workbook);
 
-        // Write 15 built-in style XF + user cell XF records
+        // Write 21 built-in XF + user cell XF records
         WriteXfRecords(stream, workbook);
+
+        // Write 6 built-in StyleRecord entries (matching POI)
+        WriteStyleRecords(stream);
 
         var boundSheetOffsetPositions = new List<long>();
         foreach (var sheet in sheets.Count == 0 ? new[] { new HSSFSheet(new HSSFWorkbook(), "Sheet1") } : sheets)
@@ -301,21 +330,48 @@ internal static class Biff8Workbook
         });
     }
 
-    // 15 built-in style XF records (hard-coded to match POI defaults)
+    // 21 built-in XF records (hard-coded to match POI defaults)
     private static readonly byte[][] BuiltinStyleXfData = GenerateBuiltinStyleXf();
 
     private static byte[][] GenerateBuiltinStyleXf()
     {
-        var result = new byte[15][];
-        // Template: fontIndex=0, formatIndex=0, cellOptions=0xFFF5 (parent=0xFFF, xf_type=style),
-        //           alignment=0x0020, indention=0, borders=0, paletteOpts=0, adtl=0, fill=0x20C0
-        for (var i = 0; i < 15; i++)
+        var result = new byte[21][];
+        for (var i = 0; i < 21; i++)
         {
+            int fontIndex, formatIndex, cellOptions, indentionOptions;
+            switch (i)
+            {
+                case 0: fontIndex = 0; formatIndex = 0; cellOptions = 0xFFF5; indentionOptions = 0; break;
+                case 1:
+                case 2: fontIndex = 1; formatIndex = 0; cellOptions = 0xFFF5; indentionOptions = 0xF400; break;
+                case 3:
+                case 4: fontIndex = 2; formatIndex = 0; cellOptions = 0xFFF5; indentionOptions = 0xF400; break;
+                case 5:
+                case 6:
+                case 7:
+                case 8:
+                case 9:
+                case 10:
+                case 11:
+                case 12:
+                case 13:
+                case 14: fontIndex = 0; formatIndex = 0; cellOptions = 0xFFF5; indentionOptions = 0xF400; break;
+                case 15: fontIndex = 0; formatIndex = 0; cellOptions = 0x0001; indentionOptions = 0; break;
+                case 16: fontIndex = 1; formatIndex = 0x2b; cellOptions = 0xFFF5; indentionOptions = 0xF800; break;
+                case 17: fontIndex = 1; formatIndex = 0x29; cellOptions = 0xFFF5; indentionOptions = 0xF800; break;
+                case 18: fontIndex = 1; formatIndex = 0x2c; cellOptions = 0xFFF5; indentionOptions = 0xF800; break;
+                case 19: fontIndex = 1; formatIndex = 0x2a; cellOptions = 0xFFF5; indentionOptions = 0xF800; break;
+                case 20: fontIndex = 1; formatIndex = 0x09; cellOptions = 0xFFF5; indentionOptions = 0xF800; break;
+                default: throw new ArgumentException("Unrecognized format id: " + i);
+            }
+
             var data = new byte[20];
-            // font_index = 0
-            // format_index = 0 (most) or varies for some
-            data[4] = 0xF5; data[5] = 0xFF; // cell_options = 0xFFF5 (style XF, parent=0xFFF)
-            data[6] = 0x20;                  // alignment = 0x0020
+            var span = (Span<byte>)data;
+            BinaryPrimitives.WriteUInt16LittleEndian(span, (ushort)fontIndex);
+            BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(2), (ushort)formatIndex);
+            BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(4), (ushort)cellOptions);
+            BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(6), 0x20); // alignment
+            BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(8), (ushort)indentionOptions);
             data[18] = 0xC0; data[19] = 0x20; // fill = 0x20C0
             result[i] = data;
         }
@@ -324,18 +380,38 @@ internal static class Biff8Workbook
 
     private static void WriteXfRecords(Stream stream, HSSFWorkbook workbook)
     {
-        // Write 15 built-in style XF records
+        // Write 21 built-in XF records
         foreach (var data in BuiltinStyleXfData)
         {
             WriteRecord(stream, XfRecord, payload => payload.Write(data, 0, data.Length));
         }
 
-        // Write user cell XF records (_cellStyles indexed 0..)
+        // Write user cell XF records starting from index 21
         var numStyles = workbook.getNumberOfCellStyles();
-        for (var i = 0; i < numStyles; i++)
+        for (var i = 21; i < numStyles; i++)
         {
             var style = workbook.getCellStyleAt(i);
             WriteXfRecord(stream, style);
+        }
+    }
+
+    private static void WriteStyleRecords(Stream stream)
+    {
+        // 6 built-in styles: Currency, Currency [0], Comma, Comma [0], Normal, Percent
+        // Hard-coded bytes for built-in styles (XFIndex | 0x8000, BuiltinStyle, OutlineStyleLevel)
+        byte[][] styles = new byte[][]
+        {
+            new byte[] { 0x10, 0x80, 0x03, 0xFF }, // Currency
+            new byte[] { 0x11, 0x80, 0x06, 0xFF }, // Currency [0]
+            new byte[] { 0x12, 0x80, 0x04, 0xFF }, // Comma
+            new byte[] { 0x13, 0x80, 0x07, 0xFF }, // Comma [0]
+            new byte[] { 0x00, 0x80, 0x00, 0xFF }, // Normal
+            new byte[] { 0x14, 0x80, 0x05, 0xFF }  // Percent
+        };
+
+        foreach (var data in styles)
+        {
+            WriteRecord(stream, StyleRecord, payload => payload.Write(data, 0, data.Length));
         }
     }
 
@@ -376,6 +452,7 @@ internal static class Biff8Workbook
 
     private static byte[] WriteWorkbookPreservingRecords(IReadOnlyList<HSSFSheet> sheets, byte[] templateWorkbookStream)
     {
+        var workbook = sheets.Count > 0 ? sheets[0].getWorkbook() : new HSSFWorkbook();
         var records = ReadRecords(templateWorkbookStream);
         var boundSheets = records
             .Where(record => record.Sid == BoundSheet8)
@@ -388,6 +465,9 @@ internal static class Biff8Workbook
 
         var firstSheetOffset = boundSheets.Min(sheet => sheet.Offset);
         var globalRecords = records.TakeWhile(record => record.Offset < firstSheetOffset).ToArray();
+        var existingXfCount = globalRecords.Count(r => r.Sid == XfRecord);
+        var totalStyles = workbook.getNumberOfCellStyles();
+
         IEnumerable<string> existingStrings = records.FirstOrDefault(record => record.Sid == Sst) is { } sstRecord
             ? ReadSst(sstRecord.Data)
             : Array.Empty<string>();
@@ -397,10 +477,24 @@ internal static class Biff8Workbook
         var boundSheetOffsetPositions = new List<long>();
         var wroteBoundSheets = false;
         var wroteSst = false;
+        var xfCount = 0;
+
         foreach (var record in globalRecords)
         {
             switch (record.Sid)
             {
+                case XfRecord:
+                    WriteRawRecord(stream, record);
+                    xfCount++;
+                    if (xfCount == existingXfCount)
+                    {
+                        // Append new user-defined styles
+                        for (var i = xfCount; i < totalStyles; i++)
+                        {
+                            WriteXfRecord(stream, workbook.getCellStyleAt(i));
+                        }
+                    }
+                    break;
                 case BoundSheet8 when !wroteBoundSheets:
                     foreach (var sheet in sheets)
                     {
@@ -428,6 +522,12 @@ internal static class Biff8Workbook
                         }
 
                         wroteBoundSheets = true;
+                    }
+
+                    if (xfCount == 0 && totalStyles > 0)
+                    {
+                         // No XF records found in template? (should not happen)
+                         for (var i = 0; i < totalStyles; i++) WriteXfRecord(stream, workbook.getCellStyleAt(i));
                     }
 
                     if (!wroteSst)
@@ -518,12 +618,16 @@ internal static class Biff8Workbook
 
     private static void SetCellStyleFromXfIndex(HSSFWorkbook workbook, HSSFCell cell, int xfIndex)
     {
-        // XF indices 0-14 are style XF; cell XF starts at 15
-        // Our _cellStyles list maps to XF 15, 16, 17...
-        var styleIndex = xfIndex - 15;
-        if (styleIndex >= 0 && styleIndex < workbook.getNumberOfCellStyles())
+        // 15 is the default cell XF (built-in).
+        if (xfIndex == 15)
         {
-            cell.setCellStyle(workbook.getCellStyleAt(styleIndex));
+            cell.setCellStyle(null); // Use default style
+            return;
+        }
+
+        if (xfIndex >= 0 && xfIndex < workbook.getNumberOfCellStyles())
+        {
+            cell.setCellStyle(workbook.getCellStyleAt(xfIndex));
         }
     }
 
@@ -863,32 +967,48 @@ internal static class Biff8Workbook
 
     private static void WriteColInfoRecords(Stream stream, HSSFSheet sheet)
     {
-        // Collect all columns that need a ColInfo record (custom width or hidden)
-        var colsNeedingRecord = new SortedSet<int>();
-        // Include all columns with explicit widths
-        foreach (var col in sheet.ExplicitColumnWidthIndices) colsNeedingRecord.Add(col);
-        // Include all hidden columns
-        foreach (var col in sheet.HiddenColumns) colsNeedingRecord.Add(col);
+        // Collect the range of columns that might need ColInfo records
+        int maxCol = -1;
+        foreach (var col in sheet.ExplicitColumnWidthIndices) maxCol = Math.Max(maxCol, col);
+        foreach (var col in sheet.HiddenColumns) maxCol = Math.Max(maxCol, col);
 
-        // Group contiguous columns with same width/hidden into ranges
-        if (colsNeedingRecord.Count == 0) return;
-        var sorted = colsNeedingRecord.OrderBy(c => c).ToList();
-        var i = 0;
-        while (i < sorted.Count)
+        if (maxCol == -1) return;
+
+        int i = 0;
+        while (i <= maxCol)
         {
-            var first = sorted[i];
-            var last = first;
-            var width = sheet.getColumnWidth(first);
-            var hidden = sheet.isColumnHidden(first);
-            while (i + 1 < sorted.Count && sorted[i + 1] == last + 1
-                   && sheet.getColumnWidth(sorted[i + 1]) == width
-                   && sheet.isColumnHidden(sorted[i + 1]) == hidden)
+            var width = sheet.getColumnWidth(i);
+            var hidden = sheet.isColumnHidden(i);
+            var biffWidth = width > 0 ? (ushort)width : (ushort)2275; // 2275 = default
+
+            // Skip default columns if they are not hidden
+            if (biffWidth == 2275 && !hidden)
             {
-                last = sorted[++i];
+                i++;
+                continue;
+            }
+
+            int first = i;
+            int last = i;
+
+            // Group contiguous columns with same effective BIFF settings
+            while (i + 1 <= maxCol)
+            {
+                var nextWidth = sheet.getColumnWidth(i + 1);
+                var nextHidden = sheet.isColumnHidden(i + 1);
+                var nextBiffWidth = nextWidth > 0 ? (ushort)nextWidth : (ushort)2275;
+
+                if (nextBiffWidth == biffWidth && nextHidden == hidden)
+                {
+                    last = ++i;
+                }
+                else
+                {
+                    break;
+                }
             }
             i++;
 
-            var biffWidth = width > 0 ? (ushort)width : (ushort)2275; // 2275 = default
             WriteRecord(stream, ColInfo, payload =>
             {
                 Span<byte> buf = stackalloc byte[12];

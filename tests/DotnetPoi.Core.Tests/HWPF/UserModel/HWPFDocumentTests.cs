@@ -421,6 +421,81 @@ public class HWPFDocumentTests
     }
 
     [Fact]
+    public void Phase14Item12_AfterEdit_FibRebuildSetsFcMacAndZerosSecondaryStoryCounts()
+    {
+        // Phase 14 item 12: after edit, FIB should be fully rebuilt:
+        // fcMac = new main stream size; ccpFtn/ccpHdd/ccpAtn/ccpEdn/ccpTxbx/ccpHdrTxbx = 0
+        using var sourceStream = File.OpenRead("hwpf-fixtures/SampleDoc.doc");
+        using var doc = new HWPFDocument(sourceStream);
+        doc.appendParagraph("Phase14Item12 rebuild test");
+
+        using var output = new MemoryStream();
+        doc.write(output);
+        output.Position = 0;
+
+        var cf = DotnetPoi.POIFS.Crypt.CompoundFile.ReadDocument(output);
+        var main = cf.Streams["WordDocument"];
+        var buf = main.AsSpan();
+
+        // fcMac at fibBase offset 28 must equal the byte length of the stream
+        var fcMac = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(28));
+        Assert.Equal(main.Length, fcMac);
+
+        // Secondary story character counts must all be 0
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(76)));  // ccpFtn
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(80)));  // ccpHdd
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(88)));  // ccpAtn
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(92)));  // ccpEdn
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(96)));  // ccpTxbx
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(100))); // ccpHdrTxbx
+    }
+
+    [Fact]
+    public void Phase14Item11_AfterEdit_ChpBinTableAndPapBinTablePointToNewTextRange()
+    {
+        // Phase 14 item 11: after appendParagraph, CHPBinTable and PAPBinTable must
+        // reference the new piece's FC range, not the stale pre-edit FKP pages.
+        using var sourceStream = File.OpenRead("hwpf-fixtures/SampleDoc.doc");
+        using var doc = new HWPFDocument(sourceStream);
+        var originalCcpText = doc.getCcpText();
+        doc.appendParagraph("Phase14 structural fix");
+
+        using var output = new MemoryStream();
+        doc.write(output);
+        output.Position = 0;
+
+        using var reread = new HWPFDocument(output);
+        var fib = reread.getFileInformationBlock();
+
+        // The new text is correct
+        Assert.Contains("Phase14 structural fix", reread.getText());
+
+        // CHPBinTable lcb must be exactly 8 (minimal: 2 FC sentinels, 0 FKP pages)
+        // FibOffsetLcbPlcfBteChpx = 254 in the WordDocument stream
+        output.Position = 0;
+        var cf = DotnetPoi.POIFS.Crypt.CompoundFile.ReadDocument(output);
+        var main = cf.Streams["WordDocument"];
+        var lcbChpx = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(254));
+        var lcbPapx = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(262));
+        Assert.Equal(8, lcbChpx); // minimal: 2 FC values, 0 pages
+        Assert.Equal(8, lcbPapx);
+
+        // The CHPBinTable FC values cover the new text's FC range
+        var tblName = fib.DeclaredTableStreamName;
+        Assert.True(cf.Streams.ContainsKey(tblName), $"Missing table stream '{tblName}'");
+        var table = cf.Streams[tblName];
+        var fcChpx = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(250));
+        var chpxFcStart = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(table.AsSpan(fcChpx));
+        var chpxFcEnd = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(table.AsSpan(fcChpx + 4));
+        Assert.True(chpxFcEnd > chpxFcStart, "CHPBinTable FC range must have positive length.");
+
+        // Paragraph and run composition still works after edit
+        var range = reread.getRange();
+        Assert.True(range.numParagraphs() > 0);
+        Assert.Equal(range.text(), string.Concat(Enumerable.Range(0, range.numParagraphs()).Select(i => range.getParagraph(i).text())));
+    }
+
+    [Fact]
     public void Phase13LimitedEdit_PreservesUneditedOleStreamsAndStorages()
     {
         using var originalStream = File.OpenRead("hwpf-fixtures/word_with_embeded.doc");

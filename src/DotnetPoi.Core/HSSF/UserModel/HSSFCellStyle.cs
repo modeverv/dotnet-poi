@@ -6,6 +6,7 @@ public sealed class HSSFCellStyle : ICellStyle
 {
     private readonly HSSFWorkbook _workbook;
     private readonly int _index;
+    private short _parentIndex = 0x0FFF;
     private short _dataFormat;
     private HSSFFont? _font;
     private HorizontalAlignment _alignment = HorizontalAlignment.General;
@@ -27,6 +28,10 @@ public sealed class HSSFCellStyle : ICellStyle
     }
 
     public int getIndex() => _index;
+
+    public short getParentIndex() => _parentIndex;
+
+    internal void setParentIndex(short parentIndex) => _parentIndex = parentIndex;
 
     public short getDataFormat() => _dataFormat;
 

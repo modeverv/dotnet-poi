@@ -140,7 +140,7 @@ public sealed class HSSFCell : ICell
 
     public void setCellErrorValue(byte errorCode) => SetError(errorCode);
 
-    internal ushort GetXfIndex() => _cellStyle is null ? (ushort)15 : (ushort)(_cellStyle.getIndex() + 15);
+    internal ushort GetXfIndex() => _cellStyle is null ? (ushort)15 : (ushort)_cellStyle.getIndex();
 
     internal void SetBlank() => _cellType = CellType.Blank;
 

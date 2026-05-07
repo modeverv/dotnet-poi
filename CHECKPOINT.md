@@ -1,5 +1,21 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — Phase 14 item 12 completed: FIB full rebuild after edit
+
+- Task: Phase 14 item 12「HWPF: write() — FIB の完全な再構築なし」を解消。
+- Fixed: `RebuildFibAfterEdit(main)` メソッドを追加し、`SetMainBodyText` の最後に呼ぶようにした。
+  - `fcMac` (fibBase offset 28) = `main.Length` — POI の `fcMac = wordDocumentStream.size()` 相当
+  - `ccpFtn` / `ccpHdd` / `ccpAtn` / `ccpEdn` / `ccpTxbx` / `ccpHdrTxbx` = 0 — 単一 Unicode ピース書き換え後は二次ストーリーなし
+- FIB オフセット定数 7 個追加: `FibOffsetFcMac`/`FibOffsetCcpFtn`/`FibOffsetCcpHdd`/`FibOffsetCcpAtn`/`FibOffsetCcpEdn`/`FibOffsetCcpTxbx`/`FibOffsetCcpHdrTxbx`
+- Test: `Phase14Item12_AfterEdit_FibRebuildSetsFcMacAndZerosSecondaryStoryCounts` — 59 passed, 0 failed。
+
+## 2026-05-07 JST — Phase 14 item 11 completed: CHPBinTable/PAPBinTable update after edit
+
+- Task: Phase 14 item 11「HWPF: appendParagraph / replaceText — piece table の不完全な更新」を解消。
+- Fixed: `SetMainBodyText` で CLX 更新後、最小限の CHPBinTable (PlcBteChpx) と PAPBinTable (PlcBtePapx) をテーブルストリーム末尾に書き込むようにした。最小エントリ構造: lcb=8 (2×int32 FC センチネル、FKP ページなし)。これにより編集後の文書で古い FKP 参照が残らず、外部リーダーが stale な FC 範囲の CHPX/PAPX を参照することがなくなる。
+- FIB 更新フィールド: `fcPlcfBteChpx`/`lcbPlcfBteChpx`/`fcPlcfBtePapx`/`lcbPlcfBtePapx` を新しいテーブルエントリ位置・長さ (8) に更新。
+- Test: `Phase14Item11_AfterEdit_ChpBinTableAndPapBinTablePointToNewTextRange` — lcbChpx=8 / lcbPapx=8 の検証、FC 範囲の正値確認、段落・ランのテキスト合成検証。58 passed, 0 failed。
+
 ## 2026-05-07 JST — Phase 12/13 remaining items + Phase 14 structure debt
 
 - Task: Phase 12/13 の未完了・部分完了アイテムを全て対応し、Phase 14 として構造的負債をリストアップ。

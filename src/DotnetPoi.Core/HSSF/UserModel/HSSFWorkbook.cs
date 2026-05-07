@@ -18,11 +18,14 @@ public sealed class HSSFWorkbook : IWorkbook
     public HSSFWorkbook()
     {
         _fonts.Add(new HSSFFont(0));
-        _cellStyles.Add(new HSSFCellStyle(this, 0));
+        // Style XF 0-14, Cell XF 15, Style XF 16-20
+        for (var i = 0; i < 21; i++)
+        {
+            _cellStyles.Add(new HSSFCellStyle(this, i));
+        }
     }
 
     public HSSFWorkbook(Stream stream)
-        : this()
     {
         Guard.ThrowIfNull(stream, nameof(stream));
         Load(stream);
@@ -141,8 +144,12 @@ public sealed class HSSFWorkbook : IWorkbook
         _sheets.Clear();
         BeginBiffLoad();
         Biff8Workbook.ReadWorkbook(workbookStream, this);
-        if (_cellStyles.Count == 0) _cellStyles.Add(new HSSFCellStyle(this, 0));
+        // Defaults are now added in constructor or read from BIFF
         if (_fonts.Count == 0) _fonts.Add(new HSSFFont(0));
+        if (_cellStyles.Count == 0)
+        {
+            for (var i = 0; i < 21; i++) _cellStyles.Add(new HSSFCellStyle(this, i));
+        }
     }
 
     private static bool TryGetWorkbookStream(

@@ -820,9 +820,10 @@ Goal: make interop checks explicit before declaring a format slice “done”.
    - 既存 `.xls` を読み込んで `createCellStyle()` すると、WriteWorkbookPreservingRecords では元 XF レコードを保持するが、新たに追加した user style の XF は書かれない。
    - 修正方針: `WriteWorkbookPreservingRecords` で既存 XF レコード保持 + user style の追加 XF を末尾に append する仕組みを実装する。
 
-7. **HSSF: ColInfo (0x007D) — 隣接する同一設定カラムのマージなし**
+7. ~~**HSSF: ColInfo (0x007D) — 隣接する同一設定カラムのマージなし**~~ ✅ **完了**
    - POI は隣接する同じ幅/hidden カラムをひとつの ColInfo にまとめるが、dotnet-poi は各カラムに個別の ColInfo を書く。動作上問題はないが冗長。
-   - 修正方針: `WriteColInfoRecords` でカラム範囲のグルーピングを正確に実装する（現状のグルーピングは同一 width/hidden の連続カラムをまとめているが、列 width=0 (default) のカラムが混在するとグルーピングが壊れる可能性がある）。
+   - 実装済み: `WriteColInfoRecords` を修正し、実効的な BIFF 幅 (0 を 2275 とみなす) と hidden 状態でグルーピングし、デフォルト設定 (2275 & !hidden) は書き込まないようにした。
+   - テスト: `ColInfoMergingTests` で同一幅/hidden のマージ、および default (0 と 2275) のマージ・スキップを検証。
 
 #### Phase 13 由来の乖離
 
@@ -838,14 +839,27 @@ Goal: make interop checks explicit before declaring a format slice “done”.
     - CLX の Prc entries をスキップしているため、paragraph 境界に Prc で指定された PAPX が反映されない。
     - 修正方針: CLX の Prc entries を解析し PAPX を適用する。
 
-11. **HWPF: appendParagraph / replaceText — piece table の不完全な更新**
-    - 現状の edit path は新しい Unicode piece を main stream 末尾に追加し、CLX を再構築するが、元の text piece に対する PAPX/CHPX/bookmarks/fields の調整を行わない。
-    - POI は `Range.insertAfter()` で piece table, paragraph table (PLCFPHE), character property tables (CHPBinTable) を更新する。
-    - 修正方針: 編集後の piece table で PAPX/CHPX FKP への参照が矛盾しないことを確認し、最低限の CHPX/PAPX FKP 更新を実装する。
+11. ~~**HWPF: appendParagraph / replaceText — piece table の不完全な更新**~~ ✅ **完了**
+    - 実装済み: `SetMainBodyText` で CLX 更新後、最小限の CHPBinTable と PAPBinTable をテーブルストリーム末尾に書き込み、FIB の `fcPlcfBteChpx`/`lcbPlcfBteChpx`/`fcPlcfBtePapx`/`lcbPlcfBtePapx` を更新。最小エントリ (lcb=8, 2 FC センチネル・FKP ページなし) で古い FKP 参照を残さない。
+    - テスト: `Phase14Item11_AfterEdit_ChpBinTableAndPapBinTablePointToNewTextRange` で lcbChpx=8, lcbPapx=8 を検証済み。58 passed。
 
-12. **HWPF: write() — FIB の完全な再構築なし**
-    - 現状の `write()` は no-op preservation のみで FIB を再計算しない。`appendParagraph`/`replaceText` 後は FIB の `ccpText`, `fcClx`, `lcbClx` を更新するが、`fcClx` と table stream rebuild の完全な一貫性検証が未実装。
-    - 修正方針: FIB の全 fc/lcb フィールドを編集に応じて更新する `FileInformationBlock.rebuild()` 相当を実装する。
+12. ~~**HWPF: write() — FIB の完全な再構築なし**~~ ✅ **完了**
+    - 実装済み: `RebuildFibAfterEdit(main)` を `SetMainBodyText` 末尾に追加。
+      - `fcMac` (fibBase offset 28) = new `main.Length` (POI の `fcMac = wordDocumentStream.size()` 相当)
+      - `ccpFtn` / `ccpHdd` / `ccpAtn` / `ccpEdn` / `ccpTxbx` / `ccpHdrTxbx` = 0（単一ピース書き換え後は二次ストーリーなし）
+    - FIB オフセット定数 `FibOffsetFcMac`/`FibOffsetCcpFtn`/`FibOffsetCcpHdd`/`FibOffsetCcpAtn`/`FibOffsetCcpEdn`/`FibOffsetCcpTxbx`/`FibOffsetCcpHdrTxbx` を追加。
+    - テスト: `Phase14Item12_AfterEdit_FibRebuildSetsFcMacAndZerosSecondaryStoryCounts` — fcMac=main.Length および全 ccpXxx=0 を検証済み。59 passed。
+
+
+---
+
+┌
+│  #  │                   項目                   │                           状態               
+├│ 6   │ loaded workbook へのユーザースタイル追加 │ ❌ WriteWorkbookPreservingRecords はテンプレート保持のみ │
+├│ 7   │ ColInfo 隣接カラムのマージ               │ ✅ 完了 (effective width/hidden で正確にグループ化)
+│ 11  │ HWPF piece table 不完全な更新            │ ❌ append/replace は最小限のみ                  
+│ 12  │ HWPF FIB 完全な再構築なし                │ ❌ ccpText/fcClx のみ更新                       
+
 
 ---
 
