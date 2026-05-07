@@ -1,5 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
+using System.Linq;
+using System.Collections.Generic;
 using DotnetPoi.HSSF.UserModel;
 using DotnetPoi.SS.UserModel;
 
@@ -292,9 +294,10 @@ internal static class Biff8Workbook
             var font = i < numFonts ? workbook.getFontAt(i) : null;
             WriteFontRecord(stream, font);
         }
-        // User fonts start at index 4 in our list → BIFF font index 5 (skip index 4)
+        // User fonts start at index 4 in our list (placeholder) → BIFF font index 5 (skip index 4)
         for (var i = 4; i < numFonts; i++)
         {
+            if (i == 4) continue; // Skip index 4 placeholder
             WriteFontRecord(stream, workbook.getFontAt(i));
         }
     }
@@ -465,7 +468,14 @@ internal static class Biff8Workbook
 
         var firstSheetOffset = boundSheets.Min(sheet => sheet.Offset);
         var globalRecords = records.TakeWhile(record => record.Offset < firstSheetOffset).ToArray();
+        var existingFontCount = globalRecords.Count(r => r.Sid == FontRecord);
         var existingXfCount = globalRecords.Count(r => r.Sid == XfRecord);
+        var existingFormatCount = globalRecords.Count(r => r.Sid == FormatRecord);
+        var existingFormatIndices = new HashSet<short>(globalRecords
+            .Where(r => r.Sid == FormatRecord && r.Data.Length >= 2)
+            .Select(r => BinaryPrimitives.ReadInt16LittleEndian(r.Data)));
+
+        var totalFonts = workbook.getNumberOfFonts();
         var totalStyles = workbook.getNumberOfCellStyles();
 
         IEnumerable<string> existingStrings = records.FirstOrDefault(record => record.Sid == Sst) is { } sstRecord
@@ -477,12 +487,40 @@ internal static class Biff8Workbook
         var boundSheetOffsetPositions = new List<long>();
         var wroteBoundSheets = false;
         var wroteSst = false;
+        var fontCount = 0;
         var xfCount = 0;
+        var formatCount = 0;
 
         foreach (var record in globalRecords)
         {
             switch (record.Sid)
             {
+                case FontRecord:
+                    WriteRawRecord(stream, record);
+                    fontCount++;
+                    if (fontCount == existingFontCount)
+                    {
+                        var startIdx = existingFontCount + (existingFontCount >= 4 ? 1 : 0);
+                        for (var i = startIdx; i < totalFonts; i++)
+                        {
+                            WriteFontRecord(stream, workbook.getFontAt(i));
+                        }
+                    }
+                    break;
+                case FormatRecord:
+                    WriteRawRecord(stream, record);
+                    formatCount++;
+                    if (formatCount == existingFormatCount)
+                    {
+                        foreach (var kv in workbook.GetOrCreateDataFormat().GetUserDefinedFormats())
+                        {
+                            if (!existingFormatIndices.Contains(kv.Key))
+                            {
+                                WriteFormatRecord(stream, kv.Key, kv.Value);
+                            }
+                        }
+                    }
+                    break;
                 case XfRecord:
                     WriteRawRecord(stream, record);
                     xfCount++;
@@ -522,6 +560,25 @@ internal static class Biff8Workbook
                         }
 
                         wroteBoundSheets = true;
+                    }
+
+                    if (fontCount == 0 && totalFonts > 0)
+                    {
+                         // No Font records found in template? (should not happen in valid BIFF8)
+                         var startIdx = 0;
+                         for (var i = startIdx; i < totalFonts; i++)
+                         {
+                             if (i == 4) continue;
+                             WriteFontRecord(stream, workbook.getFontAt(i));
+                         }
+                    }
+
+                    if (formatCount == 0)
+                    {
+                        foreach (var kv in workbook.GetOrCreateDataFormat().GetUserDefinedFormats())
+                        {
+                            WriteFormatRecord(stream, kv.Key, kv.Value);
+                        }
                     }
 
                     if (xfCount == 0 && totalStyles > 0)

@@ -67,6 +67,7 @@ public sealed class HSSFWorkbook : IWorkbook
 
     public HSSFFont createFont()
     {
+        if (_fonts.Count == 4) _fonts.Add(new HSSFFont(4));
         var font = new HSSFFont(_fonts.Count);
         _fonts.Add(font);
         return font;

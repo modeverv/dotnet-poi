@@ -816,9 +816,10 @@ Goal: make interop checks explicit before declaring a format slice “done”.
    - style XF (0〜14) は paragraph level / cell level style の「親」として機能するが、現状は cell XF のみ保持している。
    - 修正方針: style XF も必要に応じて保持し、cell XF の style inheritance を実装する。
 
-6. **HSSF: loaded workbook へのスタイル追加 — user style が template に追記されない**
+6. ~~**HSSF: loaded workbook へのスタイル追加 — user style が template に追記されない**~~ ✅ **完了**
    - 既存 `.xls` を読み込んで `createCellStyle()` すると、WriteWorkbookPreservingRecords では元 XF レコードを保持するが、新たに追加した user style の XF は書かれない。
-   - 修正方針: `WriteWorkbookPreservingRecords` で既存 XF レコード保持 + user style の追加 XF を末尾に append する仕組みを実装する。
+   - 実装済み: `WriteWorkbookPreservingRecords` を拡張し、既存レコードを維持しつつ、新しく追加された `FontRecord`, `FormatRecord`, `XfRecord` をそれぞれのセクション末尾に append するようにした。また、BIFF8 の Font index 4 (reserved) を適切に扱うよう `createFont` と `WriteFontRecords` を修正した。
+   - テスト: `UserStylePreservationTests` で Font, DataFormat, XF の追加と保存・再読み込みを検証。
 
 7. ~~**HSSF: ColInfo (0x007D) — 隣接する同一設定カラムのマージなし**~~ ✅ **完了**
    - POI は隣接する同じ幅/hidden カラムをひとつの ColInfo にまとめるが、dotnet-poi は各カラムに個別の ColInfo を書く。動作上問題はないが冗長。
@@ -855,10 +856,10 @@ Goal: make interop checks explicit before declaring a format slice “done”.
 
 ┌
 │  #  │                   項目                   │                           状態               
-├│ 6   │ loaded workbook へのユーザースタイル追加 │ ❌ WriteWorkbookPreservingRecords はテンプレート保持のみ │
+├│ 6   │ loaded workbook へのユーザースタイル追加 │ ✅ 完了 (Font/Format/XF を append 保持)         │
 ├│ 7   │ ColInfo 隣接カラムのマージ               │ ✅ 完了 (effective width/hidden で正確にグループ化)
-│ 11  │ HWPF piece table 不完全な更新            │ ❌ append/replace は最小限のみ                  
-│ 12  │ HWPF FIB 完全な再構築なし                │ ❌ ccpText/fcClx のみ更新                       
+│ 11  │ HWPF piece table 不完全な更新            │ ✅ 完了 (CLX/BTE 更新済み)                      
+│ 12  │ HWPF FIB 完全な再構築なし                │ ✅ 完了 (fcMac/ccpXxx 更新済み)                 
 
 
 ---
