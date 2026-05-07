@@ -36,6 +36,155 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    public void Write_Phase12HssfStyles_CreatesFixtureForPoi()
+    {
+        // Phase 12 item 4: Direction B — dotnet-poi writes .xls with styles → Java POI reads
+        var fixturePath = GetFixturePath("phase12-hssf-styles.xls");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new HSSFWorkbook();
+
+        var boldFont = workbook.createFont();
+        boldFont.setBold(true);
+        boldFont.setFontName("Calibri");
+        boldFont.setFontHeightInPoints(14);
+        boldFont.setItalic(true);
+
+        var style1 = workbook.createCellStyle();
+        style1.setFont(boldFont);
+        style1.setAlignment(HorizontalAlignment.Center);
+        style1.setWrapText(true);
+        style1.setBorderBottom(BorderStyle.Thin);
+        style1.setDataFormat(workbook.createDataFormat().getFormat("0.00"));
+
+        var style2 = workbook.createCellStyle();
+        style2.setAlignment(HorizontalAlignment.Right);
+        style2.setBorderLeft(BorderStyle.Medium);
+
+        var sheet = workbook.createSheet("Styles");
+        var row = sheet.createRow(0);
+        var cell0 = row.createCell(0);
+        cell0.setCellValue(42.5);
+        cell0.setCellStyle(style1);
+
+        var cell1 = row.createCell(1);
+        cell1.setCellValue("right");
+        cell1.setCellStyle(style2);
+
+        row.createCell(2).setCellValue("no style");
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+        stream.Flush();
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_Phase12HssfLayout_CreatesFixtureForPoi()
+    {
+        // Phase 12 item 4: Direction B — dotnet-poi writes .xls with layout → Java POI reads
+        var fixturePath = GetFixturePath("phase12-hssf-layout.xls");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new HSSFWorkbook();
+        var sheet = workbook.createSheet("Layout");
+
+        sheet.setColumnWidth(0, 5000);
+        sheet.setColumnWidth(1, 8000);
+        sheet.setColumnHidden(2, true);
+
+        var row0 = sheet.createRow(0);
+        row0.setHeight(30.0f);
+        row0.createCell(0).setCellValue("wide col");
+
+        var row1 = sheet.createRow(1);
+        row1.setHidden(true);
+        row1.createCell(0).setCellValue("hidden row");
+
+        var row2 = sheet.createRow(2);
+        row2.setHeight(20.0f);
+        row2.createCell(0).setCellValue("normal");
+
+        sheet.addMergedRegion(new SS.Util.CellRangeAddress(3, 3, 0, 2));
+        sheet.createRow(3).createCell(0).setCellValue("merged");
+
+        sheet.createFreezePane(1, 2);
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+        stream.Flush();
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_Phase12HssfUnicode_CreatesFixtureForPoi()
+    {
+        // Phase 12 item 3: Direction B — Unicode/Japanese sheet names and strings
+        var fixturePath = GetFixturePath("phase12-hssf-unicode.xls");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new HSSFWorkbook();
+
+        var sheet1 = workbook.createSheet("日本語");
+        var row0 = sheet1.createRow(0);
+        row0.createCell(0).setCellValue("テスト文字列");
+        row0.createCell(1).setCellValue("hello 世界");
+        row0.createCell(2).setCellValue("こんにちは");
+
+        var sheet2 = workbook.createSheet("中文测试");
+        sheet2.createRow(0).createCell(0).setCellValue("汉字测试");
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+        stream.Flush();
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    public void Write_Phase12HssfComprehensive_CreatesFixtureForPoi()
+    {
+        // Phase 12 item 3: Direction B — dotnet-poi writes .xls → Java POI reads
+        var fixturePath = GetFixturePath("phase12-hssf-comprehensive.xls");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new HSSFWorkbook();
+
+        // Sheet 1: all cell types
+        var sheet1 = workbook.createSheet("CellTypes");
+        var row0 = sheet1.createRow(0);
+        row0.createCell(0).setCellValue("string value");
+        row0.createCell(1).setCellValue(42.5);
+        row0.createCell(2).setCellValue(true);
+        row0.createCell(3).setCellValue(false);
+        row0.createCell(4).setCellErrorValue(0x07);  // #DIV/0!
+        row0.createCell(5).setCellErrorValue(0x2A);  // #N/A
+        row0.createCell(6);                          // blank
+
+        // Sheet 2: sparse layout
+        var sheet2 = workbook.createSheet("Sparse");
+        sheet2.createRow(0).createCell(0).setCellValue("row0col0");
+        sheet2.createRow(5).createCell(3).setCellValue(99.9);
+        sheet2.createRow(10).createCell(0).setCellValue("row10");
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+        stream.Flush();
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
     public void Write_StringAndNumberWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase0-basic.xlsx");

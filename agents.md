@@ -629,7 +629,38 @@ Goal: make interop checks explicit before declaring a format slice “done”.
    - [x] DIFAT extension sectors（header DIFAT 109 entries 超え）を read/write できることを fixture で確認する。
    - [x] Workbook stream 内の unknown BIFF record / unmodeled record ranges を軽編集 round-trip で保持する。
 3. 値の round-trip と Java POI interop A/B を、文字列・数値・bool/error・blank・複数シートで固める。
+   - [x] C# round-trip: string / numeric / boolean / error / blank cells が write → read で型と値を維持する。
+   - [x] C# round-trip: 複数シート、空行、空セル、疎な行列、最大列付近の基本値を維持する。
+   - [x] Java POI → dotnet-poi: POI 生成 `.xls` fixture を dotnet-poi が読み、string / numeric / boolean / error / blank / multi-sheet を検証する。
+   - [x] dotnet-poi → Java POI: dotnet-poi 生成 `.xls` fixture を Java POI が読み、同じ値・型を検証する。
+   - [x] 日本語・Unicode sheet name / string cell を双方向で検証する。
+   - [x] SST / LabelSST / Label / Number / RK / BoolErr / Blank / Dimensions / BoundSheet offsets の record-level 破綻がないことをテストで固定する。
+   - [x] 既存 `.xls` の軽編集時に、対象 cell 更新と unknown BIFF preservation が両立することを代表 fixture で確認する。
+   - [x] Phase 12 item 3 の結果と残課題を `CHECKPOINT.md` に記録する。
 4. style / layout の順に、帳票で効く機能から追加する。
+   ※ 注意: Phase 13 item 3 (codex) は HWPF/`.doc` 作業に限定。HSSF/POIFS 共通実装・`.xls` fixture には触れないこと（双方向）。
+   ※ `ICellStyle` / `IFont` インターフェースへのメンバ追加は行わない（Phase 13 item 3 との競合回避のため）。既存 API の実装を充実させる方向で進める。
+   ※ `CHECKPOINT.md` への書き込みは末尾追記のみとし、双方の作業が共存できるようにする。
+
+   --- style ---
+   - [x] `Biff8Workbook` に `FontRecord` (0x0031) の read/write を実装し、`HSSFFont` の bold/italic/color/height/fontName が BIFF に保存・復元されるようにする。
+   - [ ] `Biff8Workbook` に `FormatRecord` (0x041E) の read/write を実装し、カスタム number format 文字列が保存・復元されるようにする。
+   - [x] `Biff8Workbook` に `ExtendedFormatRecord` (XF record, 0x00E0) の read/write を実装し、data format index / font index / alignment / wrap / border が BIFF に保存・復元されるようにする。
+   - [x] `HSSFCellStyle` に alignment / wrapText / border (top/right/bottom/left) / fillForegroundColor / fillPattern の実際の値を保持する field を追加し、get/set が機能するようにする。
+   - [x] Cell の XF index を `WriteCellPrefixRecord` で実際の style index として書くようにする（現在は常に 0）。
+   - [x] C# round-trip テスト: font (bold/italic/size/name)、data format、alignment、wrap text、border のスタイルを設定して write → read で値が維持されることを確認する。
+   - [x] Java POI → dotnet-poi: POI がスタイル付きで書いた `phase12-hssf-styles.xls` fixture を dotnet-poi が読み、font name/bold/dataFormat/alignment を取得できることを検証する。
+   - [x] dotnet-poi → Java POI: dotnet-poi がスタイル付きで書いた `phase12-hssf-styles.xls` fixture を Java POI が読み、同じスタイルを確認できることを検証する。
+
+   --- layout ---
+   - [x] `Biff8Workbook` に `RowRecord` (0x0208) の read/write を実装し、row height と hidden フラグが保存・復元されるようにする。HSSFRow の `setHeight`/`getHeight` を実際に動作させる。
+   - [x] `Biff8Workbook` に `ColInfo` record (0x007D) の read/write を実装し、column width と hidden フラグが保存・復元されるようにする。HSSFSheet の `setColumnWidth`/`getColumnWidth`/`setColumnHidden`/`isColumnHidden` を実際に動作させる。
+   - [x] `Biff8Workbook` に `MergeCells` record (0x00E5) の read/write を実装し、`HSSFSheet.addMergedRegion`/`getMergedRegions` が round-trip するようにする。
+   - [x] `Biff8Workbook` に `Pane` record (0x0041) の read/write を実装し、`HSSFSheet.createFreezePane` が保存・復元されるようにする。
+   - [x] C# round-trip テスト: row height、column width、merged regions、hidden row/col、freeze panes が write → read で維持されることを確認する。
+   - [x] Java POI → dotnet-poi: POI がレイアウト付きで書いた `phase12-hssf-layout.xls` fixture を dotnet-poi が読み、column width/row height/merged regions を取得できることを検証する。
+   - [x] dotnet-poi → Java POI: dotnet-poi がレイアウト付きで書いた `phase12-hssf-layout.xls` fixture を Java POI が読み、同じレイアウトを確認できることを検証する。
+   - [x] Phase 12 item 4 の結果と残課題を `CHECKPOINT.md` に記録する。
 
 -- 以下は後回し1 --
 
@@ -696,13 +727,53 @@ Goal: make interop checks explicit before declaring a format slice “done”.
 実装順:
 
 1. POI HWPF tests / `poi/test-data/document/*.doc` から、単純本文、日本語、表、画像、ヘッダー/フッター、field を含む fixture を選ぶ。
+   - [x] `poi/poi-scratchpad/src/test/java/org/apache/poi/hwpf/` の主要 test class を確認し、text / table / picture / header-footer / field 系で参照される `.doc` fixture を洗い出す。
+   - [x] `poi/test-data/document/*.doc` から、最小本文、Unicode/日本語、複数 paragraph、table、picture、header/footer、field を含む代表 fixture を選定する。
+   - [x] 選定 fixture ごとに、関連 POI test、期待できる観測項目、dotnet-poi 側で最初に固定する read/preservation 目標を `CHECKPOINT.md` に記録する。
+   - [x] dotnet-poi 既存 HWPF reader/tests で代表 fixture を実行し、現状の成功/失敗と例外・欠損 API を確認する。
+   - [x] Phase 12 item 3 作業と衝突しないよう、HSSF/POIFS 実装や `.xls` fixture には触らず、Phase 13 調査・HWPF fixture/test 追加だけに限定する。
+   - [x] 次の Phase 13 item 2（POIFS stream preservation / FIB / table stream）に渡す blocker と優先順位を `CHECKPOINT.md` にまとめる。
 2. POIFS stream preservation と FIB / table stream 読み取りを固める。
+   - [x] Phase 12 item 3 と衝突しないよう、共有 POIFS/HSSF 実装には触れず、まず HWPF 側で stream/FIB 状態を保持・公開する。
+   - [x] `HWPFDocument` 読み込み時に OLE2 stream 一覧を保持し、`WordDocument`, `0Table` / `1Table`, `Data`, `ObjectPool` などの存在を代表 fixture で確認する。
+   - [x] FIB の基本情報（`fWhichTblStm`, `ccpText`, `fcClx`, `lcbClx`, 選択 table stream 名）をモデル化し、テストから検証できるようにする。
+   - [x] CLX 範囲が table stream 内に収まること、選択 table stream fallback が必要な場合に検出できることをテストで固定する。
+   - [x] no-op write は Phase 13 item 4 に回し、item 2 では read-side preservation inventory と FIB/table stream 読み取りの足場に限定する。
+   - [x] item 2 の結果・残課題・Phase 13 item 3 への引き継ぎを `CHECKPOINT.md` に記録する。
 3. text extraction を `Range` / paragraph / run の順に実装する。
+   - [x] Phase 12 item 3 と衝突しないよう、HSSF/POIFS 共通実装と `.xls` fixture には触れず、HWPF reader / HWPF tests / `.doc` fixture 参照に作業範囲を限定する。
+   - [x] Apache POI の `Range`, `Paragraph`, `CharacterRun`, `TextPieceTable` 周辺実装と対応 test を確認し、dotnet-poi に必要な最小 API surface を `CHECKPOINT.md` に記録する。
+   - [x] 既存 `HWPFDocument.getText()` の挙動を壊さず、`getRange()` と `Range.text()` 相当の読み取り API を追加する。
+   - [x] piece table から CP range → file offset mapping を行い、ANSI / UTF-16LE 混在 text piece を代表 fixture で読めるようにする。
+   - [x] paragraph boundary を検出し、`Range.numParagraphs()` / `getParagraph(i)` / paragraph text の最小実装を追加する。
+   - [x] run boundary を検出し、`Paragraph.numCharacterRuns()` / `getCharacterRun(i)` / run text の最小実装を追加する。
+   - [~] PAPX / CHPX / FKP から代表的な formatting（bold / italic / underline / font size / font name / alignment / indent）を読み取り、未対応 sprm は保持または無視方針を明記する。現状は POI-compatible method の足場のみで、実 property 展開は後続 TODO。
+   - [x] `SampleDoc.doc`, `HeaderFooterUnicode.doc`, `innertable.doc`, `pageref.doc`, `test-fields.doc` など item 1 で選定した fixture で C# unit tests を追加する。
+   - [~] 日本語・Unicode・複数 paragraph・field marker を含む fixture で text / paragraph / run の期待値を固定する。現状は代表 fixture で composition と offset safety を固定、個別の文字列期待値は追加 TODO。
+   - [x] item 3 の結果、残課題、Phase 13 item 4（no-op write round-trip）への引き継ぎを `CHECKPOINT.md` に記録する。
 4. no-op write round-trip を追加し、未対応 stream と binary table を壊さないことを確認する。
+   - [x] Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れず、HWPF/`.doc` の no-op preservation に作業範囲を限定する。
+   - [x] Apache POI の `HWPFDocument.write()` / `HWPFDocumentCore` / `FileInformationBlock` / table stream preservation 周辺実装と対応 tests を確認し、dotnet-poi の no-op write で最低限守る stream / storage / FIB / table stream 境界を `CHECKPOINT.md` に記録する。
+   - [x] `HWPFDocument` に no-op write API を追加し、既存 `.doc` を読み込んで API 経由で本文を変更しない場合は、`WordDocument`, `0Table` / `1Table`, `Data`, `ObjectPool`, summary streams など未対応 stream / storage を可能な限り保持して書き戻す。
+   - [x] no-op write 後に dotnet-poi で再読込し、stream inventory、FIB table stream 選択、CLX 範囲、`Range.text()` / paragraph / run composition が元文書と一致することを代表 fixture で固定する。
+   - [x] `SampleDoc.doc`, `HeaderFooterUnicode.doc`, `innertable.doc`, `two_images.doc`, `pageref.doc`, `test-fields.doc`, `word_with_embeded.doc` など item 1 の代表 fixture で、未対応 binary table / fields / images / OLE が no-op 保存で消えないことをテストする。
+   - [ ] 可能なら Java POI で no-op 保存後 `.doc` を開ける Direction B smoke test を追加する。ただし Phase 12 item 4 と競合する interop fixture 生成や `.xls` fixtures には触れない。今回は C# no-op preservation に限定し、Java interop は Phase 13 item 7 に残す。
+   - [x] no-op write では本文編集や FIB/table rebuild を行わない方針を明記し、append paragraph / simple replacement は item 5 に残す。
+   - [x] item 4 の結果、残課題、Phase 13 item 5（限定編集）への引き継ぎを `CHECKPOINT.md` に記録する。
 
 -- 以下は後回し1 --
 
 5. append paragraph / simple replacement のような限定編集を追加する。
+   - [x] Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れず、HWPF/`.doc` の限定本文編集だけに作業範囲を限定する。
+   - [x] Apache POI の `Range.insertAfter()` / `Range.replaceText()` / FIB text count adjustment / piece table write path を確認し、dotnet-poi で今回実装する最小 API と未対応範囲を `CHECKPOINT.md` に記録する。
+   - [x] `HWPFDocument` に append paragraph 相当の限定編集 API を追加し、既存本文の末尾に段落終端付きテキストを追加できるようにする。
+   - [x] `HWPFDocument` または `Range` に simple replacement 相当の限定編集 API を追加し、本文内の単純 placeholder を置換できるようにする。
+   - [x] 編集後 write では、`WordDocument` / 選択 `0Table` or `1Table` の FIB `ccpText` / CLX / piece table を最小限更新し、`Data`, `ObjectPool`, summary streams など未対応 stream / storage を保持する。
+   - [~] C# round-trip tests: append paragraph 後に再読込して `getText()` / `Range.text()` / paragraph composition に追加本文が現れることを固定する。テスト追加済みだが、Phase 12 item 4 側の一時的な HSSF compile error で実行完了できていない。
+   - [~] C# round-trip tests: simple replacement 後に再読込して置換後本文が現れ、置換前 placeholder が消えることを固定する。テスト追加済みだが、Phase 12 item 4 側の一時的な HSSF compile error で実行完了できていない。
+   - [x] 代表 fixture ではまず `SampleDoc.doc` など本文中心の `.doc` に限定し、table/header/footer/field/image/OLE を含む fixture は preservation 確認に留める。
+   - [x] Java POI interop は Phase 13 item 7 に残し、item 5 では dotnet-poi read/write/read の限定編集 smoke を優先する。
+   - [x] item 5 の結果、残課題、Phase 13 item 6（table/header/footer/field/image/OLE preservation/read/limited write）への引き継ぎを `CHECKPOINT.md` に記録する。
 
 -- 以下は後回し2 --
  

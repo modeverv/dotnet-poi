@@ -139,7 +139,10 @@ public sealed class HSSFWorkbook : IWorkbook
         _preservedWorkbookStream = workbookStream.ToArray();
         _workbookStreamName = workbookStreamName;
         _sheets.Clear();
+        BeginBiffLoad();
         Biff8Workbook.ReadWorkbook(workbookStream, this);
+        if (_cellStyles.Count == 0) _cellStyles.Add(new HSSFCellStyle(this, 0));
+        if (_fonts.Count == 0) _fonts.Add(new HSSFFont(0));
     }
 
     private static bool TryGetWorkbookStream(
@@ -190,6 +193,20 @@ public sealed class HSSFWorkbook : IWorkbook
     IFont IWorkbook.getFontAt(int idx) => getFontAt(idx);
 
     internal IReadOnlyList<HSSFSheet> Sheets => _sheets;
+
+    internal void BeginBiffLoad()
+    {
+        _fonts.Clear();
+        _cellStyles.Clear();
+    }
+
+    internal void AddFontFromBiff(HSSFFont font) => _fonts.Add(font);
+
+    internal void AddStyleFromBiff(HSSFCellStyle style) => _cellStyles.Add(style);
+
+    internal int getNumberOfFonts() => _fonts.Count;
+
+    internal int getNumberOfCellStyles() => _cellStyles.Count;
 
     private static readonly string[] WorkbookStreamAliases =
     {

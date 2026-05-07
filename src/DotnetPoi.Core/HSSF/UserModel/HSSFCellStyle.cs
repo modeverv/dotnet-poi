@@ -8,6 +8,17 @@ public sealed class HSSFCellStyle : ICellStyle
     private readonly int _index;
     private short _dataFormat;
     private HSSFFont? _font;
+    private HorizontalAlignment _alignment = HorizontalAlignment.General;
+    private VerticalAlignment _verticalAlignment = VerticalAlignment.Bottom;
+    private bool _wrapText;
+    private short _indention;
+    private short _rotation;
+    private BorderStyle _borderTop = BorderStyle.None;
+    private BorderStyle _borderRight = BorderStyle.None;
+    private BorderStyle _borderBottom = BorderStyle.None;
+    private BorderStyle _borderLeft = BorderStyle.None;
+    private short _fillForegroundColor;
+    private FillPatternType _fillPattern = FillPatternType.NoFill;
 
     internal HSSFCellStyle(HSSFWorkbook workbook, int index)
     {
@@ -29,73 +40,49 @@ public sealed class HSSFCellStyle : ICellStyle
 
     IFont ICellStyle.getFont() => getFont();
 
-    public short getFillForegroundColor() => 0;
+    public short getFillForegroundColor() => _fillForegroundColor;
 
-    public void setFillForegroundColor(short fg)
-    {
-        // TODO: [dotnet-poi] Not yet ported
-        // Original: poi/poi/src/main/java/org/apache/poi/hssf/usermodel/HSSFCellStyle.java
-        // Reason: Phase 6 xls bootstrap only persists basic cell values.
-        // Issue: Phase 6 HSSF styles backlog
-    }
+    public void setFillForegroundColor(short fg) => _fillForegroundColor = fg;
 
-    public FillPatternType getFillPattern() => FillPatternType.NoFill;
+    public FillPatternType getFillPattern() => _fillPattern;
 
-    public void setFillPattern(FillPatternType pattern)
-    {
-    }
+    public void setFillPattern(FillPatternType pattern) => _fillPattern = pattern;
 
-    public BorderStyle getBorderTop() => BorderStyle.None;
+    public BorderStyle getBorderTop() => _borderTop;
 
-    public void setBorderTop(BorderStyle border)
-    {
-    }
+    public void setBorderTop(BorderStyle border) => _borderTop = border;
 
-    public BorderStyle getBorderRight() => BorderStyle.None;
+    public BorderStyle getBorderRight() => _borderRight;
 
-    public void setBorderRight(BorderStyle border)
-    {
-    }
+    public void setBorderRight(BorderStyle border) => _borderRight = border;
 
-    public BorderStyle getBorderBottom() => BorderStyle.None;
+    public BorderStyle getBorderBottom() => _borderBottom;
 
-    public void setBorderBottom(BorderStyle border)
-    {
-    }
+    public void setBorderBottom(BorderStyle border) => _borderBottom = border;
 
-    public BorderStyle getBorderLeft() => BorderStyle.None;
+    public BorderStyle getBorderLeft() => _borderLeft;
 
-    public void setBorderLeft(BorderStyle border)
-    {
-    }
+    public void setBorderLeft(BorderStyle border) => _borderLeft = border;
 
-    public HorizontalAlignment getAlignment() => HorizontalAlignment.General;
+    public HorizontalAlignment getAlignment() => _alignment;
 
-    public void setAlignment(HorizontalAlignment align)
-    {
-    }
+    public void setAlignment(HorizontalAlignment align) => _alignment = align;
 
-    public VerticalAlignment getVerticalAlignment() => VerticalAlignment.Bottom;
+    public VerticalAlignment getVerticalAlignment() => _verticalAlignment;
 
-    public void setVerticalAlignment(VerticalAlignment align)
-    {
-    }
+    public void setVerticalAlignment(VerticalAlignment align) => _verticalAlignment = align;
 
-    public bool getWrapText() => false;
+    public bool getWrapText() => _wrapText;
 
-    public void setWrapText(bool wrapped)
-    {
-    }
+    public void setWrapText(bool wrapped) => _wrapText = wrapped;
 
-    public short getIndention() => 0;
+    public short getIndention() => _indention;
 
-    public void setIndention(short indent)
-    {
-    }
+    public void setIndention(short indent) => _indention = indent;
 
-    public short getRotation() => 0;
+    public short getRotation() => _rotation;
 
-    public void setRotation(short rotation)
-    {
-    }
+    public void setRotation(short rotation) => _rotation = rotation;
+
+    internal int FontBiffIndex => _font?.getIndex() ?? 0;
 }

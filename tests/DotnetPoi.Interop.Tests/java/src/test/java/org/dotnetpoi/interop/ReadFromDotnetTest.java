@@ -11,9 +11,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.FormulaError;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.PictureData;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -63,6 +67,152 @@ public class ReadFromDotnetTest {
             assertEquals("from dotnet-poi hssf", row.getCell(0).getStringCellValue());
             assertEquals(66.25, row.getCell(1).getNumericCellValue());
             assertTrue(row.getCell(2).getBooleanCellValue());
+        }
+    }
+
+    @Test
+    void readPhase12HssfStyles() throws IOException {
+        // Phase 12 item 4: Direction B — Java POI reads dotnet-poi .xls with styles
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase12-hssf-styles.xls");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase12HssfStyles_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSSFWorkbook workbook = new HSSFWorkbook(input)) {
+
+            Sheet sheet = workbook.getSheet("Styles");
+            assertNotNull(sheet);
+            Row row = sheet.getRow(0);
+            assertNotNull(row);
+
+            Cell cell0 = row.getCell(0);
+            assertEquals(CellType.NUMERIC, cell0.getCellType());
+            assertEquals(42.5, cell0.getNumericCellValue(), 0.001);
+            CellStyle style0 = cell0.getCellStyle();
+            assertEquals(HorizontalAlignment.CENTER, style0.getAlignment());
+            assertTrue(style0.getWrapText());
+            assertEquals(BorderStyle.THIN, style0.getBorderBottom());
+            Font font0 = workbook.getFontAt(style0.getFontIndex());
+            assertTrue(font0.getBold());
+            assertTrue(font0.getItalic());
+            assertEquals("Calibri", font0.getFontName());
+            assertEquals(14, font0.getFontHeightInPoints());
+
+            Cell cell1 = row.getCell(1);
+            assertEquals(CellType.STRING, cell1.getCellType());
+            assertEquals("right", cell1.getStringCellValue());
+            CellStyle style1 = cell1.getCellStyle();
+            assertEquals(HorizontalAlignment.RIGHT, style1.getAlignment());
+            assertEquals(BorderStyle.MEDIUM, style1.getBorderLeft());
+        }
+    }
+
+    @Test
+    void readPhase12HssfLayout() throws IOException {
+        // Phase 12 item 4: Direction B — Java POI reads dotnet-poi .xls with layout
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase12-hssf-layout.xls");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase12HssfLayout_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSSFWorkbook workbook = new HSSFWorkbook(input)) {
+
+            Sheet sheet = workbook.getSheet("Layout");
+            assertNotNull(sheet);
+
+            // Column widths
+            assertTrue(sheet.getColumnWidth(0) > 0, "Column 0 width should be set.");
+            assertTrue(sheet.getColumnWidth(1) > sheet.getColumnWidth(0), "Column 1 should be wider than column 0.");
+            assertTrue(sheet.isColumnHidden(2), "Column 2 should be hidden.");
+
+            // Row height
+            Row row0 = sheet.getRow(0);
+            assertNotNull(row0);
+            assertTrue(row0.getHeightInPoints() > 15.0f, "Row 0 height should be > 15pt.");
+
+            // Merged region
+            assertEquals(1, sheet.getNumMergedRegions());
+            org.apache.poi.ss.util.CellRangeAddress merged = sheet.getMergedRegion(0);
+            assertEquals(3, merged.getFirstRow());
+            assertEquals(3, merged.getLastRow());
+            assertEquals(0, merged.getFirstColumn());
+            assertEquals(2, merged.getLastColumn());
+        }
+    }
+
+    @Test
+    void readPhase12HssfUnicode() throws IOException {
+        // Phase 12 item 3: Direction B — Java POI reads dotnet-poi .xls with Japanese/Unicode
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase12-hssf-unicode.xls");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase12HssfUnicode_CreatesFixtureForPoi test before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSSFWorkbook workbook = new HSSFWorkbook(input)) {
+
+            assertEquals(2, workbook.getNumberOfSheets());
+
+            Sheet sheet1 = workbook.getSheet("日本語");
+            assertNotNull(sheet1);
+            Row row0 = sheet1.getRow(0);
+            assertNotNull(row0);
+            assertEquals("テスト文字列", row0.getCell(0).getStringCellValue());
+            assertEquals("hello 世界", row0.getCell(1).getStringCellValue());
+            assertEquals("こんにちは", row0.getCell(2).getStringCellValue());
+
+            Sheet sheet2 = workbook.getSheet("中文测试");
+            assertNotNull(sheet2);
+            assertEquals("汉字测试", sheet2.getRow(0).getCell(0).getStringCellValue());
+        }
+    }
+
+    @Test
+    void readPhase12HssfComprehensive() throws IOException {
+        // Phase 12 item 3: Direction B — Java POI reads dotnet-poi generated .xls
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase12-hssf-comprehensive.xls");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase12HssfComprehensive_CreatesFixtureForPoi test before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSSFWorkbook workbook = new HSSFWorkbook(input)) {
+
+            assertEquals(2, workbook.getNumberOfSheets());
+
+            // Sheet 1: all cell types
+            Sheet sheet1 = workbook.getSheet("CellTypes");
+            assertNotNull(sheet1);
+            Row row0 = sheet1.getRow(0);
+            assertNotNull(row0);
+
+            Cell c0 = row0.getCell(0);
+            assertEquals(CellType.STRING, c0.getCellType());
+            assertEquals("string value", c0.getStringCellValue());
+
+            Cell c1 = row0.getCell(1);
+            assertEquals(CellType.NUMERIC, c1.getCellType());
+            assertEquals(42.5, c1.getNumericCellValue(), 0.001);
+
+            Cell c2 = row0.getCell(2);
+            assertEquals(CellType.BOOLEAN, c2.getCellType());
+            assertTrue(c2.getBooleanCellValue());
+
+            Cell c3 = row0.getCell(3);
+            assertEquals(CellType.BOOLEAN, c3.getCellType());
+            assertFalse(c3.getBooleanCellValue());
+
+            Cell c4 = row0.getCell(4);
+            assertEquals(CellType.ERROR, c4.getCellType());
+            assertEquals(FormulaError.DIV0.getCode(), c4.getErrorCellValue());
+
+            Cell c5 = row0.getCell(5);
+            assertEquals(CellType.ERROR, c5.getCellType());
+            assertEquals(FormulaError.NA.getCode(), c5.getErrorCellValue());
+
+            Cell c6 = row0.getCell(6);
+            assertEquals(CellType.BLANK, c6.getCellType());
+
+            // Sheet 2: sparse layout
+            Sheet sheet2 = workbook.getSheet("Sparse");
+            assertNotNull(sheet2);
+            assertEquals("row0col0", sheet2.getRow(0).getCell(0).getStringCellValue());
+            assertEquals(99.9, sheet2.getRow(5).getCell(3).getNumericCellValue(), 0.001);
+            assertEquals("row10", sheet2.getRow(10).getCell(0).getStringCellValue());
         }
     }
 

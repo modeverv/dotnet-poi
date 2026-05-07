@@ -27,6 +27,13 @@
         <Content Include="../../poi/test-data/hpsf/Test_Humor-Generation.ppt" CopyToOutputDirectory="PreserveNewest" Link="Test_Humor-Generation.ppt" />
         <Content Include="../../poi/test-data/slideshow/45776.ppt" CopyToOutputDirectory="PreserveNewest" Link="45776.ppt" />
         <Content Include="../../poi/test-data/hpsf/TestMickey.doc" CopyToOutputDirectory="PreserveNewest" Link="TestMickey.doc" />
+        <Content Include="../../poi/test-data/document/SampleDoc.doc" CopyToOutputDirectory="PreserveNewest" Link="hwpf-fixtures/SampleDoc.doc" />
+        <Content Include="../../poi/test-data/document/HeaderFooterUnicode.doc" CopyToOutputDirectory="PreserveNewest" Link="hwpf-fixtures/HeaderFooterUnicode.doc" />
+        <Content Include="../../poi/test-data/document/innertable.doc" CopyToOutputDirectory="PreserveNewest" Link="hwpf-fixtures/innertable.doc" />
+        <Content Include="../../poi/test-data/document/two_images.doc" CopyToOutputDirectory="PreserveNewest" Link="hwpf-fixtures/two_images.doc" />
+        <Content Include="../../poi/test-data/document/pageref.doc" CopyToOutputDirectory="PreserveNewest" Link="hwpf-fixtures/pageref.doc" />
+        <Content Include="../../poi/test-data/document/test-fields.doc" CopyToOutputDirectory="PreserveNewest" Link="hwpf-fixtures/test-fields.doc" />
+        <Content Include="../../poi/test-data/document/word_with_embeded.doc" CopyToOutputDirectory="PreserveNewest" Link="hwpf-fixtures/word_with_embeded.doc" />
         <Content Include="../../tests/test-files/image.jpg" CopyToOutputDirectory="PreserveNewest" Link="image.jpg" />
         <Content Include="../../tests/test-files/example.xlsm" CopyToOutputDirectory="PreserveNewest" Link="example.xlsm" />
         <Content Include="../../tests/test-files/example.docm" CopyToOutputDirectory="PreserveNewest" Link="example.docm" />

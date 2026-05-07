@@ -24,6 +24,12 @@ public interface ICell
     void setCellValue(bool value);
     void setCellFormula(string? formula);
 
+    /// <summary>
+    /// Sets this cell to an error cell using a BIFF error code byte.
+    /// Ported from org.apache.poi.ss.usermodel.Cell#setCellErrorValue.
+    /// </summary>
+    void setCellErrorValue(byte errorCode);
+
     string getStringCellValue();
     double getNumericCellValue();
     bool getBooleanCellValue();

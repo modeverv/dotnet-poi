@@ -8,6 +8,9 @@ public sealed class HSSFRow : IRow
     private readonly HSSFSheet _sheet;
     private readonly int _rowNum;
 
+    private short _heightTwips; // 0 = use default
+    private bool _hidden;
+
     internal HSSFRow(HSSFSheet sheet, int rowNum)
     {
         _sheet = sheet;
@@ -34,15 +37,18 @@ public sealed class HSSFRow : IRow
 
     public HSSFSheet getSheet() => _sheet;
 
-    public void setHeight(float height)
+    public void setHeight(float heightPoints)
     {
-        // HSSF row height not yet implemented
+        _heightTwips = heightPoints <= 0 ? (short)0 : (short)(heightPoints * 20);
     }
 
-    public float getHeight() => 15.0f;
+    public float getHeight() => _heightTwips <= 0 ? 15.0f : (float)_heightTwips / 20.0f;
 
-    public void setHidden(bool hidden) { }
-    public bool isHidden() => false;
+    public void setHidden(bool hidden) => _hidden = hidden;
+    public bool isHidden() => _hidden;
+
+    internal short HeightTwips => _heightTwips;
+    internal bool Hidden => _hidden;
 
     internal IReadOnlyCollection<HSSFCell> Cells => _cells.Values;
 

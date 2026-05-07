@@ -159,6 +159,12 @@ public sealed class XSSFCell : ICell
         }
     }
 
+    public void setCellErrorValue(byte errorCode)
+    {
+        _errorString = ErrorCodeToText(errorCode);
+        _cellType = CellType.Error;
+    }
+
     /// <summary>
     /// Sets the formula string without evaluating it.
     /// Ported from XSSFCell.setCellFormula(String).

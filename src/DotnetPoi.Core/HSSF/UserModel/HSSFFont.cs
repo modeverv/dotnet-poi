@@ -51,4 +51,8 @@ public sealed class HSSFFont : IFont
     public byte getUnderline() => _underline;
 
     public void setUnderline(byte underline) => _underline = underline;
+
+    internal short BoldWeight => _bold ? (short)700 : (short)400;
+    internal short Attributes => (short)((_italic ? 0x02 : 0) | (_strikeout ? 0x08 : 0));
+    internal short AutoColor => _color == 0 ? (short)0x7FFF : _color;
 }

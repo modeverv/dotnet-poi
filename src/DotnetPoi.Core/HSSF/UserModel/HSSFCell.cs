@@ -138,6 +138,10 @@ public sealed class HSSFCell : ICell
 
     public HSSFRow getRow() => _row;
 
+    public void setCellErrorValue(byte errorCode) => SetError(errorCode);
+
+    internal ushort GetXfIndex() => _cellStyle is null ? (ushort)15 : (ushort)(_cellStyle.getIndex() + 15);
+
     internal void SetBlank() => _cellType = CellType.Blank;
 
     internal void SetError(byte value)
@@ -145,6 +149,8 @@ public sealed class HSSFCell : ICell
         _errorValue = value;
         _cellType = CellType.Error;
     }
+
+    internal byte GetErrorByte() => _errorValue;
 
     ISheet ICell.getSheet() => getSheet();
 

@@ -1,5 +1,223 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — Phase 12 item 4 completed: style/layout BIFF records
+
+- Task: Phase 12 実装順 4「style / layout の順に、帳票で効く機能から追加する」の主要サブタスクを完了。
+- Completed:
+  - `HSSFCellStyle`: alignment/wrapText/border/fill 等の実際のフィールドを追加し get/set が機能するようにした。
+  - `HSSFFont`: BoldWeight/Attributes/AutoColor internal helper を追加。
+  - `HSSFRow`: `_heightTwips`/`_hidden` を追加し setHeight/getHeight/setHidden/isHidden が動作するようにした。
+  - `HSSFSheet`: freeze pane / hidden columns の state を追加し createFreezePane/setColumnHidden/isColumnHidden が動作するようにした。
+  - `HSSFWorkbook`: BeginBiffLoad/AddFontFromBiff/AddStyleFromBiff 等の internal method を追加。
+  - `Biff8Workbook`: FontRecord (0x0031), XfRecord (0x00E0) の read/write を実装。RowRecord (0x0208), ColInfo (0x007D), MergeCells (0x00E5), Pane (0x0041) の read/write を実装。WriteSheet を ROW record + cells interleaved 構造に変更 (POI 互換)。
+  - Cell prefix record で実際の XF index を使うよう修正。cell 読み取り時に XF index から style を参照するよう修正。
+- Tests added:
+  - `Write_CellStyles_RoundTrip`, `Write_SheetLayout_RoundTrip` (C# round-trip)
+  - `Read_Phase12HssfStyles_GeneratedByPoi`, `Read_Phase12HssfLayout_GeneratedByPoi` (Direction A)
+  - `Write_Phase12HssfStyles_CreatesFixtureForPoi`, `Write_Phase12HssfLayout_CreatesFixtureForPoi` (Direction B + Java verification)
+- Test counts: HSSFWorkbookTests 34 passed; Interop Phase12 8 passed.
+- Remaining: FormatRecord (custom number formats) 未実装。loaded workbook への新規スタイル追加は未対応。
+
+## 2026-05-07 JST — Phase 13 item 5: HWPF limited body edits
+
+- Task: Phase 13 実装順 5「append paragraph / simple replacement のような限定編集を追加する」に対応。
+- Conflict note:
+  - Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れず、HWPF/`.doc` の限定本文編集に限定する。
+- POI reference checked:
+  - `poi/poi-scratchpad/src/main/java/org/apache/poi/hwpf/usermodel/Range.java` の `insertAfter(String)`, `replaceText(String, String)`, `delete()`, FIB text count adjustment 周辺を確認。
+  - POI は character/paragraph/section tables と bookmarks を編集に合わせて調整するが、dotnet-poi Phase 13 item 5 は本文中心 fixture の限定編集に絞り、PAPX/CHPX/FKP/bookmarks/fields の完全調整は Phase 13 item 6 以降に残す。
+- Changes:
+  - `agents.md` の Phase 13 item 5 に、POI 調査、append paragraph、simple replacement、FIB/CLX/piece table 最小更新、C# round-trip、preservation 境界、Phase 13 item 6/7 への引き継ぎ TODO を追加。
+  - `HWPFDocument.appendParagraph(string)` を追加。本文末尾に段落終端 `\r` 付きテキストを追加する。
+  - `HWPFDocument.replaceText(string placeholder, string value)` を追加。本文内の plain-text placeholder を ordinal replacement する。
+  - 編集時は既存 `WordDocument` 末尾に新しい単一 Unicode text piece を追加し、選択 table stream 末尾に新しい CLX/Pcdt を追加。FIB の `ccpText`, `fcClx`, `lcbClx` を更新する。
+  - `Data`, `ObjectPool`, summary streams など未編集 stream/storage は保持する。
+  - `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs` に append paragraph / simple replacement / unedited OLE stream preservation tests を追加。
+- Verification:
+  - Attempted: `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore`
+  - Blocked by unrelated concurrent Phase 12 item 4 compile error in `src/DotnetPoi.Core/HSSF/UserModel/HSSFSheet.cs`: `CS0246: IReadOnlySet<>` not found.
+  - Existing NuGet sync-conflict import warnings were also emitted as before.
+- Residual TODO / Phase 13 item 6 handoff:
+  - Current edit path rebuilds main body text as one new Unicode piece and does not adjust PAPX/CHPX/FKP, bookmarks, fields, headers/footers, tables, or image/OLE references semantically.
+  - Java POI interop and Office/LibreOffice manual verification stay in Phase 13 item 7 after the repository builds cleanly again.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 4 completed: HWPF no-op write preservation
+
+- Task: Phase 13 実装順 4「no-op write round-trip を追加し、未対応 stream と binary table を壊さないことを確認する」に対応。
+- Conflict note:
+  - Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れず、HWPF/`.doc` の no-op preservation のみに限定した。
+- POI reference checked:
+  - `poi/poi-scratchpad/src/main/java/org/apache/poi/hwpf/HWPFDocument.java#write(OutputStream)` と private write path、`HWPFDocumentCore`, `FileInformationBlock.writeTo`, `ComplexFileTable.writeTo` 周辺を確認。
+  - POI は編集時に FIB/table stream を再構築するが、dotnet-poi Phase 13 item 4 は no-op preservation に限定し、本文編集・FIB/table rebuild は item 5 以降に残す。
+- Changes:
+  - `HWPFDocument.write(Stream)` を追加。読み込み時に保持した `CompoundFileDocument` を `CompoundFile.Write()` で書き戻す no-op preservation path。
+  - `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs` に `Phase13NoOpWriteFixtures()` を追加し、代表 fixture + `word_with_embeded.doc` を対象化。
+  - `Phase13NoOpWrite_PreservesOleStreamsAndStorages`: no-op write 後も全 OLE2 stream name と stream bytes が一致し、storage/root entries が保持されることを固定。
+  - `Phase13NoOpWrite_RoundTrippedDocumentKeepsFibClxAndTextModel`: no-op write 後に dotnet-poi で再読込し、FIB table stream 選択、CLX offset/length、`Range.text()` と paragraph composition が一致することを固定。
+  - `agents.md` の Phase 13 item 4 checklist を実績ベースに更新。Java POI Direction B smoke は Phase 13 item 7 に残した。
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore` ✅
+  - Result: 52 passed, 0 failed, 0 skipped.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings, existing XWPF nullable warnings, and existing xUnit analyzer warning; no new failures.
+- Residual TODO / Phase 13 item 5 handoff:
+  - Current write path intentionally does not edit text, rebuild FIB, rebuild piece table, or update binary tables.
+  - append paragraph / simple replacement should start by cloning existing streams and then performing the smallest POI-compatible WordDocument/table stream update needed, with Java POI interop left for Phase 13 item 7.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 4: add HWPF no-op write task list
+
+- Task: Phase 13 実装順 4「no-op write round-trip を追加し、未対応 stream と binary table を壊さないことを確認する」の作業サブリストを `agents.md` に追加する。
+- Conflict note:
+  - Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、Phase 13 item 4 は HWPF/`.doc` no-op preservation に限定し、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れない方針を明記した。
+- Changes:
+  - `agents.md` の Phase 13 item 4 に、POI 調査、HWPF no-op write API、代表 fixture round-trip、stream/storage/FIB/CLX/text composition preservation、Java POI smoke、item 5 への引き継ぎ TODO を追加。
+- Verification:
+  - Documentation-only change so far. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 3 completed: value round-trip and Java POI interop A/B
+
+- Task: Phase 12 実装順 3「値の round-trip と Java POI interop A/B を、文字列・数値・bool/error・blank・複数シートで固める」を完了。
+- Completed:
+  - `ICell.setCellErrorValue(byte)` を追加し、`HSSFCell` と `XSSFCell` に実装。
+  - `HSSFCell.GetErrorByte()` を追加し、`Biff8Workbook.WriteSheetCells` で error cell を `BoolErr` record (fError=1) として書き込むよう実装。
+  - C# round-trip テスト: `Write_AllCellTypes_RoundTrip`（string/numeric/boolean/error/blank 全型）。
+  - C# round-trip テスト: `Write_MultipleSheets_RoundTrip`（複数シート・空行・疎行列・col 255）。
+  - Interop Direction A (Java→C#): `phase12-hssf-comprehensive.xls` fixture を Java POI が生成、dotnet-poi が読み取り検証。
+  - Interop Direction B (C#→Java): `phase12-hssf-comprehensive.xls` fixture を dotnet-poi が生成、Java POI が読み取り検証。
+  - Unicode Direction A (Java→C#): `phase12-hssf-unicode.xls` で日本語/中国語 sheet name・string cell を検証。
+  - Unicode Direction B (C#→Java): 同 fixture を dotnet-poi が生成、Java POI が検証。
+  - Record-level integrity テスト: SST/LabelSST/Number/BoolErr/Blank/Dimensions/BoundSheet offset の一貫性を BIFF byte 解析で固定。
+  - Light-edit テスト: `SimpleMultiCell.xls` を読み込み・軽編集・再読み込みで cell 更新を検証。
+- Test counts after this phase:
+  - `HSSFWorkbookTests`: 32 passed (was 28 before Phase 12 item 3).
+  - Interop tests: 新規 4 テスト追加 (Phase12 Comprehensive x2 方向, Unicode x2 方向).
+- Remaining / notes:
+  - Error cell: C# 側の `setCellErrorValue` で error code を byte で渡す（0x07=#DIV/0!, 0x2A=#N/A 等）。XSSF 実装も追加済み。
+  - `getErrorCellString()` は HSSFCell の error code → string mapping でカバー: #NULL!/#DIV/0!/#VALUE!/#REF!/#NAME?/#NUM!/#N/A。
+  - Blank cell: `row.createCell(index)` で値未設定のまま書き込むと Blank record が出力され、読み戻し時 `CellType.Blank` として復元される。
+  - Unknown BIFF preservation: Phase 12 item 2 で実装済みの template-based writing が引き続き動作する。
+  - 次のステップは Phase 12 item 4: style / layout の実装。
+
+## 2026-05-07 JST — Phase 13 item 3: add HWPF text extraction task list
+
+- Task: Phase 13 実装順 3「text extraction を `Range` / paragraph / run の順に実装する」の作業サブリストを `agents.md` に追加する。
+- Conflict note:
+  - Claude Code が Phase 12 item 3 を作業中のため、Phase 13 item 3 の予定は HWPF reader / HWPF tests / `.doc` fixture 参照に限定し、HSSF/POIFS 共通実装や `.xls` fixture には触れない方針を明記した。
+- Changes:
+  - `agents.md` の Phase 13 item 3 に、POI 調査、`Range` API、piece table CP/FC mapping、paragraph/run boundary、PAPX/CHPX/FKP formatting、代表 fixture tests、CHECKPOINT 引き継ぎの TODO を追加。
+- Verification:
+  - Documentation-only change. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 3: HWPF Range / paragraph / run baseline
+
+- Task: Phase 13 実装順 3「text extraction を `Range` / paragraph / run の順に実装する」に対応。
+- Conflict note:
+  - Claude Code が Phase 12 item 3 を作業中のため、HSSF/POIFS 共通実装、`.xls` fixture、HSSF tests には触れず、HWPF reader と HWPF tests のみに限定した。
+- POI reference checked:
+  - `HWPFDocument.getRange()`, `Range.text()`, `Range.numParagraphs()`, `Paragraph.numCharacterRuns()`, `CharacterRun.text()`, `ComplexFileTable`, `TextPieceTable`, `TextPiece` 周辺。
+- Changes:
+  - `HWPFDocument` が CLX/piece table 抽出結果を `HWPFTextModel` として保持するように変更し、既存 `getText()` は同じ文字列を返し続ける。
+  - `HWPFDocument.getRange()` を追加。
+  - 最小 read-only usermodel として `Range`, `Paragraph`, `CharacterRun` を追加。
+  - `Range.text()`, `getStartOffset()`, `getEndOffset()`, `numParagraphs()`, `getParagraph(i)`, `numCharacterRuns()`, `getCharacterRun(i)` を追加。
+  - paragraph boundary は `\r`, `\f`, `\a` を終端として検出。
+  - run boundary は CLX piece table の text piece 境界を使い、compressed/Unicode piece を `CharacterRun.isCompressed()` から確認できるようにした。
+  - `CharacterRun` / `Paragraph` formatting 系 method は POI-compatible API の足場のみ。PAPX/CHPX/FKP sprm 展開は未実装で後続 TODO。
+- Tests:
+  - `Phase13Range_TextMatchesDocumentText`
+  - `Phase13Range_ParagraphsAndRunsComposeOriginalText`
+  - 対象 fixture: `SampleDoc.doc`, `HeaderFooterUnicode.doc`, `innertable.doc`, `two_images.doc`, `pageref.doc`, `test-fields.doc`
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore` ✅
+  - Result: 38 passed, 0 failed, 0 skipped.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings, existing XWPF nullable warnings, and existing xUnit analyzer warning; no new failures.
+- Residual TODO:
+  - Add exact string expectations for Japanese/Unicode and field marker fixtures instead of only composition/offset invariants.
+  - Parse PAPX/CHPX/FKP and map representative formatting: bold, italic, underline, font size/name, alignment, indent.
+  - Consider exposing a dedicated text piece table model if later POI parity tests need CP/FC-level assertions.
+- Phase 13 item 4 handoff:
+  - `Range` is read-only and does not mutate piece table / FIB state. No-op write round-trip can build on the existing stream inventory from item 2 without relying on editing APIs from item 3.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 2: HWPF stream inventory and FIB/table stream model
+
+- Task: Phase 13 実装順 2「POIFS stream preservation と FIB / table stream 読み取りを固める」に対応。
+- Conflict note:
+  - Claude Code が Phase 12 item 3（HSSF `.xls` value round-trip / Java POI interop）を作業中のため、共有 POIFS/HSSF 実装には触れず、HWPF read-side の状態保持と検証だけに限定した。
+- Changes:
+  - `agents.md` の Phase 13 実装順 2 にサブタスクを追加し、完了状態へ更新。
+  - `HWPFDocument` が `CompoundFile.ReadDocument()` を使って OLE2 stream と storage metadata を保持するように変更。
+  - `HWPFDocument` に `getStreamNames()`, `hasStream()`, `hasStorage()`, `hasEntry()`, `getFileInformationBlock()` を追加。
+  - `HWPFFileInformationBlock` を追加し、`fWhichTblStm`, `ccpText`, `fcClx`, `lcbClx`, declared/selected table stream, fallback flag, selected table stream length, CLX validity を公開。
+  - 代表 `.doc` fixture で `WordDocument` と選択 `0Table` / `1Table` が見えること、CLX 範囲が table stream 内に収まることをテストで固定。
+  - `two_images.doc` で `Data` stream、`word_with_embeded.doc` で `ObjectPool` storage と配下 stream を検出するテストを追加。
+  - 合成 OLE2 fixture（declared table stream を削除し、反対側 table stream に同じ bytes を置く）で table stream fallback 検出を固定。
+- Tests:
+  - Added/extended HWPF tests in `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs`.
+  - Added `word_with_embeded.doc` as a linked HWPF fixture in `tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj`.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore` succeeded: 26 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and an existing xUnit analyzer warning; no new failures.
+- Phase 13 item 3 handoff:
+  - Build `Range` / paragraph / run extraction on top of `HWPFFileInformationBlock` and selected table stream state.
+  - Current API intentionally does not write `.doc`; no-op write/preservation belongs to Phase 13 item 4.
+  - Fallback behavior is modeled and covered by a synthetic/mutated in-memory OLE2 document; representative POI fixtures all have their selected table stream present.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 1: HWPF fixture survey
+
+- Task: Phase 13 実装順 1「POI HWPF tests / `poi/test-data/document/*.doc` から、単純本文、日本語、表、画像、ヘッダー/フッター、field を含む fixture を選ぶ」に対応。
+- Changes:
+  - `agents.md` の Phase 13 実装順 1 にサブタスクを追加し、完了状態へ更新。
+  - 代表 fixture を `tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj` に `hwpf-fixtures/` link として追加。
+  - `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs` に Phase 13 representative fixture smoke test を追加。
+- Selected fixtures:
+  - `SampleDoc.doc`: simple body / write baseline. POI refs: `TestHWPFWrite`, `TestProblems`.
+  - `HeaderFooterUnicode.doc`: Unicode header/footer and text piece coverage. POI refs: `TestHeaderStories`, `TestWordExtractor`, `TestTextPieceTable`.
+  - `innertable.doc`: nested table structure. POI refs: `TestTableRow`, `TestWordToFoConverter`, `TestSprms`.
+  - `two_images.doc`: picture table with jpg/png. POI refs: `TestPictures`, `TestHWPFPictures`.
+  - `pageref.doc`: bookmarks/page-reference fields. POI refs: `TestBookmarksTables`, `TestWordToFoConverter`.
+  - `test-fields.doc`: fields PLCF coverage. POI ref: `TestFieldsTables`.
+- Current dotnet-poi status:
+  - Existing `HWPFDocument` can open all selected representative fixtures and `getText()` / `getCcpText()` do not throw.
+  - Added tests intentionally assert only the current safe baseline: open + plain text extraction API stability.
+  - Missing for later Phase 13 items: POI-compatible `Range`, paragraph/run model, header/footer stories, table model, pictures table, fields tables, and write/no-op preservation API.
+- Phase 13 item 2 handoff:
+  - Start by exposing/validating FIB and selected table stream details, then add preservation-aware stream bookkeeping before any write path.
+  - Keep Phase 12 item 3 isolated: do not touch HSSF/POIFS `.xls` value interop work unless a shared POIFS bug is explicitly confirmed.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore` succeeded: 11 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and an existing xUnit analyzer warning; no new failures.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — agents.md: add Phase 12 item 3 task sublist
+
+- Task: `agents.md` の Phase 12 実装順 3 に、対応予定のサブリストを追加する。
+- Changes:
+  - C# round-trip、Java POI → dotnet-poi、dotnet-poi → Java POI、Unicode、BIFF record-level 検証、軽編集 preservation、CHECKPOINT 記録の項目に分解。
+- Verification:
+  - Documentation-only change. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
 ## 2026-05-07 JST — Phase 12 item 2 completed: BIFF unknown record preservation
 
 - Task: Complete Phase 12 item 2 item「Workbook stream 内の unknown BIFF record / unmodeled record ranges を軽編集 round-trip で保持する」。

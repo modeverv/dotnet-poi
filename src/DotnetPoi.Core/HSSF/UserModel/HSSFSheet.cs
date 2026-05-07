@@ -9,6 +9,9 @@ public sealed class HSSFSheet : ISheet
     private readonly HSSFWorkbook _workbook;
     private readonly List<CellRangeAddress> _mergedRegions = new();
     private readonly SortedDictionary<int, int> _columnWidths = new();
+    private readonly HashSet<int> _hiddenColumns = new();
+    private int _freezeColSplit;
+    private int _freezeRowSplit;
 
     internal HSSFSheet(HSSFWorkbook workbook, string sheetName)
     {
@@ -62,10 +65,27 @@ public sealed class HSSFSheet : ISheet
         return _columnWidths.TryGetValue(columnIndex, out var width) ? width : 0;
     }
 
-    public void createFreezePane(int colSplit, int rowSplit) { }
-    public void createFreezePane(int colSplit, int rowSplit, int leftmostColumn, int topRow) { }
-    public void setColumnHidden(int columnIndex, bool hidden) { }
-    public bool isColumnHidden(int columnIndex) => false;
+    public void createFreezePane(int colSplit, int rowSplit)
+    {
+        _freezeColSplit = colSplit;
+        _freezeRowSplit = rowSplit;
+    }
+
+    public void createFreezePane(int colSplit, int rowSplit, int leftmostColumn, int topRow) =>
+        createFreezePane(colSplit, rowSplit);
+
+    public void setColumnHidden(int columnIndex, bool hidden)
+    {
+        if (hidden) _hiddenColumns.Add(columnIndex);
+        else _hiddenColumns.Remove(columnIndex);
+    }
+
+    public bool isColumnHidden(int columnIndex) => _hiddenColumns.Contains(columnIndex);
+
+    internal int FreezeColSplit => _freezeColSplit;
+    internal int FreezeRowSplit => _freezeRowSplit;
+    internal IEnumerable<int> HiddenColumns => _hiddenColumns;
+    internal IEnumerable<int> ExplicitColumnWidthIndices => _columnWidths.Keys;
 
     public void protectSheet(bool protect) { }
     public bool isSheetProtected() => false;
