@@ -1997,3 +1997,19 @@ Notes:
   - `dotnet test tests/DotnetPoi.Core.Tests/ -c Debug --filter "RoundTrip_HeaderFooterVariants_Restored"` ✅
   - `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs` ✅ (36 HTML files)
   - Spot-check: `usage-workbook.xlsx` contains pivot table/cache parts; `usage-macro-preserve.xlsm` contains `xl/vbaProject.bin`; `usage-document.docx` has matching hyperlink/image/header/footer relationship ids.
+
+## 2026-05-07 14:47 JST — examples/README.md coverage check
+
+- Task: `examples/README.md` の内容が足りているか確認。
+- Finding:
+  - README did document the main phase examples and already had sections for `Phase5FormulaEvaluatorExample` / `Phase7CellTypesExample`.
+  - Actual `examples/` also contains `Phase8CoreOnlyExample` and `EdgeCaseProbeExample`; those needed stronger entrypoint coverage.
+  - `UsageSamples` description needed the macro-preservation output and newer workbook/docx coverage.
+  - `docs_src/content/reference/examples-index.md` listed several non-existent projects (`Phase2ReadExample`, `Phase4XSSFOnlyExample`, `Phase6StreamingExample`, `Phase8RichTextExample`, `Phase30DocxCreateExample`, `Phase31DocxReadExample`).
+- Implementation:
+  - Rewrote `examples/README.md` with a quick index, all real example projects, generated-output note, updated `UsageSamples` coverage, and Java fixture prerequisites.
+  - Rewrote `docs_src/content/reference/examples-index.md` to list only real examples and regenerated `docs/reference/examples-index.html`.
+- Verification:
+  - `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs` ✅ (36 HTML files; macOS `CSSM_ModuleLoad` warning printed but generation succeeded)
+  - Shell check confirmed every `examples/*/*.csproj` directory name appears in `examples/README.md`.
+  - `rg` confirmed old non-existent example names no longer appear in `docs`, `docs_src`, or `examples`.

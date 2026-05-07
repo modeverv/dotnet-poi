@@ -1,5 +1,31 @@
 # Examples
 
+Runnable examples live under `examples/`. Each example is a small console project that writes sample files to `examples/output/` and, where practical, reads them back to verify the result.
+
+```bash
+dotnet run --project examples/UsageSamples/UsageSamples.csproj
+```
+
+`examples/output/` is generated output. Re-run the examples when you want fresh files.
+
+## Quick Index
+
+| Example | Format | Focus |
+|---|---|---|
+| `UsageSamples` | xlsx, xlsm, docx, pptx | Broad user-facing samples and read-back checks |
+| `Phase0WriteExample` | xlsx | Minimal workbook write |
+| `Phase1InteropExample` | xlsx | Java POI / dotnet-poi interoperability path |
+| `Phase25ImagesExample` | xlsx | Embedded images and anchors |
+| `Phase3InterfaceExample` | xlsx | Common SS interfaces |
+| `Phase32DocxExample` | docx | Paragraphs, runs, inline picture, rotation |
+| `Phase33PptxExample` | pptx | Slides, pictures, anchors, rotation, flip |
+| `Phase34AgileEncryptionExample` | xlsx | Agile encryption and decryption |
+| `Phase4HssfXlsExample` | xls | BIFF8 bootstrap write/read |
+| `Phase5FormulaEvaluatorExample` | xlsx | Formula evaluator package and cached results |
+| `Phase7CellTypesExample` | xlsx | Numeric, string, boolean, formula, and error cell handling |
+| `Phase8CoreOnlyExample` | xlsx | Core package without Formula |
+| `EdgeCaseProbeExample` | xlsx, docx, pptx | Edge-case probes and validation checks |
+
 ## UsageSamples
 
 Creates practical, user-facing sample files and reads them back to verify the output:
@@ -12,15 +38,17 @@ Output:
 
 ```text
 examples/output/usage-workbook.xlsx
+examples/output/usage-macro-preserve.xlsm
 examples/output/usage-document.docx
 examples/output/usage-presentation.pptx
 ```
 
 The sample covers:
 
-- `.xlsx`: cells, styles, merged title, freeze pane, validation, conditional formatting, and rich text
-- `.docx`: paragraphs, formatted runs, hyperlink metadata, table, and image
-- `.pptx`: slides, text boxes, image, and table
+- `.xlsx`: cells, styles, merged title, freeze pane, auto filter, validation, conditional formatting, rich text, sheet/workbook protection, and a pivot table
+- `.xlsm`: edit an existing macro-enabled workbook while preserving `xl/vbaProject.bin` byte-for-byte
+- `.docx`: page setup, margins, columns, header/footer variants, paragraphs, formatted runs, fields, hyperlink metadata, table, and image
+- `.pptx`: slides, text boxes, image, rotation, and table
 
 ## Phase0WriteExample
 
@@ -68,30 +96,9 @@ tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase1-basic.xlsx
 For the reverse direction, Java POI reading dotnet-poi output, run the interop tests:
 
 ```bash
-dotnet test tests/DotnetPoi.Interop.Tests/cs/DotnetPoi.Interop.Tests.csproj --filter Category=WriteForPoi
+dotnet test tests/DotnetPoi.Interop.Tests/ --filter "Category=WriteForPoi"
 mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest
 ```
-
-## Phase3InterfaceExample
-
-Demonstrates the Phase 3 SS common interfaces (`IWorkbook`, `ISheet`, `IRow`, `ICell`, `ICellStyle`, `IFont`).
-All variables are typed as interfaces — the example works identically against any future `IWorkbook` implementation.
-
-```bash
-dotnet run --project examples/Phase3InterfaceExample/Phase3InterfaceExample.csproj
-```
-
-Output:
-
-```text
-examples/output/phase3-interface-example.xlsx
-```
-
-The example:
-
-- Creates a styled header row using `ICellStyle` and `IFont`
-- Writes data rows with a number format via `IDataFormat`
-- Reads the workbook back via `IWorkbook`/`ISheet`/`IRow`/`ICell` and asserts cell values
 
 ## Phase25ImagesExample
 
@@ -114,6 +121,26 @@ The workbook uses:
 - `XSSFSheet.createDrawingPatriarch()`
 - `XSSFDrawing.createPicture(...)`
 
+## Phase3InterfaceExample
+
+Demonstrates the Phase 3 SS common interfaces (`IWorkbook`, `ISheet`, `IRow`, `ICell`, `ICellStyle`, `IFont`). All variables are typed as interfaces.
+
+```bash
+dotnet run --project examples/Phase3InterfaceExample/Phase3InterfaceExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase3-interface-example.xlsx
+```
+
+The example:
+
+- Creates a styled header row using `ICellStyle` and `IFont`
+- Writes data rows with a number format via `IDataFormat`
+- Reads the workbook back via `IWorkbook` / `ISheet` / `IRow` / `ICell` and asserts cell values
+
 ## Phase32DocxExample
 
 Generates a `.docx` file using the Phase 3.2 XWPF API, then reads it back to assert the content:
@@ -133,7 +160,7 @@ The document demonstrates:
 - `XWPFDocument.createParagraph()`
 - `XWPFParagraph.createRun()`
 - `XWPFRun.setText()`, `setBold()`, `setItalic()`
-- `XWPFRun.addPicture()` — inline JPEG with rotation
+- `XWPFRun.addPicture()` with inline JPEG rotation
 - `XWPFDocument.write(Stream)`
 - Round-trip read back via `XWPFDocument(Stream)`
 
@@ -154,19 +181,15 @@ examples/output/phase3_3-pptx-example.pptx
 The presentation demonstrates:
 
 - `XMLSlideShow.createSlide()`
-- `XMLSlideShow.addPicture()` — JPEG format, deduplicated across slides
-- `XMLSlideShow.createPicture()` — places a picture shape on a slide
-- `XSLFPictureShape.setAnchor()` — position and size in EMU
-- `XSLFPictureShape.setRotation()` — rotation in degrees (normalised to [0°, 360°))
-- `XSLFPictureShape.setFlipHorizontal()` — horizontal flip
+- `XMLSlideShow.addPicture()` with JPEG picture data deduplication
+- `XMLSlideShow.createPicture()` to place a picture shape on a slide
+- `XSLFPictureShape.setAnchor()` for position and size in EMU
+- `XSLFPictureShape.setRotation()` normalized to `[0, 360)`
+- `XSLFPictureShape.setFlipHorizontal()`
 - `XMLSlideShow.write(Stream)`
 - Round-trip read back via `XMLSlideShow(Stream)`
 
-Requires `tests/test-files/image.jpg` (present in the repository).
-
-Slide 1: photo filling the entire slide at 0° rotation.  
-Slide 2: same photo at 3×2.25 inch, 45° rotation, horizontal flip.  
-Slide 3: same photo at 3×2.25 inch, 90° rotation.
+Requires `tests/test-files/image.jpg`, which is present in the repository.
 
 ## Phase34AgileEncryptionExample
 
@@ -220,7 +243,7 @@ The example demonstrates:
 
 ## Phase5FormulaEvaluatorExample
 
-Creates an `.xlsx` file with formula cells, evaluates a representative Phase 5 function subset, writes cached formula results, then reads the workbook back:
+Creates an `.xlsx` file with formula cells, evaluates a representative function subset, writes cached formula results, then reads the workbook back:
 
 ```bash
 dotnet run --project examples/Phase5FormulaEvaluatorExample/Phase5FormulaEvaluatorExample.csproj
@@ -240,9 +263,11 @@ The example demonstrates:
 - string formulas: `CONCATENATE(...)` and `&`
 - cached formula result readback through `getCachedFormulaResultType()`
 
+Formula evaluation is intentionally limited and isolated in `DotnetPoi.Formula`; Core can still preserve formula text and cached results.
+
 ## Phase7CellTypesExample
 
-Demonstrates reading all OOXML cell types — numeric, string, boolean, formula (with numeric/string/boolean/error cached results) — from a POI-generated fixture, and verifies Boolean cell write/read round-trip:
+Demonstrates reading OOXML cell types from a POI-generated fixture and verifies Boolean cell write/read round-trip:
 
 ```bash
 # Generate the Java fixture first:
@@ -263,7 +288,49 @@ Cells demonstrated:
 | Row | POI type | dotnet-poi reads as |
 |---|---|---|
 | 0 | Numeric `10.0` | `CellType.Numeric = 10` |
-| 1 | Formula `A1+B1` cached `30.0` | `CellType.Formula → Numeric = 30` |
-| 2 | Formula `"hello "&"world"` cached string | `CellType.Formula → String = "hello world"` |
+| 1 | Formula `A1+B1` cached `30.0` | `CellType.Formula -> Numeric = 30` |
+| 2 | Formula `"hello "&"world"` cached string | `CellType.Formula -> String = "hello world"` |
 | 3 | Boolean `true` | `CellType.Boolean = True` |
-| 4 | Formula `1/0` cached `#DIV/0!` | `CellType.Formula → Error = #DIV/0!` |
+| 4 | Formula `1/0` cached `#DIV/0!` | `CellType.Formula -> Error = #DIV/0!` |
+
+## Phase8CoreOnlyExample
+
+Demonstrates using `DotnetPoi.Core` without the `DotnetPoi.Formula` package. This confirms that spreadsheet read/write/format operations are available in Core, while formula evaluation is isolated.
+
+```bash
+dotnet run --project examples/Phase8CoreOnlyExample/Phase8CoreOnlyExample.csproj
+```
+
+The example:
+
+- Creates a styled workbook with headers, fonts, fills, number formats, borders, and alignment
+- Saves to a `MemoryStream` and reads it back
+- Verifies that cell values and styles survived the round-trip
+- Confirms that `createFormulaEvaluator()` throws `NotSupportedException` when Formula is absent
+
+## EdgeCaseProbeExample
+
+Runs a suite of edge-case probes across supported formats. This example is useful when checking behavior near boundaries and preservation-sensitive paths.
+
+```bash
+dotnet run --project examples/EdgeCaseProbeExample/EdgeCaseProbeExample.csproj
+```
+
+Generated outputs include:
+
+```text
+examples/output/edge-empty-workbook.xlsx
+examples/output/edge-sparse-and-strings.xlsx
+examples/output/edge-formulas.xlsx
+examples/output/edge-encrypted-sparse.xlsx
+examples/output/edge-docx-empty-and-text.docx
+examples/output/edge-pptx-empty-slide.pptx
+```
+
+Probes covered:
+
+- `.xlsx`: empty workbooks, sparse rows/cells, XML-sensitive text, Unicode strings, and formula edge cases
+- Encryption: sparse workbook round-trip through Agile encryption and decryption
+- `.docx`: empty paragraph plus multiline text with special characters
+- `.pptx`: blank slide round-trip
+- Validation: rejection of negative row/column indices and invalid sheet names

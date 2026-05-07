@@ -87,28 +87,40 @@
     <main class="content">
 <h1>Examples Index</h1>
 <p>All runnable examples are in <code>examples/</code>. Build and run with:</p>
-<pre><code class="language-bash">dotnet run --project examples/ExampleName</code></pre>
-<h2>By Phase</h2>
+<pre><code class="language-bash">dotnet run --project examples/ExampleName/ExampleName.csproj</code></pre>
+<p>Generated files are written to <code>examples/output/</code>.</p>
+<h2>By Example</h2>
 <table>
-<thead><tr><th>Example</th><th>Phase</th><th>Format</th><th>Topics</th></tr></thead>
+<thead><tr><th>Example</th><th>Format</th><th>Topics</th></tr></thead>
 <tbody>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase0WriteExample">Phase0WriteExample</a></td><td>0</td><td>xlsx</td><td>First workbook, create sheet, rows, cells, save, read back</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase1InteropExample">Phase1InteropExample</a></td><td>1</td><td>xlsx</td><td>Java POI interoperability, bidirectional round-trip</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase2ReadExample">Phase2ReadExample</a></td><td>2</td><td>xlsx</td><td>Reading existing workbooks, enumerating sheets and cells</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase3InterfaceExample">Phase3InterfaceExample</a></td><td>3</td><td>xlsx</td><td>Using IWorkbook / ISheet / IRow / ICell interfaces</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase4XSSFOnlyExample">Phase4XSSFOnlyExample</a></td><td>4</td><td>xlsx</td><td>Create, styles, formulas, merged regions, freeze panes</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase5FormulaEvaluatorExample">Phase5FormulaEvaluatorExample</a></td><td>5</td><td>xlsx</td><td>Formula evaluator setup with DotnetPoi.Formula</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase6StreamingExample">Phase6StreamingExample</a></td><td>6</td><td>xlsx</td><td>SXSSF streaming, large data write + read verification</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase7CellTypesExample">Phase7CellTypesExample</a></td><td>7</td><td>xlsx</td><td>Read all cell types, write round-trip with boolean/numeric/string</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase8RichTextExample">Phase8RichTextExample</a></td><td>8</td><td>xlsx</td><td>Rich text strings, formatting runs</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase25ImagesExample">Phase25ImagesExample</a></td><td>25</td><td>xlsx</td><td>Image embedding with anchors and rotation</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase30DocxCreateExample">Phase30DocxCreateExample</a></td><td>30</td><td>docx</td><td>Create document, paragraphs, headers, footers, images, tables</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase31DocxReadExample">Phase31DocxReadExample</a></td><td>31</td><td>docx</td><td>Read back paragraphs, tables, images, fields</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase32DocxExample">Phase32DocxExample</a></td><td>32</td><td>docx</td><td>Read docx from POI, verify paragraphs, tables, pages, images</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase33PptxExample">Phase33PptxExample</a></td><td>33</td><td>pptx</td><td>Read pptx from POI, slides, text, tables, images</td></tr>
-<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples">UsageSamples</a></td><td>—</td><td>xlsx, docx, pptx</td><td>All-in-one with styles, validation, conditional formatting</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples">UsageSamples</a></td><td>xlsx, xlsm, docx, pptx</td><td>Broad user-facing samples, macro preservation, read-back checks</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase0WriteExample">Phase0WriteExample</a></td><td>xlsx</td><td>First workbook, create sheet, rows, cells, save</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase1InteropExample">Phase1InteropExample</a></td><td>xlsx</td><td>Java POI interoperability, read/write fixtures</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase25ImagesExample">Phase25ImagesExample</a></td><td>xlsx</td><td>Image embedding with anchors</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase3InterfaceExample">Phase3InterfaceExample</a></td><td>xlsx</td><td><code>IWorkbook</code> / <code>ISheet</code> / <code>IRow</code> / <code>ICell</code> interfaces</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase32DocxExample">Phase32DocxExample</a></td><td>docx</td><td>Paragraphs, runs, inline image, rotation</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase33PptxExample">Phase33PptxExample</a></td><td>pptx</td><td>Slides, pictures, anchors, rotation, flip</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase34AgileEncryptionExample">Phase34AgileEncryptionExample</a></td><td>xlsx</td><td>Agile encryption and decryption</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase4HssfXlsExample">Phase4HssfXlsExample</a></td><td>xls</td><td>BIFF8 bootstrap write/read</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase5FormulaEvaluatorExample">Phase5FormulaEvaluatorExample</a></td><td>xlsx</td><td>Limited formula evaluator, cached formula results</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase7CellTypesExample">Phase7CellTypesExample</a></td><td>xlsx</td><td>Numeric, string, boolean, formula, and error cell handling</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase8CoreOnlyExample">Phase8CoreOnlyExample</a></td><td>xlsx</td><td>Core package without Formula</td></tr>
+<tr><td><a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/EdgeCaseProbeExample">EdgeCaseProbeExample</a></td><td>xlsx, docx, pptx</td><td>Edge cases, encrypted sparse workbook, invalid inputs</td></tr>
 </tbody>
 </table>
+<h2>Recommended Starting Point</h2>
+<p>Start with <a href="https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples">UsageSamples</a> if you want practical examples for the currently supported user workflows. It creates:</p>
+<ul>
+<li><code>examples/output/usage-workbook.xlsx</code></li>
+<li><code>examples/output/usage-macro-preserve.xlsm</code></li>
+<li><code>examples/output/usage-document.docx</code></li>
+<li><code>examples/output/usage-presentation.pptx</code></li>
+</ul>
+<p>Use the phase-specific examples when you need a smaller sample for one API area.</p>
+<h2>Java Fixture Examples</h2>
+<p>Some examples rely on fixtures generated by the Java Apache POI test project.</p>
+<pre><code class="language-bash">mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest</code></pre>
+<p>Run this before <code>Phase1InteropExample</code> or <code>Phase7CellTypesExample</code> if the expected fixture file is missing.</p>
 
     </main>
   </div>
