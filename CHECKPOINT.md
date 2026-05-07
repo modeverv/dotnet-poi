@@ -1970,3 +1970,30 @@ Notes:
 - Verification:
   - `mvn -q -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest#writePhaseAutoFilterSheet test` ✅
   - `dotnet test tests/DotnetPoi.Interop.Tests/ --no-build -c Debug --filter "Category=ReadFromPoi"` ✅ (9 passed, 1 skipped)
+
+## 2026-05-07 JST — Documentation UsageSamples gap fill
+
+- Task: ドキュメントに対応する runnable UsageExample が不足しているため、足りていない例を実装する。
+- Initial assessment:
+  - `UsageSamples` 既存: xlsx styles/data validation/conditional formatting/rich text、docx paragraph/table/image/hyperlink、pptx slide/image/table/text。
+  - Missing or thin vs docs: xlsx auto filter, pivot tables, protection, xlsm macro preservation, docx headers/footers, fields, sections/page setup.
+  - `reference/examples-index.md` also lists non-existent projects (`Phase2ReadExample`, `Phase4XSSFOnlyExample`, etc.), so it should be aligned with actual `examples/`.
+- Plan:
+  - Extend `examples/UsageSamples/Program.cs` instead of creating many tiny projects.
+  - Generate/verify `usage-workbook.xlsx`, `usage-document.docx`, `usage-presentation.pptx`, plus `usage-macro-preserve.xlsm`.
+  - Update docs pages that currently lack a Full Runnable Example link to point at `UsageSamples`.
+  - Fix docs snippets that reference older/non-existent APIs where directly touched.
+  - Run `dotnet run --project examples/UsageSamples/UsageSamples.csproj`.
+- Implementation:
+  - `UsageSamples` xlsx expanded with auto filter, sheet/workbook protection, pivot table sheet, and read-back assertions.
+  - Added xlsm macro preservation sample using `tests/test-files/example.xlsm`, writing `examples/output/usage-macro-preserve.xlsm`, and comparing `xl/vbaProject.bin` bytes.
+  - `UsageSamples` docx expanded with page setup, margins, columns, default/first/even headers and footers, and PAGE/TOC/MERGEFIELD fields.
+  - Updated guide pages for auto filter, pivot tables, macros, protection, headers/footers, fields, and sections with runnable `UsageSamples` links.
+  - Rewrote `reference/examples-index.md` to list only real example projects.
+  - Found and fixed XWPF relationship-id mismatch for header/footer references when images/hyperlinks are also present: `WriteDocument()` now starts header/footer relationship ids at `3 + pictures + hyperlinks (+ numbering/vba)`, matching `WriteDocumentRelationships()`.
+  - Added assertions to `RoundTrip_HeaderFooterVariants_Restored` that document.xml references the same header/footer rIds as document.xml.rels.
+- Verification:
+  - `dotnet run --project examples/UsageSamples/UsageSamples.csproj` ✅
+  - `dotnet test tests/DotnetPoi.Core.Tests/ -c Debug --filter "RoundTrip_HeaderFooterVariants_Restored"` ✅
+  - `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs` ✅ (36 HTML files)
+  - Spot-check: `usage-workbook.xlsx` contains pivot table/cache parts; `usage-macro-preserve.xlsm` contains `xl/vbaProject.bin`; `usage-document.docx` has matching hyperlink/image/header/footer relationship ids.

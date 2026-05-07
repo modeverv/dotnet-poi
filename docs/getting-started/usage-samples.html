@@ -91,6 +91,7 @@
 <pre><code class="language-bash">dotnet run --project examples/UsageSamples/UsageSamples.csproj</code></pre>
 <p>Generated files:</p>
 <pre><code class="language-text">examples/output/usage-workbook.xlsx
+examples/output/usage-macro-preserve.xlsm
 examples/output/usage-document.docx
 examples/output/usage-presentation.pptx</code></pre>
 <h2>Spreadsheet</h2>
@@ -101,19 +102,35 @@ examples/output/usage-presentation.pptx</code></pre>
 <li>apply fonts, fills, borders, alignment, and number formats</li>
 <li>merge a title range</li>
 <li>freeze header rows</li>
+<li>add an auto filter</li>
 <li>add a whole-number data validation</li>
+<li>add conditional formatting</li>
 <li>preserve rich text in a shared string</li>
+<li>enable sheet and workbook protection</li>
+<li>create a simple pivot table sheet</li>
 <li>read the workbook back and assert cell values</li>
 </ul>
 <p>Source: <code>examples/UsageSamples/Program.cs</code>, <code>CreateSpreadsheet</code>.</p>
+<h2>Macro-Enabled Workbook</h2>
+<p><code>usage-macro-preserve.xlsm</code> demonstrates:</p>
+<ul>
+<li>open an existing <code>.xlsm</code> template</li>
+<li>edit workbook content</li>
+<li>save a new macro-enabled workbook</li>
+<li>compare <code>xl/vbaProject.bin</code> before and after to verify byte-for-byte VBA preservation</li>
+</ul>
+<p>Source: <code>examples/UsageSamples/Program.cs</code>, <code>CreateMacroWorkbookRoundTrip</code>.</p>
 <h2>Word Document</h2>
 <p><code>usage-document.docx</code> demonstrates:</p>
 <ul>
 <li>create paragraphs and runs</li>
+<li>set page size, margins, landscape orientation, and columns</li>
+<li>add default, first-page, and even-page headers and footers</li>
+<li>add PAGE, TOC, and MERGEFIELD fields</li>
 <li>apply bold text, font size, color, underline, and hyperlink metadata</li>
 <li>create a table</li>
 <li>embed an inline JPEG image</li>
-<li>read the document back and assert paragraphs, table content, and image data</li>
+<li>read the document back and assert paragraphs, fields, page settings, table content, and image data</li>
 </ul>
 <p>Source: <code>examples/UsageSamples/Program.cs</code>, <code>CreateDocument</code>.</p>
 <h2>PowerPoint Presentation</h2>

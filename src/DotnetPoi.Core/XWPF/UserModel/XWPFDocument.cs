@@ -1643,7 +1643,7 @@ public sealed class XWPFDocument : IDisposable
         }
         // headerReference / footerReference (variants: default, first, even)
         {
-            int relOffset = 2 + _pictures.Count + _hyperlinkUrls.Count;
+            int relOffset = 3 + _pictures.Count + _hyperlinkUrls.Count;
             if (_numInstances.Count > 0) relOffset++;
             if (_vbaProjectBin != null) relOffset++;
 

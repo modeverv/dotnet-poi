@@ -73,4 +73,4 @@ Requirements: .NET SDK, Java 17+, Maven.
 
 See `examples/Phase1InteropExample/` for a worked example:
 
-[examples/Phase1InteropExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase1InteropExample)
+[examples/Phase1InteropExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase1InteropExample)

@@ -91,7 +91,7 @@ doc.write(file);
 
 See `examples/Phase32DocxExample/` in the repository:
 
-[examples/Phase32DocxExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase32DocxExample)
+[examples/Phase32DocxExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase32DocxExample)
 
 Run it:
 

@@ -12,24 +12,20 @@ using var doc = new XWPFDocument();
 var p = doc.createParagraph();
 var r = p.createRun();
 r.setText("Page ");
-
-var field = p.addField();
-field.SetFieldCode("PAGE");
+p.addField(" PAGE ", "1");
 ```
 
 ## TOC (Table of Contents)
 
 ```csharp
 var tocParagraph = doc.createParagraph();
-var tocField = tocParagraph.addField();
-tocField.SetFieldCode("TOC \\o \"1-3\" \\h \\z \\u");
+tocParagraph.addField("TOC \\o \"1-3\" \\h \\z \\u");
 ```
 
 ## Mail Merge Fields
 
 ```csharp
-var mergeField = paragraph.addField();
-mergeField.SetFieldCode("MERGEFIELD CustomerName");
+paragraph.addField("MERGEFIELD CustomerName", "Acme Inc.");
 ```
 
 ## Reading Fields
@@ -38,9 +34,15 @@ mergeField.SetFieldCode("MERGEFIELD CustomerName");
 var fields = paragraph.getFields();
 foreach (var f in fields)
 {
-    var code = f.GetFieldCode();
+    var code = f.Instruction;
     // "PAGE", "TOC \\o \"1-3\" \\h \\z \\u", "MERGEFIELD CustomerName"
 }
 ```
 
 Fields are preserved on round-trip and are interoperable with Java POI.
+
+## Full Runnable Example
+
+See `examples/UsageSamples/Program.cs` (`CreateDocument`):
+
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)

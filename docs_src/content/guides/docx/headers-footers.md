@@ -8,45 +8,36 @@ Add headers and footers to docx documents.
 using DotnetPoi.XWPF.UserModel;
 
 using var doc = new XWPFDocument();
-
-var header = doc.getHeaderFooterPolicy().createHeader(XWPFHeaderFooterPolicy.DEFAULT);
-var hPara = header.createParagraph();
-var hRun = hPara.createRun();
-hRun.setText("Document Header");
+doc.setHeaderText("Document Header");
 ```
 
 ## Adding a Footer
 
 ```csharp
-var footer = doc.getHeaderFooterPolicy().createFooter(XWPFHeaderFooterPolicy.DEFAULT);
-var fPara = footer.createParagraph();
-var fRun = fPara.createRun();
-fRun.setText("Page ");
-fRun.setItalic(true);
+doc.setFooterText("Page footer");
 ```
 
 ## Different Headers for First Page
 
 ```csharp
-var firstHeader = doc.getHeaderFooterPolicy().createHeader(XWPFHeaderFooterPolicy.FIRST);
-firstHeader.createParagraph().createRun().setText("Cover Page Header");
+doc.setFirstHeaderText("Cover Page Header");
+doc.setEvenHeaderText("Even Page Header");
+doc.setFirstFooterText("Cover Page Footer");
+doc.setEvenFooterText("Even Page Footer");
 ```
 
 ## Reading Headers and Footers
 
 ```csharp
-var policy = doc.getHeaderFooterPolicy();
-var defaultHeader = policy.getDefaultHeader();
-if (defaultHeader is not null)
-{
-    var text = defaultHeader.getParagraphs()[0].getText();
-}
-
-var defaultFooter = policy.getDefaultFooter();
-if (defaultFooter is not null)
-{
-    var text = defaultFooter.getParagraphs()[0].getText();
-}
+var defaultHeader = doc.getHeaderText();
+var firstHeader = doc.getFirstHeaderText();
+var evenFooter = doc.getEvenFooterText();
 ```
 
 Headers and footers are preserved on round-trip.
+
+## Full Runnable Example
+
+See `examples/UsageSamples/Program.cs` (`CreateDocument`):
+
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)

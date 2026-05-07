@@ -40,4 +40,4 @@ See [Package Split](../../compatibility/package-split.md) for details.
 
 See `examples/Phase5FormulaEvaluatorExample/`:
 
-[examples/Phase5FormulaEvaluatorExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase5FormulaEvaluatorExample)
+[examples/Phase5FormulaEvaluatorExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase5FormulaEvaluatorExample)

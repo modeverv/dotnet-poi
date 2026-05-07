@@ -607,6 +607,10 @@ public class XWPFDocumentTests
         Assert.Contains("footer1.xml", relsXml);
         Assert.Contains("footer2.xml", relsXml);
         Assert.Contains("footer3.xml", relsXml);
+        Assert.Contains("Id=\"rId3\" Target=\"header1.xml\"", relsXml);
+        Assert.Contains("Id=\"rId6\" Target=\"footer1.xml\"", relsXml);
+        Assert.Contains("r:id=\"rId3\"", docXml);
+        Assert.Contains("r:id=\"rId6\"", docXml);
 
         // Verify content types
         var ctEntry = archive.GetEntry("[Content_Types].xml");

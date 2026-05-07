@@ -100,7 +100,7 @@ prs.write(file);
 
 See `examples/Phase33PptxExample/` in the repository:
 
-[examples/Phase33PptxExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase33PptxExample)
+[examples/Phase33PptxExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase33PptxExample)
 
 Run it:
 

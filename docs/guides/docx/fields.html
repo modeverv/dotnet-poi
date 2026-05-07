@@ -95,24 +95,23 @@ using var doc = new XWPFDocument();
 var p = doc.createParagraph();
 var r = p.createRun();
 r.setText(&quot;Page &quot;);
-
-var field = p.addField();
-field.SetFieldCode(&quot;PAGE&quot;);</code></pre>
+p.addField(&quot; PAGE &quot;, &quot;1&quot;);</code></pre>
 <h2>TOC (Table of Contents)</h2>
 <pre><code class="language-csharp">var tocParagraph = doc.createParagraph();
-var tocField = tocParagraph.addField();
-tocField.SetFieldCode(&quot;TOC \\o \&quot;1-3\&quot; \\h \\z \\u&quot;);</code></pre>
+tocParagraph.addField(&quot;TOC \\o \&quot;1-3\&quot; \\h \\z \\u&quot;);</code></pre>
 <h2>Mail Merge Fields</h2>
-<pre><code class="language-csharp">var mergeField = paragraph.addField();
-mergeField.SetFieldCode(&quot;MERGEFIELD CustomerName&quot;);</code></pre>
+<pre><code class="language-csharp">paragraph.addField(&quot;MERGEFIELD CustomerName&quot;, &quot;Acme Inc.&quot;);</code></pre>
 <h2>Reading Fields</h2>
 <pre><code class="language-csharp">var fields = paragraph.getFields();
 foreach (var f in fields)
 {
-    var code = f.GetFieldCode();
+    var code = f.Instruction;
     // &quot;PAGE&quot;, &quot;TOC \\o \&quot;1-3\&quot; \\h \\z \\u&quot;, &quot;MERGEFIELD CustomerName&quot;
 }</code></pre>
 <p>Fields are preserved on round-trip and are interoperable with Java POI.</p>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/UsageSamples/Program.cs</code> (<code>CreateDocument</code>):</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples">examples/UsageSamples</a></p>
 
     </main>
   </div>

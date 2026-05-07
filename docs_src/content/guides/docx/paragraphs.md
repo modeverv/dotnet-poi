@@ -75,6 +75,6 @@ For more detail, see [Styles](styles.md).
 
 See `examples/Phase32DocxExample/` and `examples/UsageSamples/Program.cs` (`CreateDocument`):
 
-[examples/Phase32DocxExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase32DocxExample)
+[examples/Phase32DocxExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase32DocxExample)
 
-[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples)

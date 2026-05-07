@@ -43,4 +43,4 @@ wb.getSheetAt(0).protectSheet("password");  // applied per-sheet
 
 See `examples/UsageSamples/Program.cs`:
 
-[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples)

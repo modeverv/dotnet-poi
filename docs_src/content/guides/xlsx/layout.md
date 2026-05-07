@@ -111,6 +111,6 @@ bool selected = sheet.isSelected();  // check if selected
 
 See `examples/UsageSamples/Program.cs` (`CreateSpreadsheet`) and `examples/Phase3InterfaceExample/`:
 
-[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples)
 
-[examples/Phase3InterfaceExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase3InterfaceExample)
+[examples/Phase3InterfaceExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase3InterfaceExample)

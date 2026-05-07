@@ -10,7 +10,8 @@ using var wb = new XSSFWorkbook(stream);
 
 // Make changes to cells, styles, etc.
 var sheet = wb.getSheetAt(0);
-sheet.getRow(0).createCell(5).setCellValue("New data");
+var row = sheet.getRow(0) ?? sheet.createRow(0);
+row.createCell(5).setCellValue("New data");
 
 // Save — macro bytes are preserved automatically
 using var outStream = File.Create("macro-workbook-modified.xlsm");
@@ -46,3 +47,9 @@ For template-based workflows, start from an existing xlsm that contains the macr
 | xlsm (Excel macro-enabled) | ✅ Byte-for-byte preservation verified |
 | docm (Word macro-enabled) | ✅ Byte-for-byte preservation verified |
 | pptm (PowerPoint macro-enabled) | ✅ Byte-for-byte preservation verified |
+
+## Full Runnable Example
+
+See `examples/UsageSamples/Program.cs` (`CreateMacroWorkbookRoundTrip`):
+
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)

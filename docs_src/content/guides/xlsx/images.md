@@ -53,4 +53,4 @@ Each picture needs its own anchor and unique picture index from `addPicture`.
 
 See `examples/Phase25ImagesExample/`:
 
-[examples/Phase25ImagesExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase25ImagesExample)
+[examples/Phase25ImagesExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase25ImagesExample)

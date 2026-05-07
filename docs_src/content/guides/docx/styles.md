@@ -55,4 +55,4 @@ New documents write a default `word/styles.xml` with Normal and Heading 1-3 defi
 
 See `examples/Phase32DocxExample/` for docx creation patterns:
 
-[examples/Phase32DocxExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase32DocxExample)
+[examples/Phase32DocxExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase32DocxExample)

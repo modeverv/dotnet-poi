@@ -89,33 +89,34 @@
 <p>dotnet-poi supports programmatic creation of pivot tables. Editing existing pivot tables is not modeled but they are preserved on round-trip.</p>
 <h2>Creating a Pivot Table</h2>
 <pre><code class="language-csharp">using DotnetPoi.XSSF.UserModel;
-using DotnetPoi.SS.Util;
 
 // Create source data
 var sheet = wb.createSheet(&quot;Data&quot;);
-sheet.createRow(0).CreateCells(new[] { &quot;Category&quot;, &quot;Amount&quot; });
-sheet.createRow(1).CreateCells(new[] { &quot;Food&quot;, &quot;100&quot; });
-sheet.createRow(2).CreateCells(new[] { &quot;Travel&quot;, &quot;200&quot; });
+var header = sheet.createRow(0);
+header.createCell(0).setCellValue(&quot;Category&quot;);
+header.createCell(1).setCellValue(&quot;Amount&quot;);
+var food = sheet.createRow(1);
+food.createCell(0).setCellValue(&quot;Food&quot;);
+food.createCell(1).setCellValue(100);
 
 // Create pivot table sheet
 var pivotSheet = wb.createSheet(&quot;Pivot&quot;);
 
-// Define source range
-var sourceRange = new CellRangeAddress(0, 2, 0, 1);  // Data!A1:B3
-
 // Create pivot table
-var pivotTable = pivotSheet.createPivotTable(sourceRange, new CellReference(0, 0));
+var pivotTable = pivotSheet.createPivotTable(&quot;A1&quot;, &quot;A1:B2&quot;, &quot;Data&quot;);
 
 // Add rows and data fields
-var categoryField = pivotTable.getRowLabel().AddValueField(0);     // Column 0 = Category
-var amountField = pivotTable.getDataFields().AddValueField(1);     // Column 1 = Amount
-amountField.SetValueFieldSum();</code></pre>
+pivotTable.RowLabels.Add(0);   // Column 0 = Category
+pivotTable.DataColumns.Add(1); // Column 1 = Amount</code></pre>
 <h2>Limitations</h2>
 <ul>
 <li>Only programmatic creation is supported</li>
 <li>Editing existing pivot tables is not modeled</li>
 <li>Pivot tables in existing files are preserved as unknown parts on round-trip</li>
 </ul>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/UsageSamples/Program.cs</code> (<code>CreateSpreadsheet</code>):</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples">examples/UsageSamples</a></p>
 
     </main>
   </div>

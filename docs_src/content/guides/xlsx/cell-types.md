@@ -100,4 +100,4 @@ var cachedValue = cell.getNumericCellValue();        // 55.0
 
 See `examples/Phase7CellTypesExample/`:
 
-[examples/Phase7CellTypesExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase7CellTypesExample)
+[examples/Phase7CellTypesExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase7CellTypesExample)

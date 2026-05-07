@@ -73,7 +73,7 @@ Console.WriteLine(row.getCell(1).getNumericCellValue()); // 123.45
 
 See `examples/Phase0WriteExample/` in the repository for a complete example that writes an xlsx, saves it, and prints confirmation:
 
-[examples/Phase0WriteExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase0WriteExample)
+[examples/Phase0WriteExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase0WriteExample)
 
 Run it:
 

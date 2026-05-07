@@ -12,6 +12,7 @@ Generated files:
 
 ```text
 examples/output/usage-workbook.xlsx
+examples/output/usage-macro-preserve.xlsm
 examples/output/usage-document.docx
 examples/output/usage-presentation.pptx
 ```
@@ -25,21 +26,39 @@ examples/output/usage-presentation.pptx
 - apply fonts, fills, borders, alignment, and number formats
 - merge a title range
 - freeze header rows
+- add an auto filter
 - add a whole-number data validation
+- add conditional formatting
 - preserve rich text in a shared string
+- enable sheet and workbook protection
+- create a simple pivot table sheet
 - read the workbook back and assert cell values
 
 Source: `examples/UsageSamples/Program.cs`, `CreateSpreadsheet`.
+
+## Macro-Enabled Workbook
+
+`usage-macro-preserve.xlsm` demonstrates:
+
+- open an existing `.xlsm` template
+- edit workbook content
+- save a new macro-enabled workbook
+- compare `xl/vbaProject.bin` before and after to verify byte-for-byte VBA preservation
+
+Source: `examples/UsageSamples/Program.cs`, `CreateMacroWorkbookRoundTrip`.
 
 ## Word Document
 
 `usage-document.docx` demonstrates:
 
 - create paragraphs and runs
+- set page size, margins, landscape orientation, and columns
+- add default, first-page, and even-page headers and footers
+- add PAGE, TOC, and MERGEFIELD fields
 - apply bold text, font size, color, underline, and hyperlink metadata
 - create a table
 - embed an inline JPEG image
-- read the document back and assert paragraphs, table content, and image data
+- read the document back and assert paragraphs, fields, page settings, table content, and image data
 
 Source: `examples/UsageSamples/Program.cs`, `CreateDocument`.
 

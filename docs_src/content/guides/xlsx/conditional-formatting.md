@@ -36,4 +36,4 @@ This highlights cells in range D4:D6 where the value is greater than 20.
 
 See `examples/UsageSamples/Program.cs` (`CreateSpreadsheet`):
 
-[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples)

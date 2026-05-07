@@ -89,16 +89,19 @@
 <p>Add dropdown filter buttons to column headers.</p>
 <h2>Basic Usage</h2>
 <pre><code class="language-csharp">sheet.setAutoFilter(new CellRangeAddress(2, 6, 0, 3));
-// Adds filter buttons to the header range A2:D6</code></pre>
+// Adds filter buttons to the header range A3:D7</code></pre>
 <p>The method takes a <code>CellRangeAddress</code> specifying the data range including headers. Excel displays dropdown arrows in the first row of the range.</p>
 <h2>Reading Auto Filter</h2>
 <pre><code class="language-csharp">var filter = sheet.getAutoFilter();
 if (filter is not null)
 {
-    var range = filter.CellRange;
-    // range.FirstRow, range.LastRow, range.FirstCol, range.LastCol
+    Console.WriteLine(filter.FormatAsString());
+    // filter.FirstRow, filter.LastRow, filter.FirstCol, filter.LastCol
 }</code></pre>
 <p>Auto filter settings are preserved on round-trip.</p>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/UsageSamples/Program.cs</code> (<code>CreateSpreadsheet</code>):</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples">examples/UsageSamples</a></p>
 
     </main>
   </div>

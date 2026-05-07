@@ -3,6 +3,7 @@ using DotnetPoi.SS.Util;
 using DotnetPoi.XSSF.UserModel;
 using DotnetPoi.XSLF.UserModel;
 using DotnetPoi.XWPF.UserModel;
+using System.IO.Compression;
 
 var repoRoot = FindRepositoryRoot(AppContext.BaseDirectory);
 var outputDirectory = Path.Combine(repoRoot, "examples", "output");
@@ -14,13 +15,17 @@ var sampleImageBytes = File.ReadAllBytes(sampleImagePath);
 var spreadsheetPath = Path.Combine(outputDirectory, "usage-workbook.xlsx");
 var documentPath = Path.Combine(outputDirectory, "usage-document.docx");
 var presentationPath = Path.Combine(outputDirectory, "usage-presentation.pptx");
+var macroWorkbookPath = Path.Combine(outputDirectory, "usage-macro-preserve.xlsm");
+var macroTemplatePath = Path.Combine(repoRoot, "tests", "test-files", "example.xlsm");
 
 CreateSpreadsheet(spreadsheetPath);
+CreateMacroWorkbookRoundTrip(macroTemplatePath, macroWorkbookPath);
 CreateDocument(documentPath, sampleImageBytes);
 CreatePresentation(presentationPath, sampleImageBytes);
 
 Console.WriteLine("Usage samples generated and verified:");
 Console.WriteLine($"  {spreadsheetPath}");
+Console.WriteLine($"  {macroWorkbookPath}");
 Console.WriteLine($"  {documentPath}");
 Console.WriteLine($"  {presentationPath}");
 
@@ -100,6 +105,7 @@ static void CreateSpreadsheet(string outputPath)
     sheet.setColumnWidth(2, 12 * 256);
     sheet.setColumnWidth(3, 14 * 256);
     sheet.createFreezePane(0, 3);
+    sheet.setAutoFilter(new CellRangeAddress(2, 5, 0, 3));
 
     sheet.AddDataValidation(new XSSFDataValidation
     {
@@ -125,6 +131,14 @@ static void CreateSpreadsheet(string outputPath)
     conditional.Rules[0].Formulas.Add("20");
     sheet.AddConditionalFormatting(conditional);
 
+    sheet.protectSheet(true);
+    workbook.protectWorkbook(true);
+
+    var pivotSheet = workbook.createSheet("Summary");
+    var pivotTable = pivotSheet.createPivotTable("A1", "A3:D6", "Invoice");
+    pivotTable.RowLabels.Add(0);
+    pivotTable.DataColumns.Add(3);
+
     using (var stream = File.Create(outputPath))
     {
         workbook.write(stream);
@@ -139,11 +153,51 @@ static void CreateSpreadsheet(string outputPath)
     AssertEqual("Note: quantities must be whole numbers.",
         loadedSheet.getRow(7)!.getCell(0)!.getRichStringCellValue().getString(),
         "spreadsheet rich text");
+    AssertEqual(true, loadedSheet.isSheetProtected(), "spreadsheet sheet protection");
+    AssertEqual(true, loaded.isWorkbookProtected(), "spreadsheet workbook protection");
+    AssertEqual("A3:D6", loadedSheet.getAutoFilter()!.FormatAsString(), "spreadsheet auto filter");
+    AssertEqual(2, loaded.getNumberOfSheets(), "spreadsheet sheet count including pivot sheet");
+}
+
+static void CreateMacroWorkbookRoundTrip(string templatePath, string outputPath)
+{
+    using (var template = File.OpenRead(templatePath))
+    using (var workbook = new XSSFWorkbook(template))
+    {
+        if (!workbook.HasMacros)
+            throw new InvalidOperationException("Macro template should be loaded as an xlsm workbook.");
+
+        var sheet = workbook.getSheetAt(0);
+        var row = sheet.getRow(0) ?? sheet.createRow(0);
+        row.createCell(5).setCellValue("edited by UsageSamples");
+
+        using var output = File.Create(outputPath);
+        workbook.write(output);
+    }
+
+    var originalVba = ReadZipEntry(templatePath, "xl/vbaProject.bin");
+    var roundTrippedVba = ReadZipEntry(outputPath, "xl/vbaProject.bin");
+    AssertBytesEqual(originalVba, roundTrippedVba, "xlsm VBA project");
+
+    using var readBack = File.OpenRead(outputPath);
+    using var loaded = new XSSFWorkbook(readBack);
+    AssertEqual(true, loaded.HasMacros, "xlsm macro flag");
+    AssertEqual("edited by UsageSamples", loaded.getSheetAt(0).getRow(0)!.getCell(5)!.getStringCellValue(), "xlsm edited cell");
 }
 
 static void CreateDocument(string outputPath, byte[] imageBytes)
 {
     using var document = new XWPFDocument();
+    document.setPageSize(16838, 11906);
+    document.setLandscape(true);
+    document.setMargins(top: 720, right: 720, bottom: 720, left: 720);
+    document.setColumns(count: 2, spacingTwips: 720);
+    document.setHeaderText("Usage Sample Header");
+    document.setFirstHeaderText("Usage Sample First Page Header");
+    document.setEvenHeaderText("Usage Sample Even Page Header");
+    document.setFooterText("Usage Sample Footer");
+    document.setFirstFooterText("Usage Sample First Page Footer");
+    document.setEvenFooterText("Usage Sample Even Page Footer");
 
     var heading = document.createParagraph();
     var headingRun = heading.createRun();
@@ -153,6 +207,17 @@ static void CreateDocument(string outputPath, byte[] imageBytes)
 
     var intro = document.createParagraph();
     intro.createRun().setText("This document was created, saved, and read back with dotnet-poi.");
+
+    var pageField = document.createParagraph();
+    pageField.createRun().setText("Page ");
+    pageField.addField(" PAGE ", "1");
+
+    var tocField = document.createParagraph();
+    tocField.addField("TOC \\o \"1-3\" \\h \\z \\u");
+
+    var mergeField = document.createParagraph();
+    mergeField.createRun().setText("Customer: ");
+    mergeField.addField("MERGEFIELD CustomerName", "Acme Inc.");
 
     var link = document.createParagraph();
     var linkRun = link.createRun();
@@ -187,6 +252,12 @@ static void CreateDocument(string outputPath, byte[] imageBytes)
     AssertEqual("Usage Sample Report", loaded.getParagraphs()[0].getText(), "document heading");
     AssertEqual("Status", loaded.getTables()[0].getRows()[0].getCells()[1].getParagraphs()[0].getText(), "document table");
     AssertEqual(1, loaded.getAllPictures().Count, "document image count");
+    AssertEqual(true, loaded.isLandscape(), "document landscape setting");
+    AssertEqual(2, loaded.getColumnCount(), "document column count");
+    AssertEqual("Usage Sample Header", loaded.getHeaderText(), "document default header");
+    AssertEqual("Usage Sample Footer", loaded.getFooterText(), "document default footer");
+    AssertEqual(" PAGE ", loaded.getParagraphs()[2].getFields()[0].Instruction, "document page field");
+    AssertEqual("MERGEFIELD CustomerName", loaded.getParagraphs()[4].getFields()[0].Instruction, "document merge field");
 }
 
 static void AddDocxTableRow(XWPFTable table, string left, string right)
@@ -251,6 +322,23 @@ static void AssertEqual<T>(T expected, T actual, string label)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual))
         throw new InvalidOperationException($"{label}: expected {expected}, got {actual}.");
+}
+
+static byte[] ReadZipEntry(string packagePath, string entryName)
+{
+    using var archive = ZipFile.OpenRead(packagePath);
+    var entry = archive.GetEntry(entryName)
+        ?? throw new InvalidDataException($"{entryName} was not found in {packagePath}.");
+    using var stream = entry.Open();
+    using var memory = new MemoryStream();
+    stream.CopyTo(memory);
+    return memory.ToArray();
+}
+
+static void AssertBytesEqual(byte[] expected, byte[] actual, string label)
+{
+    if (!expected.SequenceEqual(actual))
+        throw new InvalidOperationException($"{label}: byte content changed.");
 }
 
 static string FindRepositoryRoot(string startDirectory)

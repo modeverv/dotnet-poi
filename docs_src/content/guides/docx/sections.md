@@ -56,3 +56,9 @@ Console.WriteLine(doc.getMarginLeft());
 ```
 
 Page settings, final-section columns, and raw paragraph-level `sectPr` section breaks are preserved on round-trip.
+
+## Full Runnable Example
+
+See `examples/UsageSamples/Program.cs` (`CreateDocument`):
+
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)

@@ -93,7 +93,8 @@ using var wb = new XSSFWorkbook(stream);
 
 // Make changes to cells, styles, etc.
 var sheet = wb.getSheetAt(0);
-sheet.getRow(0).createCell(5).setCellValue(&quot;New data&quot;);
+var row = sheet.getRow(0) ?? sheet.createRow(0);
+row.createCell(5).setCellValue(&quot;New data&quot;);
 
 // Save — macro bytes are preserved automatically
 using var outStream = File.Create(&quot;macro-workbook-modified.xlsm&quot;);
@@ -122,6 +123,9 @@ wb.write(file);</code></pre>
 <tr><td>pptm (PowerPoint macro-enabled)</td><td>✅ Byte-for-byte preservation verified</td></tr>
 </tbody>
 </table>
+<h2>Full Runnable Example</h2>
+<p>See <code>examples/UsageSamples/Program.cs</code> (<code>CreateMacroWorkbookRoundTrip</code>):</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples">examples/UsageSamples</a></p>
 
     </main>
   </div>

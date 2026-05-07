@@ -6,27 +6,25 @@ dotnet-poi supports programmatic creation of pivot tables. Editing existing pivo
 
 ```csharp
 using DotnetPoi.XSSF.UserModel;
-using DotnetPoi.SS.Util;
 
 // Create source data
 var sheet = wb.createSheet("Data");
-sheet.createRow(0).CreateCells(new[] { "Category", "Amount" });
-sheet.createRow(1).CreateCells(new[] { "Food", "100" });
-sheet.createRow(2).CreateCells(new[] { "Travel", "200" });
+var header = sheet.createRow(0);
+header.createCell(0).setCellValue("Category");
+header.createCell(1).setCellValue("Amount");
+var food = sheet.createRow(1);
+food.createCell(0).setCellValue("Food");
+food.createCell(1).setCellValue(100);
 
 // Create pivot table sheet
 var pivotSheet = wb.createSheet("Pivot");
 
-// Define source range
-var sourceRange = new CellRangeAddress(0, 2, 0, 1);  // Data!A1:B3
-
 // Create pivot table
-var pivotTable = pivotSheet.createPivotTable(sourceRange, new CellReference(0, 0));
+var pivotTable = pivotSheet.createPivotTable("A1", "A1:B2", "Data");
 
 // Add rows and data fields
-var categoryField = pivotTable.getRowLabel().AddValueField(0);     // Column 0 = Category
-var amountField = pivotTable.getDataFields().AddValueField(1);     // Column 1 = Amount
-amountField.SetValueFieldSum();
+pivotTable.RowLabels.Add(0);   // Column 0 = Category
+pivotTable.DataColumns.Add(1); // Column 1 = Amount
 ```
 
 ## Limitations
@@ -34,3 +32,9 @@ amountField.SetValueFieldSum();
 - Only programmatic creation is supported
 - Editing existing pivot tables is not modeled
 - Pivot tables in existing files are preserved as unknown parts on round-trip
+
+## Full Runnable Example
+
+See `examples/UsageSamples/Program.cs` (`CreateSpreadsheet`):
+
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)

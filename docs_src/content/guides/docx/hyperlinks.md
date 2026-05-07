@@ -29,4 +29,4 @@ Hyperlinks round-trip correctly and are readable by Java POI.
 
 See `examples/UsageSamples/Program.cs` (`CreateDocument`):
 
-[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples)

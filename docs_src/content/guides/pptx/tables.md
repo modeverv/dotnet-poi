@@ -52,6 +52,6 @@ foreach (var row in table.Rows)
 
 See `examples/Phase33PptxExample/` and `examples/UsageSamples/Program.cs` (`CreatePresentation`):
 
-[examples/Phase33PptxExample](https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase33PptxExample)
+[examples/Phase33PptxExample](https://github.com/modeverv/dotnet-poi/tree/master/examples/Phase33PptxExample)
 
-[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples)
