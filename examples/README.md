@@ -308,6 +308,42 @@ The example:
 - Verifies that cell values and styles survived the round-trip
 - Confirms that `createFormulaEvaluator()` throws `NotSupportedException` when Formula is absent
 
+## Phase9HwpfDocExample
+
+Demonstrates basic text extraction and limited body editing for legacy Word 97-2003 (.doc) files using the HWPF API:
+
+```bash
+dotnet run --project examples/Phase9HwpfDocExample/Phase9HwpfDocExample.csproj
+```
+
+Output:
+
+```text
+examples/output/phase9-hwpf-doc-example.doc
+```
+
+The example:
+- Opens a legacy `.doc` fixture from the `poi/` submodule
+- Extracts and prints the main body text via `HWPFDocument.getText()`
+- Appends a paragraph via `appendParagraph()`
+- Saves the modified document, preserving unedited OLE streams
+
+Requires the `poi` submodule to be initialized.
+
+## Phase10HslfPptExample
+
+Demonstrates basic text extraction from legacy PowerPoint 97-2003 (.ppt) files using the early HSLF reader:
+
+```bash
+dotnet run --project examples/Phase10HslfPptExample/Phase10HslfPptExample.csproj
+```
+
+The example:
+- Opens a legacy `.ppt` fixture from the `poi/` submodule
+- Iterates through slides and extracts text from `TextCharsAtom` and `TextBytesAtom` records
+
+Requires the `poi` submodule to be initialized.
+
 ## EdgeCaseProbeExample
 
 Runs a suite of edge-case probes across supported formats. This example is useful when checking behavior near boundaries and preservation-sensitive paths.

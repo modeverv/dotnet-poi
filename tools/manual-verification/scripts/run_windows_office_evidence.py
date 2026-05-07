@@ -43,7 +43,7 @@ def now_jst():
 
 
 def read_project_version():
-    csproj = ROOT / "src" / "DotnetPoi.Core" / "DotnetPoi.Core.csproj"
+    csproj = ROOT / "src" / "DotnetPoi.Common" / "DotnetPoi.Common.csproj"
     try:
         root = ET.parse(csproj).getroot()
         for elem in root.iter():
@@ -129,7 +129,7 @@ def case_matrix():
             "password": "f",
             "encrypted": True,
         },
-#        {
+#       {
 #            "kind": "pptx",
 #            "app": "powerpoint",
 #            "source": generated("manual-simple.pptx"),
@@ -143,17 +143,39 @@ def case_matrix():
 #            "password": None,
 #            "encrypted": False,
 #        },
-#        {
-#            "kind": "encrypted pptx",
-#            "app": "powerpoint",
-#            "source": generated("manual-encrypted.pptx"),
-#            "password": "f",
-#            "encrypted": True,
-#        },
+         {
+              "kind": "encrypted pptx",
+              "app": "powerpoint",
+              "source": generated("manual-encrypted.pptx"),
+              "password": "f",
+              "encrypted": True,
+        },
+        {
+             "kind": "xls",
+             "app": "excel",
+             "source": generated("manual-simple.xls"),
+             "password": None,
+             "encrypted": False,
+        },
+        {
+            "kind": "doc",
+            "app": "word",
+            "source": generated("manual-simple.doc"),
+            "password": None,
+            "encrypted": False,
+        },
+        {
+           "kind": "ppt",
+           "app": "powerpoint",
+           "source": generated("manual-simple.ppt"),
+           "password": None,
+           "encrypted": False,
+       },
     ]
 
 
 def safe_name(text):
+
     allowed = []
     for ch in text.lower().replace(" ", "-"):
         allowed.append(ch if ch.isalnum() or ch in "._-" else "-")

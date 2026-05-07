@@ -5,10 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.Formula", "src\DotnetPoi.Formula\DotnetPoi.Formula.csproj", "{C29F6C07-F0AC-430C-8B5B-601F16E8F931}"
 EndProject
-
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.Formula.Tests", "tests\DotnetPoi.Formula.Tests\DotnetPoi.Formula.Tests.csproj", "{C19CCB97-25F7-4D65-8A09-9E42AA00042A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.Interop.Tests", "tests\DotnetPoi.Interop.Tests\DotnetPoi.Interop.Tests.csproj", "{6FF0321E-9786-42A6-941B-819D94BC0D60}"
@@ -70,6 +68,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.Legacy.Tests", "tests\DotnetPoi.Legacy.Tests\DotnetPoi.Legacy.Tests.csproj", "{80B4D7F4-4B3C-4E6C-BF38-45AA08843C3D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetPoi.All.Tests", "tests\DotnetPoi.All.Tests\DotnetPoi.All.Tests.csproj", "{A76BE16E-F4B0-4DE7-9053-4B97C2062DC8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Phase9HwpfDocExample", "examples\Phase9HwpfDocExample\Phase9HwpfDocExample.csproj", "{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Phase10HslfPptExample", "examples\Phase10HslfPptExample\Phase10HslfPptExample.csproj", "{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -417,6 +419,30 @@ Global
 		{A76BE16E-F4B0-4DE7-9053-4B97C2062DC8}.Release|x64.Build.0 = Release|Any CPU
 		{A76BE16E-F4B0-4DE7-9053-4B97C2062DC8}.Release|x86.ActiveCfg = Release|Any CPU
 		{A76BE16E-F4B0-4DE7-9053-4B97C2062DC8}.Release|x86.Build.0 = Release|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Debug|x64.Build.0 = Debug|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Debug|x86.Build.0 = Debug|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Release|x64.ActiveCfg = Release|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Release|x64.Build.0 = Release|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Release|x86.ActiveCfg = Release|Any CPU
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA}.Release|x86.Build.0 = Release|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Debug|x64.Build.0 = Debug|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Debug|x86.Build.0 = Debug|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Release|x64.ActiveCfg = Release|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Release|x64.Build.0 = Release|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Release|x86.ActiveCfg = Release|Any CPU
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -451,5 +477,7 @@ Global
 		{75824BDD-648F-439B-886D-4CEE4ABC412A} = {DF56B7B8-2D7A-4504-BB97-3651B0AF42A1}
 		{80B4D7F4-4B3C-4E6C-BF38-45AA08843C3D} = {DF56B7B8-2D7A-4504-BB97-3651B0AF42A1}
 		{A76BE16E-F4B0-4DE7-9053-4B97C2062DC8} = {DF56B7B8-2D7A-4504-BB97-3651B0AF42A1}
+		{4573ED1B-4165-41BE-BF25-D6EF7A7BCCFA} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{7EC22E75-A346-4ECB-BEB3-9EFB9D1CF6FB} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 EndGlobal

@@ -30,6 +30,8 @@ It creates:
 - `manual-simple.docm`
 - `manual-encrypted.docx`
 - `manual-simple.xls`
+- `manual-simple.doc`
+- `manual-simple.ppt`
 
 Encrypted files use password `f`. Generated files are ignored by git; rerun the generator whenever manual verification needs a clean set.
 

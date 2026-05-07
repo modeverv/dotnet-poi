@@ -14,6 +14,29 @@ dotnet add package DotnetPoi.Legacy
 
 NuGet automatically resolves transitive dependencies (`DotnetPoi.Common`, `DotnetPoi.POIFS`).
 
+## Support Status
+
+| Format | Implementation | Status | Description |
+|---|---|---|---|
+| **xls** | HSSF | ⚠️ Partial (~35%) | Basic workbook read/write, styles, layout, and OLE/BIFF preservation. |
+| **doc** | HWPF | ⚠️ Partial (~20%) | Main body text extraction and limited body editing with OLE preservation. |
+| **ppt** | HSLF | ❌ Experimental (~5%) | Early text extraction reader; no write support yet. |
+
+### HSSF (Excel 97-2003)
+
+- **Supported:** String, numeric, boolean, error cells; multiple sheets; basic fonts/styles; column/row sizing; merged regions; freeze panes; reading formula text/values; preservation of macros (VBA), OLE streams, and unknown BIFF records.
+- **Not yet modeled:** Image/shape/chart creation; comment/hyperlink editing; filters; pivots; new formula token writing.
+
+### HWPF (Word 97-2003)
+
+- **Supported:** OLE2 open; FIB parsing; main body text extraction (CLX/piece table); basic Range/Paragraph/Run model; bold/italic/size/font; no-op write; append paragraph; simple text replacement; OLE preservation.
+- **Not yet modeled:** Tables; images; header/footer; footnotes; comments; fields; bookmarks.
+
+### HSLF (PowerPoint 97-2003)
+
+- **Supported:** OLE2 open; `PowerPoint Document` stream scan; basic text extraction.
+- **Not yet modeled:** Writing; slide order reconstruction; shapes; images; master slides.
+
 ## Usage scenarios
 
 | If you need… | Install this |

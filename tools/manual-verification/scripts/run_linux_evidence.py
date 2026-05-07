@@ -32,7 +32,7 @@ def now_jst():
 
 
 def read_project_version():
-    csproj = ROOT / "src" / "DotnetPoi.Core" / "DotnetPoi.Core.csproj"
+    csproj = ROOT / "src" / "DotnetPoi.Common" / "DotnetPoi.Common.csproj"
     try:
         root = ET.parse(csproj).getroot()
         for elem in root.iter():
@@ -196,6 +196,24 @@ def case_matrix():
             "source": generated("manual-encrypted.pptx"),
             "password": "f",
             "encrypted": True,
+        },
+        {
+            "kind": "xls",
+            "source": generated("manual-simple.xls"),
+            "password": None,
+            "encrypted": False,
+        },
+        {
+            "kind": "doc",
+            "source": generated("manual-simple.doc"),
+            "password": None,
+            "encrypted": False,
+        },
+        {
+            "kind": "ppt",
+            "source": generated("manual-simple.ppt"),
+            "password": None,
+            "encrypted": False,
         },
     ]
 
