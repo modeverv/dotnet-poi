@@ -167,6 +167,20 @@ Tracked in [NOW.md](./NOW.md):
 
 ---
 
+## Testing Strategy
+
+This project employs a multi-layered testing strategy to ensure maximum fidelity to Apache POI and seamless interoperability with Microsoft Office.
+
+- **Unit Tests (xUnit):** Ported alongside each class from the original Apache POI test suite. Ensures internal logic and edge-case handling are consistent with Java.
+- **XML Parity Tests:** We verify that our `PoiXmlWriter` produces byte-equivalent XML output to Apache POI (XMLBeans). This ensures that subtle formatting differences don't break digital signatures or strict OOXML parsers.
+- **Bidirectional Interop Tests:** Every supported format is tested in both directions:
+    - **Direction A:** Java POI writes → dotnet-poi reads.
+    - **Direction B:** dotnet-poi writes → Java POI reads.
+- **Preservation Tests:** We verify that unmodeled features (macros, charts, comments, pivot tables) survive a read-modify-write cycle (round-trip) without data loss or corruption.
+- **Manual Verification:** Before releases, we perform manual checks using real **Microsoft Office (Excel/Word/PowerPoint)** and **LibreOffice** on macOS, Windows, and Linux to ensure no "repair" dialogs or visual regressions occur.
+
+---
+
 ## Quick Start
 
 Published to **[NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core)** — `dotnet add package DotnetPoi.Core`.

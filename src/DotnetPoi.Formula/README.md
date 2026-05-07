@@ -148,6 +148,18 @@ Console.WriteLine(sheet.getRow(0).getCell(2).getNumericCellValue()); // 30
 
 ---
 
+## Testing strategy
+
+Accuracy of the formula engine is verified through:
+
+- **Logic verification:** Unit tests for each supported function (`SUM`, `AVERAGE`, etc.) comparing results against known Excel outputs.
+- **Reference handling:** Tests for relative/absolute cell references and range evaluation.
+- **Interop calculation tests:** 
+    - Verify that `DotnetPoi.Formula` produces the same results as Apache POI's `FormulaEvaluator` for a given set of inputs.
+    - Verify that Excel recalculates the formulas to the same values when the file is opened.
+
+---
+
 ## Version
 
 This is a **v0.x** package. The supported function set will grow over time independently of `DotnetPoi.Core`, which targets v1.0 stability.

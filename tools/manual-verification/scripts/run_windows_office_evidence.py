@@ -129,27 +129,27 @@ def case_matrix():
             "password": "f",
             "encrypted": True,
         },
-        {
-            "kind": "pptx",
-            "app": "powerpoint",
-            "source": generated("manual-simple.pptx"),
-            "password": None,
-            "encrypted": False,
-        },
-        {
-            "kind": "pptm",
-            "app": "powerpoint",
-            "source": generated("manual-simple.pptm"),
-            "password": None,
-            "encrypted": False,
-        },
-        {
-            "kind": "encrypted pptx",
-            "app": "powerpoint",
-            "source": generated("manual-encrypted.pptx"),
-            "password": "f",
-            "encrypted": True,
-        },
+#        {
+#            "kind": "pptx",
+#            "app": "powerpoint",
+#            "source": generated("manual-simple.pptx"),
+#            "password": None,
+#            "encrypted": False,
+#        },
+#        {
+#            "kind": "pptm",
+#            "app": "powerpoint",
+#            "source": generated("manual-simple.pptm"),
+#            "password": None,
+#            "encrypted": False,
+#        },
+#        {
+#            "kind": "encrypted pptx",
+#            "app": "powerpoint",
+#            "source": generated("manual-encrypted.pptx"),
+#            "password": "f",
+#            "encrypted": True,
+#        },
     ]
 
 

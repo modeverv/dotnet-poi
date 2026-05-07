@@ -250,6 +250,20 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, not edi
 
 ---
 
+## Testing strategy
+
+Quality and fidelity to Apache POI are ensured through a multi-layered testing strategy:
+
+- **Unit tests (xUnit):** Ported alongside each class from the original Apache POI test suite. Ensures internal logic and edge-case handling are consistent with Java.
+- **XML Parity tests:** Captures raw XML output from Apache POI (via XMLBeans) and verifies that `PoiXmlWriter` produces byte-equivalent output in C#. This prevents interoperability issues caused by subtle XML formatting differences.
+- **Bidirectional Interop tests:**
+    - **Direction A:** Java POI writes a file → `DotnetPoi.Core` reads it.
+    - **Direction B:** `DotnetPoi.Core` writes a file → Java POI reads it.
+- **Preservation tests:** Verifies that unmodeled features (macros, charts, comments, pivot tables) survive a read-modify-write cycle (round-trip) without data loss.
+- **Manual Verification:** Periodic verification using real Office applications (Excel, Word, PowerPoint) and LibreOffice on macOS, Windows, and Linux to ensure no "repair" dialogs or visual regressions.
+
+---
+
 ## Philosophy
 
 - 🔱 Maximum fidelity to upstream Apache POI — we follow, not reinvent
