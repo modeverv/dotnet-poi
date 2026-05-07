@@ -21,7 +21,7 @@ dotnet add package DotnetPoi.Core
 ```
 
 ```xml
-<PackageReference Include="DotnetPoi.Core" Version="0.5.0" />
+<PackageReference Include="DotnetPoi.Core" Version="..." />
 ```
 
 > Compatible with **.NET 5+**, **.NET Core 3.1+**, **.NET Framework 4.7.2+**, **Mono 5.4+**, **Unity 2018.1+**.

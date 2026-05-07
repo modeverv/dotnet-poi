@@ -20,7 +20,7 @@ dotnet add package DotnetPoi.Formula
 ```
 
 ```xml
-<PackageReference Include="DotnetPoi.Formula" Version="0.1.0" />
+<PackageReference Include="DotnetPoi.Formula" Version="..." />
 ```
 
 > Requires **DotnetPoi.Core** 0.1.0+ and **.NET 8.0+** or **.NET Framework 4.7.2+**.

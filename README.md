@@ -51,7 +51,7 @@ dotnet-poi ships as **two separate NuGet packages** with a clear separation of c
 
 ## Status
 
-Current status: **beta** — `DotnetPoi.Core` v0.1.0 and `DotnetPoi.Formula` v0.1.0 are published on [NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core).
+Current status: **beta** — `DotnetPoi.Core` v0.5.0 and `DotnetPoi.Formula` v0.5.0 are published on [NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core).
 
 The strongest format today is **xlsx / XSSF**. It has broad support for common workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. Some advanced workbook features are still preservation-only rather than editable API models, but ordinary `.xlsx` workflows are well beyond the original bootstrap stage.
 

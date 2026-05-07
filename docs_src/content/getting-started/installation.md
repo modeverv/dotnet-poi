@@ -8,7 +8,7 @@ Add the package to your `.csproj`:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="DotnetPoi.Core" Version="0.1.0" />
+  <PackageReference Include="DotnetPoi.Core" Version="..." />
 </ItemGroup>
 ```
 
@@ -16,8 +16,8 @@ If you need spreadsheet formula evaluation, add the Formula package as well:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="DotnetPoi.Core" Version="0.1.0" />
-  <PackageReference Include="DotnetPoi.Formula" Version="0.1.0" />
+  <PackageReference Include="DotnetPoi.Core" Version="..." />
+  <PackageReference Include="DotnetPoi.Formula" Version="..." />
 </ItemGroup>
 ```
 
@@ -41,7 +41,7 @@ Create a file `TestInstall.csproj`:
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="DotnetPoi.Core" Version="0.1.0" />
+    <PackageReference Include="DotnetPoi.Core" Version="..." />
   </ItemGroup>
 </Project>
 ```

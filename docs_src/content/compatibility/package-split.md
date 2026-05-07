@@ -40,9 +40,9 @@ dotnet-poi ships as **two separate NuGet packages** to decouple Core stability f
 
 ```xml
 <!-- Read/write only -->
-<PackageReference Include="DotnetPoi.Core" Version="0.1.0" />
+<PackageReference Include="DotnetPoi.Core" Version="..." />
 
 <!-- Add formula evaluation -->
-<PackageReference Include="DotnetPoi.Core" Version="0.1.0" />
-<PackageReference Include="DotnetPoi.Formula" Version="0.1.0" />
+<PackageReference Include="DotnetPoi.Core" Version="..." />
+<PackageReference Include="DotnetPoi.Formula" Version="..." />
 ```
