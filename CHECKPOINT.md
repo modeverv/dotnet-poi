@@ -1,5 +1,32 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — Phase 12 item 2: first POIFS/HSSF container fixes
+
+- Task: Phase 12 実装順 2「POIFS の不足を洗い出し、HSSF を壊している container 問題を先に直す」に対応。
+- Fixed:
+  - `HSSFWorkbook` now keeps the original OLE2 streams returned by `CompoundFile.ReadStreams()` when loading an existing `.xls`.
+  - `HSSFWorkbook.write()` now starts from those preserved streams and replaces only the workbook stream instead of writing a compound file containing only `Workbook`.
+  - Non-workbook streams such as `SummaryInformation`, `DocumentSummaryInformation`, and `CompObj` are preserved byte-for-byte through the current flat stream model.
+  - Added `BOOK` as an accepted workbook stream alias. `BOOK_in_capitals.xls` now opens and writes back using `BOOK` rather than being normalized to `Workbook`.
+- Tests:
+  - Added coverage that `BOOK_in_capitals.xls` loads.
+  - Added coverage that writing loaded `empty.xls` preserves non-workbook OLE2 streams byte-for-byte.
+  - Added coverage that writing loaded `BOOK_in_capitals.xls` preserves the uppercase `BOOK` workbook stream name.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 25 passed, 0 failed.
+  - Build emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining POIFS/HSSF container gaps:
+  - `CompoundFile.ReadStreams()` is still a flat stream API. It reads stream bytes but does not preserve storage hierarchy, directory entry metadata, CLSIDs, timestamps, or sibling tree shape.
+  - `CompoundFile.Write()` rebuilds a fresh root-level directory from a flat dictionary. This is enough for simple workbook/document summary streams, but not sufficient for robust macro/VBA, embedded OLE, drawing package, or arbitrary storage preservation.
+  - Unknown BIFF records inside the Workbook stream are still not preserved; the current writer regenerates a minimal workbook stream from the modeled cells.
+  - DIFAT beyond the first 109 FAT sectors has not been validated in this slice.
+- Next:
+  - For Phase 12 item 3, value round-trip can proceed on top of this safer stream preservation.
+  - Before macro/OLE/drawing preservation is claimed, introduce a structured POIFS document model that round-trips storages and directory metadata instead of flattening names.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
 ## 2026-05-07 JST — Phase 12 item 1: POI HSSF fixture survey
 
 - Task: Phase 12 実装順 1「POI HSSF tests / `poi/test-data/spreadsheet/*.xls` から代表 fixture を選び、現状の read/write 失敗を `CHECKPOINT.md` に記録する」に対応。

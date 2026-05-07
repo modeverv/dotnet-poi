@@ -9,6 +9,8 @@ public sealed class HSSFWorkbook : IWorkbook
     private readonly List<HSSFSheet> _sheets = new();
     private readonly List<HSSFFont> _fonts = new();
     private readonly List<HSSFCellStyle> _cellStyles = new();
+    private Dictionary<string, byte[]>? _preservedOleStreams;
+    private string _workbookStreamName = "Workbook";
     private HSSFCreationHelper? _creationHelper;
     private HSSFDataFormat? _dataFormat;
 
@@ -109,10 +111,13 @@ public sealed class HSSFWorkbook : IWorkbook
     {
         Guard.ThrowIfNull(stream, nameof(stream));
         var workbookStream = Biff8Workbook.WriteWorkbook(_sheets);
-        CompoundFile.Write(stream, new Dictionary<string, byte[]>(StringComparer.Ordinal)
-        {
-            ["Workbook"] = workbookStream
-        });
+        var streams = _preservedOleStreams is null
+            ? new Dictionary<string, byte[]>(StringComparer.Ordinal)
+            : new Dictionary<string, byte[]>(_preservedOleStreams, StringComparer.Ordinal);
+
+        RemoveWorkbookStreamAliases(streams);
+        streams[_workbookStreamName] = workbookStream;
+        CompoundFile.Write(stream, streams);
     }
 
     public void close()
@@ -124,15 +129,42 @@ public sealed class HSSFWorkbook : IWorkbook
     private void Load(Stream stream)
     {
         var streams = CompoundFile.ReadStreams(stream);
-        if (!streams.TryGetValue("Workbook", out var workbookStream) &&
-            !streams.TryGetValue("Book", out workbookStream) &&
-            !streams.TryGetValue("WORKBOOK", out workbookStream))
+        if (!TryGetWorkbookStream(streams, out var workbookStream, out var workbookStreamName))
         {
             throw new InvalidDataException("The OLE2 document does not contain a Workbook stream.");
         }
 
+        _preservedOleStreams = new Dictionary<string, byte[]>(streams, StringComparer.Ordinal);
+        _workbookStreamName = workbookStreamName;
         _sheets.Clear();
         Biff8Workbook.ReadWorkbook(workbookStream, this);
+    }
+
+    private static bool TryGetWorkbookStream(
+        IReadOnlyDictionary<string, byte[]> streams,
+        out byte[] workbookStream,
+        out string streamName)
+    {
+        foreach (var candidate in WorkbookStreamAliases)
+        {
+            if (streams.TryGetValue(candidate, out workbookStream!))
+            {
+                streamName = candidate;
+                return true;
+            }
+        }
+
+        workbookStream = Array.Empty<byte>();
+        streamName = "Workbook";
+        return false;
+    }
+
+    private static void RemoveWorkbookStreamAliases(IDictionary<string, byte[]> streams)
+    {
+        foreach (var candidate in WorkbookStreamAliases)
+        {
+            streams.Remove(candidate);
+        }
     }
 
     ISheet IWorkbook.createSheet() => createSheet();
@@ -156,4 +188,12 @@ public sealed class HSSFWorkbook : IWorkbook
     IFont IWorkbook.getFontAt(int idx) => getFontAt(idx);
 
     internal IReadOnlyList<HSSFSheet> Sheets => _sheets;
+
+    private static readonly string[] WorkbookStreamAliases =
+    {
+        "Workbook",
+        "Book",
+        "WORKBOOK",
+        "BOOK"
+    };
 }

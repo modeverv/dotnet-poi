@@ -1,4 +1,5 @@
 using DotnetPoi.HSSF.UserModel;
+using DotnetPoi.POIFS.Crypt;
 using DotnetPoi.SS.UserModel;
 using Xunit;
 
@@ -13,6 +14,7 @@ public sealed class HSSFWorkbookTests
         yield return new object[] { "SimpleMultiCell.xls", 3 };
         yield return new object[] { "SampleSS.xls", 3 };
         yield return new object[] { "WORKBOOK_in_capitals.xls", 1 };
+        yield return new object[] { "BOOK_in_capitals.xls", 1 };
         yield return new object[] { "chinese-provinces.xls", 1 };
         yield return new object[] { "DateFormats.xls", 3 };
         yield return new object[] { "SimpleWithStyling.xls", 3 };
@@ -86,13 +88,57 @@ public sealed class HSSFWorkbookTests
     }
 
     [Fact]
-    public void Read_BookUppercasePoiFixture_CurrentlyRequiresWorkbookStreamAliasSupport()
+    public void Read_BookUppercasePoiFixture_LoadsWorkbookStream()
     {
         var sample = FindRepoRoot().Combine("poi/test-data/spreadsheet/BOOK_in_capitals.xls");
         using var input = sample.OpenRead();
 
-        var exception = Assert.Throws<InvalidDataException>(() => new HSSFWorkbook(input));
-        Assert.Equal("The OLE2 document does not contain a Workbook stream.", exception.Message);
+        using var workbook = new HSSFWorkbook(input);
+
+        Assert.Equal(1, workbook.getNumberOfSheets());
+    }
+
+    [Fact]
+    public void Write_LoadedPoiFixture_PreservesNonWorkbookOleStreams()
+    {
+        var sample = FindRepoRoot().Combine("poi/test-data/spreadsheet/empty.xls");
+        Dictionary<string, byte[]> originalStreams;
+        using (var originalInput = sample.OpenRead())
+        {
+            originalStreams = CompoundFile.ReadStreams(originalInput);
+        }
+
+        using var workbookInput = sample.OpenRead();
+        using var workbook = new HSSFWorkbook(workbookInput);
+
+        using var output = new MemoryStream();
+        workbook.write(output);
+        output.Position = 0;
+        var writtenStreams = CompoundFile.ReadStreams(output);
+
+        foreach (var streamName in originalStreams.Keys.Where(name => name != "Workbook"))
+        {
+            Assert.True(writtenStreams.ContainsKey(streamName), $"Missing preserved stream '{streamName}'.");
+            Assert.Equal(originalStreams[streamName], writtenStreams[streamName]);
+        }
+    }
+
+    [Fact]
+    public void Write_BookUppercasePoiFixture_PreservesWorkbookStreamAlias()
+    {
+        var sample = FindRepoRoot().Combine("poi/test-data/spreadsheet/BOOK_in_capitals.xls");
+        using var input = sample.OpenRead();
+        using var workbook = new HSSFWorkbook(input);
+
+        using var output = new MemoryStream();
+        workbook.write(output);
+        output.Position = 0;
+        var writtenStreams = CompoundFile.ReadStreams(output);
+
+        Assert.True(writtenStreams.ContainsKey("BOOK"));
+        Assert.False(writtenStreams.ContainsKey("Workbook"));
+        Assert.False(writtenStreams.ContainsKey("Book"));
+        Assert.False(writtenStreams.ContainsKey("WORKBOOK"));
     }
 
     private static DirectoryInfo FindRepoRoot()
