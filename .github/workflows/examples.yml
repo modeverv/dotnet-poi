@@ -60,7 +60,7 @@ jobs:
       - name: Phase 7 — cell type coverage
         run: dotnet run --project examples/Phase7CellTypesExample/
 
-      - name: Phase 8 — Core-only (no Formula evaluator)
+      - name: Phase 8 — All-in-one (no Formula evaluator separately)
         run: dotnet run --project examples/Phase8CoreOnlyExample/
 
       - name: Edge case probes

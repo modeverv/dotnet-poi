@@ -5,17 +5,17 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 [![CI](https://github.com/modeverv/dotnet-poi/actions/workflows/ci.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/ci.yml)
 [![Examples](https://github.com/modeverv/dotnet-poi/actions/workflows/examples.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/examples.yml)
 [![XML Parity](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml)
-[![NuGet Core](https://img.shields.io/nuget/v/DotnetPoi.Core)](https://www.nuget.org/packages/DotnetPoi.Core)
+[![NuGet All](https://img.shields.io/nuget/v/DotnetPoi.All)](https://www.nuget.org/packages/DotnetPoi.All)
 [![NuGet Ooxml](https://img.shields.io/nuget/v/DotnetPoi.Ooxml)](https://www.nuget.org/packages/DotnetPoi.Ooxml)
 [![NuGet Formula](https://img.shields.io/nuget/v/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
-[![NuGet All](https://img.shields.io/nuget/v/DotnetPoi.All)](https://www.nuget.org/packages/DotnetPoi.All)
+[![NuGet Legacy](https://img.shields.io/nuget/v/DotnetPoi.Legacy)](https://www.nuget.org/packages/DotnetPoi.Legacy)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-practical%20OOXML%20workflows-brightgreen)
 ![Tests](https://img.shields.io/badge/tests-441%20passing-brightgreen)
 
 ## NuGet Package Strategy
 
-dotnet-poi has migrated from a single `DotnetPoi.Core` package to a **multi-package architecture** with clear separation of concerns. This enables OOXML stability to advance independently of legacy binary format development.
+dotnet-poi uses a **multi-package architecture** with clear separation of concerns. This enables OOXML stability to advance independently of legacy binary format development.
 
 ### Recommended Package
 
@@ -36,11 +36,9 @@ For most users, **`DotnetPoi.All`** is the simplest choice — it includes all f
 | **DotnetPoi.POIFS** | OLE2/CFB compound file container, encryption helpers | OLE2 container foundation (included transitively by Ooxml and Legacy) |
 | **DotnetPoi.All** | All of the above in a single meta-package | Users who want everything with one dependency |
 
-### Legacy `DotnetPoi.Core`
+### Migration from `DotnetPoi.Core`
 
-`DotnetPoi.Core` v0.5.x is still published and acts as a **facade** that references Ooxml, Legacy, POIFS, and Common. Code written against `DotnetPoi.Core` will continue to compile. However, new projects should prefer the granular packages or `DotnetPoi.All` for a cleaner dependency graph.
-
-**Migration path:** Replace `<PackageReference Include="DotnetPoi.Core" />` with `<PackageReference Include="DotnetPoi.All" />` — namespaces and public API surface are unchanged.
+The legacy `DotnetPoi.Core` facade package has been **removed**. Replace any existing `DotnetPoi.Core` reference with `DotnetPoi.All` — namespaces and public API surface are unchanged:
 
 ```xml
 <!-- Before -->
@@ -90,7 +88,6 @@ Current status: **practical for covered OOXML workflows** — packages are avail
 | **OOXML** | `DotnetPoi.Ooxml` | 0.1.x | Stable for common xlsx/docx/pptx workflows |
 | **Legacy** | `DotnetPoi.Legacy` | 0.1.x | In-development (HSSF/HWPF/HSLF) |
 | **Formula** | `DotnetPoi.Formula` | 0.5.x | Narrow evaluator subset |
-| **Core** (legacy) | `DotnetPoi.Core` | 0.5.x | Deprecated facade — prefer Ooxml/All |
 
 The strongest format today is **xlsx / XSSF**, with broad support for workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. **docx / XWPF** and **pptx / XSLF** are also useful for practical generation, light editing, and loss-resistant round-trips of many real files.
 
@@ -366,14 +363,12 @@ dotnet-poi/
 │   │   └── HSLF/               # ppt minimal reader
 │   ├── DotnetPoi.Formula/      # NuGet: DotnetPoi.Formula
 │   │   └── UserModel/          # FormulaEvaluator implementation
-│   ├── DotnetPoi.Core/         # Legacy facade (references all above)
 │   └── DotnetPoi.All/          # Meta-package referencing everything
 ├── tests/
 │   ├── DotnetPoi.Common.Tests/     # Common package tests
 │   ├── DotnetPoi.POIFS.Tests/      # POIFS container tests
 │   ├── DotnetPoi.Ooxml.Tests/      # OOXML format tests
 │   ├── DotnetPoi.Legacy.Tests/     # Legacy format tests
-│   ├── DotnetPoi.Core.Tests/       # Legacy facade tests
 │   ├── DotnetPoi.All.Tests/        # All-package smoke tests
 │   ├── DotnetPoi.Formula.Tests/    # Formula package tests
 │   ├── DotnetPoi.Interop.Tests/    # Java/.NET compatibility tests
@@ -410,7 +405,7 @@ dotnet-poi/
 └── README.md
 ```
 
-> **Architecture note:** Format implementations are now split across `DotnetPoi.Ooxml` (OOXML formats) and `DotnetPoi.Legacy` (legacy binary formats), with `DotnetPoi.Common` and `DotnetPoi.POIFS` as shared foundations. `DotnetPoi.Core` is maintained as a backward-compatibility facade.
+> **Architecture note:** Format implementations are split across `DotnetPoi.Ooxml` (OOXML formats) and `DotnetPoi.Legacy` (legacy binary formats), with `DotnetPoi.Common` and `DotnetPoi.POIFS` as shared foundations. `DotnetPoi.All` is the meta-package that bundles everything under a single dependency.
 
 ---
 
