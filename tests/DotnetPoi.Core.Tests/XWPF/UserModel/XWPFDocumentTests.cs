@@ -787,6 +787,81 @@ public class XWPFDocumentTests
         Assert.Contains("<w:comments>", r.ReadToEnd());
     }
 
+    [Fact]
+    public void RoundTrip_TableCellMerge_Preserved()
+    {
+        using var original = new XWPFDocument();
+        var table = original.createTable();
+        table.addGridCol(9144);
+        table.addGridCol(9144);
+        table.addGridCol(9144);
+
+        var row = table.createRow();
+        var cell1 = row.createCell();
+        cell1.addParagraph().createRun().setText("A1");
+        cell1.setGridSpan(3); // merge 3 columns horizontally
+
+        var row2 = table.createRow();
+        var cell2 = row2.createCell();
+        cell2.addParagraph().createRun().setText("B1");
+        cell2.setVMerge("restart");
+        var cell3 = row2.createCell();
+        cell3.addParagraph().createRun().setText("B2");
+
+        var row3 = table.createRow();
+        var cell4 = row3.createCell();
+        cell4.addParagraph().createRun().setText("C1");
+        cell4.setVMerge("continue");
+        var cell5 = row3.createCell();
+        cell5.addParagraph().createRun().setText("C2");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        var tables = loaded.getTables();
+        Assert.Single(tables);
+        var loadedTable = tables[0];
+        Assert.Equal(3, loadedTable.getRows().Count);
+
+        // Row 0: cells[0] has gridSpan=3
+        var loadedRow0 = loadedTable.getRows()[0];
+        Assert.Equal(1, loadedRow0.getCells().Count);
+        var loadedCell = loadedRow0.getCells()[0];
+        Assert.Equal(3, loadedCell.getGridSpan());
+        Assert.Equal("A1", loadedCell.getParagraphs()[0].getText());
+
+        // Row 1: cells[0] has vMerge="restart"
+        var loadedRow1 = loadedTable.getRows()[1];
+        Assert.Equal(2, loadedRow1.getCells().Count);
+        Assert.Equal("restart", loadedRow1.getCells()[0].getVMerge());
+
+        // Row 2: cells[0] has vMerge="continue"
+        var loadedRow2 = loadedTable.getRows()[2];
+        Assert.Equal(2, loadedRow2.getCells().Count);
+        Assert.Equal("continue", loadedRow2.getCells()[0].getVMerge());
+    }
+
+    [Fact]
+    public void RoundTrip_ParagraphStyle_Preserved()
+    {
+        using var original = new XWPFDocument();
+        var p = original.createParagraph();
+        p.setStyle("Heading1");
+        p.createRun().setText("Styled heading");
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        Assert.Single(loaded.getParagraphs());
+        var loadedPara = loaded.getParagraphs()[0];
+        Assert.Equal("Heading1", loadedPara.getStyleID());
+        Assert.Equal("Styled heading", loadedPara.getText());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

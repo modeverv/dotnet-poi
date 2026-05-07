@@ -52,6 +52,7 @@
 <div class="nav-title">docx Guides</div>
 <ul>
 <li><a href="../guides/docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../guides/docx/styles.html">Styles</a></li>
 <li><a href="../guides/docx/tables.html">Tables</a></li>
 <li><a href="../guides/docx/images.html">Images</a></li>
 <li><a href="../guides/docx/headers-footers.html">Headers &amp; Footers</a></li>
@@ -97,30 +98,29 @@
 </ul>
 <h3>Chart Creation</h3>
 <p>Charts in xlsx and pptx are <strong>preserved on round-trip but cannot be created or edited programmatically</strong>. If your workflow requires generating chart visuals from data, this is not yet supported.</p>
-<h3>docx Styles</h3>
-<p>Only direct formatting (bold, italic, font size, color, etc.) is supported. <strong>Paragraph styles (Normal, Heading 1, Title) and character styles are not implemented.</strong> Documents that depend on style-based formatting may lose appearance when round-tripped.</p>
-<h3>docx Table Features</h3>
-<p>Cell merging and table borders are <strong>not implemented</strong> in docx tables.</p>
+<h3>docx Style Editing</h3>
+<p>Paragraph style references are supported with <code>setStyle()</code> / <code>getStyleID()</code>, and <code>word/styles.xml</code> is read or generated for new documents. Character styles, table styles, and full Word style inheritance are not yet editable or evaluated by dotnet-poi.</p>
+<h3>docx Table Styling</h3>
+<p>docx tables support basic creation, width, grid columns, row height, header rows, cell width, horizontal grid span, vertical merge, and vertical alignment. Detailed border and shading creation is not yet exposed as an API, but existing <code>tblPr</code> / <code>trPr</code> / <code>tcPr</code> children are preserved as raw XML during round-trip.</p>
 <h2>Moderate Gaps</h2>
 <table>
 <thead><tr><th>Feature</th><th>Format</th><th>Impact</th></tr></thead>
 <tbody>
 <tr><td>Comments (read/create)</td><td>xlsx, docx</td><td>Existing comments preserved on round-trip but cannot be read or created</td></tr>
-<tr><td>Text boxes (w:txbxContent)</td><td>docx</td><td>Text inside Word text boxes is not readable</td></tr>
-<tr><td>Content controls (SDT)</td><td>docx</td><td>Structured document tags not supported</td></tr>
-<tr><td>Section columns</td><td>docx</td><td>Multi-column layout not supported</td></tr>
+<tr><td>Content controls (SDT)</td><td>docx</td><td>Block-level and inline SDT are preserved on round-trip but cannot be edited through a public API</td></tr>
+<tr><td>Word text boxes (w:txbxContent)</td><td>docx</td><td>Text inside Word text boxes is not readable</td></tr>
 <tr><td>Track changes</td><td>docx</td><td>Revision marks not supported</td></tr>
-<tr><td>Grouped shapes</td><td>pptx</td><td>Shape grouping not supported</td></tr>
-<tr><td>Notes slides</td><td>pptx</td><td>Speaker notes cannot be created or read</td></tr>
+<tr><td>Grouped shapes</td><td>pptx</td><td>Preserved as raw <code>spTree</code> XML but cannot be edited through a public API</td></tr>
+<tr><td>Notes slides</td><td>pptx</td><td>Existing notes slides are preserved but cannot be created or read through a public API</td></tr>
 <tr><td>Sparklines</td><td>xlsx</td><td>In-cell sparkline charts not supported</td></tr>
-<tr><td>External data connections</td><td>xlsx</td><td>Data connections not supported</td></tr>
+<tr><td>External data connections</td><td>xlsx</td><td>Existing connection parts are preserved but cannot be edited through a public API</td></tr>
 </tbody>
 </table>
 <h2>Minor Gaps</h2>
 <table>
 <thead><tr><th>Feature</th><th>Format</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>Auto-shapes</td><td>xlsx</td><td>Not supported</td></tr>
+<tr><td>Auto-shapes</td><td>xlsx</td><td>Preserved as unknown DrawingML XML; only pictures are modeled</td></tr>
 <tr><td>SmartArt editing</td><td>pptx</td><td>Preserved as unknown parts</td></tr>
 <tr><td>Animations/transitions editing</td><td>pptx</td><td>Preserved as unknown parts</td></tr>
 <tr><td>Theme editing</td><td>pptx</td><td>Layout/master/theme preserved but not editable</td></tr>
@@ -133,7 +133,7 @@
 <ul>
 <li>Programmatic formula evaluation (Excel calculation engine)</li>
 <li>Chart creation from data</li>
-<li>Heavy use of docx paragraph/table styles</li>
+<li>Editing character/table styles or resolving complex Word style inheritance</li>
 <li>Full xls (BIFF) support</li>
 <li>Legacy doc (HWPF) or ppt (HSLF) formats</li>
 </ul>

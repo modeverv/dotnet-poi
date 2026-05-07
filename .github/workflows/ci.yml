@@ -54,11 +54,11 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Java 11
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "11"
+          java-version: "21"
           cache: maven
 
       - name: Setup .NET 9

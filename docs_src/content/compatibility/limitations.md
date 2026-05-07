@@ -17,33 +17,32 @@ dotnet-poi can write formula text and preserve cached values, but **full formula
 
 Charts in xlsx and pptx are **preserved on round-trip but cannot be created or edited programmatically**. If your workflow requires generating chart visuals from data, this is not yet supported.
 
-### docx Styles
+### docx Style Editing
 
-Only direct formatting (bold, italic, font size, color, etc.) is supported. **Paragraph styles (Normal, Heading 1, Title) and character styles are not implemented.** Documents that depend on style-based formatting may lose appearance when round-tripped.
+Paragraph style references are supported with `setStyle()` / `getStyleID()`, and `word/styles.xml` is read or generated for new documents. Character styles, table styles, and full Word style inheritance are not yet editable or evaluated by dotnet-poi.
 
-### docx Table Features
+### docx Table Styling
 
-Cell merging and table borders are **not implemented** in docx tables.
+docx tables support basic creation, width, grid columns, row height, header rows, cell width, horizontal grid span, vertical merge, and vertical alignment. Detailed border and shading creation is not yet exposed as an API, but existing `tblPr` / `trPr` / `tcPr` children are preserved as raw XML during round-trip.
 
 ## Moderate Gaps
 
 | Feature | Format | Impact |
 |---|---|---|
 | Comments (read/create) | xlsx, docx | Existing comments preserved on round-trip but cannot be read or created |
-| Text boxes (w:txbxContent) | docx | Text inside Word text boxes is not readable |
-| Content controls (SDT) | docx | Structured document tags not supported |
-| Section columns | docx | Multi-column layout not supported |
+| Content controls (SDT) | docx | Block-level and inline SDT are preserved on round-trip but cannot be edited through a public API |
+| Word text boxes (w:txbxContent) | docx | Text inside Word text boxes is not readable |
 | Track changes | docx | Revision marks not supported |
-| Grouped shapes | pptx | Shape grouping not supported |
-| Notes slides | pptx | Speaker notes cannot be created or read |
+| Grouped shapes | pptx | Preserved as raw `spTree` XML but cannot be edited through a public API |
+| Notes slides | pptx | Existing notes slides are preserved but cannot be created or read through a public API |
 | Sparklines | xlsx | In-cell sparkline charts not supported |
-| External data connections | xlsx | Data connections not supported |
+| External data connections | xlsx | Existing connection parts are preserved but cannot be edited through a public API |
 
 ## Minor Gaps
 
 | Feature | Format | Notes |
 |---|---|---|
-| Auto-shapes | xlsx | Not supported |
+| Auto-shapes | xlsx | Preserved as unknown DrawingML XML; only pictures are modeled |
 | SmartArt editing | pptx | Preserved as unknown parts |
 | Animations/transitions editing | pptx | Preserved as unknown parts |
 | Theme editing | pptx | Layout/master/theme preserved but not editable |
@@ -56,6 +55,6 @@ If your project depends on any of the following, consider using Apache POI (Java
 
 - Programmatic formula evaluation (Excel calculation engine)
 - Chart creation from data
-- Heavy use of docx paragraph/table styles
+- Editing character/table styles or resolving complex Word style inheritance
 - Full xls (BIFF) support
 - Legacy doc (HWPF) or ppt (HSLF) formats

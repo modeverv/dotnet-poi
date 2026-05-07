@@ -1,5 +1,24 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — Phase 9 docs: document recently completed docx features
+
+- Task: Read `agents.md`, `NOW.md`, `DOC_PLAN.md`, existing `docs_src/`, and source/tests to identify implemented features that were not yet accurately documented.
+- Findings:
+  - `docs_src/content/compatibility/limitations.md` was stale for docx paragraph styles, table merge/preservation, SDT preservation, section columns, grouped shapes, auto-shape preservation, and external connection preservation.
+  - There was no docx styles guide even though `XWPFParagraph.setStyle()` / `getStyleID()` and `XWPFStyles` are implemented.
+  - Some doc examples referenced older/nonexistent API names (`getDocument().getBody()...`, `addNewTextParagraph()`, `ParagraphAlignment.CENTER`, etc.).
+- Changes:
+  - Added `docs_src/content/guides/docx/styles.md` and linked it from `docs_src/site.json`.
+  - Updated docx paragraph, table, section, image, and limitations pages to describe current APIs and raw XML preservation behavior.
+  - Fixed the first PowerPoint getting-started text-run snippet to current XSLF APIs.
+  - Regenerated static HTML in `docs/` with `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs`.
+- Verification:
+  - Docs generator succeeded and produced 36 HTML files.
+  - Spot-checked generated `docs/guides/docx/styles.html`, `docs/guides/docx/sections.html`, `docs/guides/docx/images.html`, and `docs/compatibility/limitations.html`.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
 ## 2026-05-18 JST — docx inRPr cross-paragraph leak fix (round-trip bug)
 
 - Task: Fix a bug where paragraphs added to documents with tracked changes (`delins.docx`) lost their runs after write/read round-trip.
@@ -1923,3 +1942,10 @@ Notes:
 - **全 244 Core tests passing** ✅ (was 243)
 - Total C# tests: **309**
 - `README.md`, `NOW.md`, `format-coverage.md`, `agents.md` updated with floating image status 🔵 and test counts.
+## 2026-05-07 JST — dotnet test failure: POI-generated docx fields interop skip
+
+- Task: `NUGET_PACKAGES=/tmp/nuget-cache dotnet test` の失敗修正。
+- Failure: `DotnetPoi.Interop.Tests.ReadPoiGeneratedTests.Read_DocxWithFields_GeneratedByPoi` が `Assert.NotEmpty()` で失敗。
+- Cause: Java fixture generator `WriteForDotnetTest.writePhaseDocxWithFields()` は POI 5.5.1 に XWPF field creation API が無いため、field code ではなく placeholder text だけを含む `phase-docx-fields.docx` を生成している。一方 C# 側 Direction A テストが skip されておらず、field code を期待していた。
+- Fix: `Read_DocxWithFields_GeneratedByPoi` に `Fact(Skip = ...)` を戻し、Java 側コメントと実 fixture の状態に合わせた。
+- Next: `NUGET_PACKAGES=/tmp/nuget-cache dotnet test` で全体確認する。

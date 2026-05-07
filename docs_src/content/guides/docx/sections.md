@@ -1,6 +1,6 @@
-# Page Setup (Sections)
+# Page Setup and Sections
 
-Control page size, margins, and orientation in docx documents.
+Control page size, margins, orientation, and section columns in docx documents.
 
 ## Page Size
 
@@ -8,11 +8,7 @@ Control page size, margins, and orientation in docx documents.
 using DotnetPoi.XWPF.UserModel;
 
 using var doc = new XWPFDocument();
-
-var section = doc.getDocument().getBody().addNewSectPr();
-var pgSz = section.addNewPgSz();
-pgSz.w = 11906;   // A4 width in twips (1/1440 inch)
-pgSz.h = 16838;   // A4 height
+doc.setPageSize(11906, 16838);   // A4 in twips (1/1440 inch)
 ```
 
 Common paper sizes in twips:
@@ -26,30 +22,37 @@ Common paper sizes in twips:
 ## Orientation
 
 ```csharp
-pgSz.w = 16838;   // swap width/height for landscape
-pgSz.h = 11906;
+doc.setPageSize(16838, 11906);
+doc.setLandscape(true);
 ```
 
 ## Margins
 
 ```csharp
-var pgMar = section.addNewPgMar();
-pgMar.left   = 1440;   // 1 inch in twips
-pgMar.right  = 1440;
-pgMar.top    = 1440;
-pgMar.bottom = 1440;
-pgMar.header = 720;    // 0.5 inch
-pgMar.footer = 720;
+doc.setMargins(
+    top: 1440,
+    right: 1440,
+    bottom: 1440,
+    left: 1440);
 ```
 
 1 inch = 1440 twips. 1 cm ≈ 567 twips.
 
+## Columns
+
+```csharp
+doc.setColumns(count: 2, spacingTwips: 720);
+
+var count = doc.getColumnCount();
+var spacing = doc.getColumnSpacing();
+```
+
 ## Reading Page Settings
 
 ```csharp
-var sectPr = doc.getDocument().getBody().getSectPr();
-var size = sectPr.getPgSz();
-Console.WriteLine($"Width: {size.w}, Height: {size.h}");
+Console.WriteLine($"{doc.getPageWidth()} x {doc.getPageHeight()}");
+Console.WriteLine(doc.isLandscape());
+Console.WriteLine(doc.getMarginLeft());
 ```
 
-Page settings are preserved on round-trip.
+Page settings, final-section columns, and raw paragraph-level `sectPr` section breaks are preserved on round-trip.

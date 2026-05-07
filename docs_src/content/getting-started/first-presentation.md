@@ -55,12 +55,12 @@ textBox.setAnchor(100, 100, 400, 200);
 Format individual text runs:
 
 ```csharp
-var tp = textBox.addNewTextParagraph();
-var tr = tp.addNewTextRun();
+var tp = textBox.addParagraph();
+var tr = tp.addRun();
 tr.setText("Bold title");
-tr.setBold(true);
-tr.setFontSize(24);
-tr.setFontColor("FF0000");
+tr.Bold = true;
+tr.FontSize = 24;
+tr.FontColor = "FF0000";
 ```
 
 ### 4. Add an Image

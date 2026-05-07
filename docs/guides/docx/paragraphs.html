@@ -52,6 +52,7 @@
 <div class="nav-title">docx Guides</div>
 <ul>
 <li><a class="active" href="paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="styles.html">Styles</a></li>
 <li><a href="tables.html">Tables</a></li>
 <li><a href="images.html">Images</a></li>
 <li><a href="headers-footers.html">Headers &amp; Footers</a></li>
@@ -105,23 +106,31 @@ r.setColor(&quot;FF0000&quot;);             // hex RGB
 r.setUnderline(UnderlinePatterns.Single);
 r.setStrikeThrough(true);</code></pre>
 <h2>Paragraph Alignment</h2>
-<pre><code class="language-csharp">paragraph.setAlignment(ParagraphAlignment.CENTER);
-// LEFT, CENTER, RIGHT, BOTH (justified)</code></pre>
+<pre><code class="language-csharp">paragraph.setAlignment(ParagraphAlignment.Center);
+// Left, Center, Right, Both (justified)</code></pre>
 <h2>Indentation and Spacing</h2>
 <pre><code class="language-csharp">paragraph.setIndentationLeft(500);    // left indent in twips (1/1440 inch)
 paragraph.setIndentationRight(300);
 paragraph.setIndentationFirstLine(200);  // first-line indent
 paragraph.setSpacingBefore(200);         // space before in twips
 paragraph.setSpacingAfter(100);
-paragraph.setSpacingBetween(1.5);        // line spacing (1.0, 1.5, 2.0)</code></pre>
+paragraph.setSpacingBetween(276);        // OOXML line value, e.g. 276 = 1.15
+paragraph.setLineSpacingRule(LineSpacingRule.Auto);</code></pre>
 <h2>Bullet and Numbered Lists</h2>
 <pre><code class="language-csharp">var bullet = doc.createParagraph();
-bullet.setBullet(true);   // bullet point
+bullet.setBulletList();
 bullet.createRun().setText(&quot;First item&quot;);
 
 var numbered = doc.createParagraph();
-numbered.setNumbering(1);  // numbered (1, 2, 3...)
+numbered.setNumberedList();
 numbered.createRun().setText(&quot;Step one&quot;);</code></pre>
+<h2>Paragraph Styles</h2>
+<pre><code class="language-csharp">var heading = doc.createParagraph();
+heading.setStyle(&quot;Heading1&quot;);
+heading.createRun().setText(&quot;Report heading&quot;);
+
+var styleId = heading.getStyleID();  // &quot;Heading1&quot;</code></pre>
+<p>For more detail, see <a href="styles.md">Styles</a>.</p>
 <h2>Full Runnable Example</h2>
 <p>See <code>examples/Phase32DocxExample/</code> and <code>examples/UsageSamples/Program.cs</code> (<code>CreateDocument</code>):</p>
 <p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase32DocxExample">examples/Phase32DocxExample</a></p>

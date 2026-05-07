@@ -52,6 +52,7 @@
 <div class="nav-title">docx Guides</div>
 <ul>
 <li><a href="paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="styles.html">Styles</a></li>
 <li><a href="tables.html">Tables</a></li>
 <li><a class="active" href="images.html">Images</a></li>
 <li><a href="headers-footers.html">Headers &amp; Footers</a></li>
@@ -131,6 +132,8 @@ var picType = pic.getPictureType();  // PICTURE_TYPE_JPEG
 var runs = paragraphs[0].getRuns();
 var embedded = runs[0].getEmbeddedPictures();
 var rotation = embedded[0].getRotation();</code></pre>
+<h2>Floating Images</h2>
+<p>Floating or anchored images (<code>wp:anchor</code>) are preserved when an existing document is read and written again. dotnet-poi currently models inline images for API-level creation; anchored positioning, wrapping, and floating-image editing are preserved as raw OOXML rather than exposed as public setters.</p>
 <h2>Full Runnable Example</h2>
 <p>See <code>examples/Phase32DocxExample/</code> and <code>examples/UsageSamples/Program.cs</code> (<code>CreateDocument</code>):</p>
 <p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase32DocxExample">examples/Phase32DocxExample</a></p>

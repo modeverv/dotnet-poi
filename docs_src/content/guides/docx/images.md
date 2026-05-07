@@ -54,6 +54,10 @@ var embedded = runs[0].getEmbeddedPictures();
 var rotation = embedded[0].getRotation();
 ```
 
+## Floating Images
+
+Floating or anchored images (`wp:anchor`) are preserved when an existing document is read and written again. dotnet-poi currently models inline images for API-level creation; anchored positioning, wrapping, and floating-image editing are preserved as raw OOXML rather than exposed as public setters.
+
 ## Full Runnable Example
 
 See `examples/Phase32DocxExample/` and `examples/UsageSamples/Program.cs` (`CreateDocument`):

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Page Setup (Sections) | dotnet-poi Documentation</title>
+  <title>Page Setup and Sections | dotnet-poi Documentation</title>
   <meta name="description" content="Apache POI-compatible un-official .NET library for Office files, focused on faithful round-trip and Java POI interop.">
   <link rel="stylesheet" href="../../assets/site.css">
 </head>
@@ -52,6 +52,7 @@
 <div class="nav-title">docx Guides</div>
 <ul>
 <li><a href="paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="styles.html">Styles</a></li>
 <li><a href="tables.html">Tables</a></li>
 <li><a href="images.html">Images</a></li>
 <li><a href="headers-footers.html">Headers &amp; Footers</a></li>
@@ -84,17 +85,13 @@
       </nav>
     </aside>
     <main class="content">
-<h1>Page Setup (Sections)</h1>
-<p>Control page size, margins, and orientation in docx documents.</p>
+<h1>Page Setup and Sections</h1>
+<p>Control page size, margins, orientation, and section columns in docx documents.</p>
 <h2>Page Size</h2>
 <pre><code class="language-csharp">using DotnetPoi.XWPF.UserModel;
 
 using var doc = new XWPFDocument();
-
-var section = doc.getDocument().getBody().addNewSectPr();
-var pgSz = section.addNewPgSz();
-pgSz.w = 11906;   // A4 width in twips (1/1440 inch)
-pgSz.h = 16838;   // A4 height</code></pre>
+doc.setPageSize(11906, 16838);   // A4 in twips (1/1440 inch)</code></pre>
 <p>Common paper sizes in twips:</p>
 <table>
 <thead><tr><th>Paper</th><th>Width</th><th>Height</th></tr></thead>
@@ -105,22 +102,25 @@ pgSz.h = 16838;   // A4 height</code></pre>
 </tbody>
 </table>
 <h2>Orientation</h2>
-<pre><code class="language-csharp">pgSz.w = 16838;   // swap width/height for landscape
-pgSz.h = 11906;</code></pre>
+<pre><code class="language-csharp">doc.setPageSize(16838, 11906);
+doc.setLandscape(true);</code></pre>
 <h2>Margins</h2>
-<pre><code class="language-csharp">var pgMar = section.addNewPgMar();
-pgMar.left   = 1440;   // 1 inch in twips
-pgMar.right  = 1440;
-pgMar.top    = 1440;
-pgMar.bottom = 1440;
-pgMar.header = 720;    // 0.5 inch
-pgMar.footer = 720;</code></pre>
+<pre><code class="language-csharp">doc.setMargins(
+    top: 1440,
+    right: 1440,
+    bottom: 1440,
+    left: 1440);</code></pre>
 <p>1 inch = 1440 twips. 1 cm ≈ 567 twips.</p>
+<h2>Columns</h2>
+<pre><code class="language-csharp">doc.setColumns(count: 2, spacingTwips: 720);
+
+var count = doc.getColumnCount();
+var spacing = doc.getColumnSpacing();</code></pre>
 <h2>Reading Page Settings</h2>
-<pre><code class="language-csharp">var sectPr = doc.getDocument().getBody().getSectPr();
-var size = sectPr.getPgSz();
-Console.WriteLine($&quot;Width: {size.w}, Height: {size.h}&quot;);</code></pre>
-<p>Page settings are preserved on round-trip.</p>
+<pre><code class="language-csharp">Console.WriteLine($&quot;{doc.getPageWidth()} x {doc.getPageHeight()}&quot;);
+Console.WriteLine(doc.isLandscape());
+Console.WriteLine(doc.getMarginLeft());</code></pre>
+<p>Page settings, final-section columns, and raw paragraph-level <code>sectPr</code> section breaks are preserved on round-trip.</p>
 
     </main>
   </div>

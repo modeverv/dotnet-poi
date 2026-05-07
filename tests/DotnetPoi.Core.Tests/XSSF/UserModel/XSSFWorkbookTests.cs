@@ -693,6 +693,130 @@ public class XSSFWorkbookTests
     }
 
     [Fact]
+    public void RoundTrip_DataValidation_TypesAndOperators()
+    {
+        // Test all DataValidation types (Decimal, Date, TextLength, List, Time, Custom)
+        // with various operators to ensure round-trip preservation.
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("Validation");
+        sheet.createRow(0).createCell(0).setCellValue("A");
+        sheet.createRow(1).createCell(0).setCellValue("B");
+        sheet.createRow(0).createCell(1).setCellValue("C");
+        sheet.createRow(1).createCell(1).setCellValue("D");
+
+        // 1. Decimal + Between
+        var dvDecimal = new XSSFDataValidation
+        {
+            Sqref = "A1:A10",
+            Type = DataValidationType.Decimal,
+            Operator = DataValidationOperator.Between,
+            Formula1 = "1.5",
+            Formula2 = "10.0",
+            AllowBlank = true,
+            ShowDropDown = true,
+            ErrorStyle = "stop",
+            ErrorTitle = "Range",
+            ErrorMessage = "Enter a decimal between 1.5 and 10.0."
+        };
+        sheet.AddDataValidation(dvDecimal);
+
+        // 2. Date + Equal
+        var dvDate = new XSSFDataValidation
+        {
+            Sqref = "B1:B10",
+            Type = DataValidationType.Date,
+            Operator = DataValidationOperator.Equal,
+            Formula1 = "2026-01-01",
+            AllowBlank = false,
+            ShowDropDown = false,
+        };
+        sheet.AddDataValidation(dvDate);
+
+        // 3. TextLength + Between
+        var dvTextLength = new XSSFDataValidation
+        {
+            Sqref = "C1:C10",
+            Type = DataValidationType.TextLength,
+            Operator = DataValidationOperator.Between,
+            Formula1 = "1",
+            Formula2 = "100",
+        };
+        sheet.AddDataValidation(dvTextLength);
+
+        // 4. List (formula-based, no operator — operator skipped for List type)
+        var dvList = new XSSFDataValidation
+        {
+            Sqref = "D1:D10",
+            Type = DataValidationType.List,
+            Formula1 = "$A$1:$A$3",
+        };
+        sheet.AddDataValidation(dvList);
+
+        // 5. Time + LessThan
+        var dvTime = new XSSFDataValidation
+        {
+            Sqref = "E1:E10",
+            Type = DataValidationType.Time,
+            Operator = DataValidationOperator.LessThan,
+            Formula1 = "12:00:00",
+        };
+        sheet.AddDataValidation(dvTime);
+
+        // Round-trip and verify
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheetAt(0);
+        var xssfSheet = (XSSFSheet)loadedSheet;
+
+        var loadedValidations = xssfSheet.DataValidations;
+        Assert.Equal(5, loadedValidations.Count);
+
+        // Verify Decimal validation
+        var dv0 = loadedValidations[0];
+        Assert.Equal("A1:A10", dv0.Sqref);
+        Assert.Equal(DataValidationType.Decimal, dv0.Type);
+        Assert.Equal(DataValidationOperator.Between, dv0.Operator);
+        Assert.Equal("1.5", dv0.Formula1);
+        Assert.Equal("10.0", dv0.Formula2);
+        Assert.True(dv0.AllowBlank);
+        Assert.True(dv0.ShowDropDown);
+        Assert.Equal("Enter a decimal between 1.5 and 10.0.", dv0.ErrorMessage);
+
+        // Verify Date validation
+        var dv1 = loadedValidations[1];
+        Assert.Equal("B1:B10", dv1.Sqref);
+        Assert.Equal(DataValidationType.Date, dv1.Type);
+        Assert.Equal(DataValidationOperator.Equal, dv1.Operator);
+        Assert.Equal("2026-01-01", dv1.Formula1);
+        Assert.False(dv1.AllowBlank);
+        Assert.False(dv1.ShowDropDown);
+
+        // Verify TextLength validation
+        var dv2 = loadedValidations[2];
+        Assert.Equal("C1:C10", dv2.Sqref);
+        Assert.Equal(DataValidationType.TextLength, dv2.Type);
+        Assert.Equal(DataValidationOperator.Between, dv2.Operator);
+        Assert.Equal("1", dv2.Formula1);
+        Assert.Equal("100", dv2.Formula2);
+
+        // Verify List validation (no operator — should be None/unspecified)
+        var dv3 = loadedValidations[3];
+        Assert.Equal("D1:D10", dv3.Sqref);
+        Assert.Equal(DataValidationType.List, dv3.Type);
+        Assert.Equal("$A$1:$A$3", dv3.Formula1);
+
+        // Verify Time validation
+        var dv4 = loadedValidations[4];
+        Assert.Equal("E1:E10", dv4.Sqref);
+        Assert.Equal(DataValidationType.Time, dv4.Type);
+        Assert.Equal(DataValidationOperator.LessThan, dv4.Operator);
+        Assert.Equal("12:00:00", dv4.Formula1);
+    }
+
+    [Fact]
     public void RoundTrip_ConditionalFormatting_Preserved()
     {
         using var original = new XSSFWorkbook();
@@ -730,6 +854,46 @@ public class XSSFWorkbookTests
         Assert.Equal("greaterThan", loadedRule.Operator);
         Assert.Single(loadedRule.Formulas);
         Assert.Equal("100", loadedRule.Formulas[0]);
+    }
+
+    [Fact]
+    public void RoundTrip_ConditionalFormatting_FormulaType()
+    {
+        // Test ConditionalFormatType.Formula with custom formula
+        using var original = new XSSFWorkbook();
+        var sheet = original.createSheet("Rules");
+        sheet.createRow(0).createCell(0).setCellValue(10);
+        sheet.createRow(1).createCell(0).setCellValue(200);
+
+        // Formula type: =A1>100
+        var cf = new XSSFConditionalFormatting();
+        cf.Sqref = "A1:A10";
+        var rule = new XSSFCFRule();
+        rule.Type = ConditionalFormatType.Formula;
+        rule.Priority = 1;
+        rule.Operator = "greaterThan";
+        rule.Formulas.Add("A1>100");
+        cf.Rules.Add(rule);
+        sheet.AddConditionalFormatting(cf);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XSSFWorkbook(stream);
+        var loadedSheet = loaded.getSheet("Rules")!;
+        var loadedCfs = loadedSheet.ConditionalFormatting;
+        Assert.Single(loadedCfs);
+        var loadedCf = loadedCfs[0];
+        Assert.Equal("A1:A10", loadedCf.Sqref);
+        Assert.Single(loadedCf.Rules);
+
+        var loadedRule = loadedCf.Rules[0];
+        Assert.Equal(ConditionalFormatType.Formula, loadedRule.Type);
+        Assert.Equal(1, loadedRule.Priority);
+        Assert.Equal("greaterThan", loadedRule.Operator);
+        Assert.Single(loadedRule.Formulas);
+        Assert.Equal("A1>100", loadedRule.Formulas[0]);
     }
 
     [Fact]
@@ -1111,6 +1275,57 @@ public class XSSFWorkbookTests
         Assert.NotNull(result.GetEntry("xl/externalLinks/externalLink1.xml"));
         using var r = new StreamReader(result.GetEntry("xl/connections.xml")!.Open());
         Assert.Contains("<connections>", r.ReadToEnd());
+    }
+
+    [Fact]
+    public void RoundTrip_PivotTable_Preserved()
+    {
+        // Test pivot table creation and round-trip preservation via the API.
+        byte[] xlsxBytes;
+        using (var original = new XSSFWorkbook())
+        {
+            // Source data sheet
+            var dataSheet = original.createSheet("Data");
+            dataSheet.createRow(0).createCell(0).setCellValue("Category");
+            dataSheet.createRow(0).createCell(1).setCellValue("Value");
+            dataSheet.createRow(1).createCell(0).setCellValue("A");
+            dataSheet.createRow(1).createCell(1).setCellValue(10);
+            dataSheet.createRow(2).createCell(0).setCellValue("B");
+            dataSheet.createRow(2).createCell(1).setCellValue(20);
+
+            // Pivot table on a separate sheet
+            var pivotSheet = original.createSheet("Pivot");
+            var pivot = pivotSheet.createPivotTable("A1", "A1:B3", "Data");
+            pivot.RowLabels.Add(0);       // Category as row label
+            pivot.DataColumns.Add(1);      // Value as data field
+
+            using var ms = new MemoryStream();
+            original.write(ms);
+            xlsxBytes = ms.ToArray();
+        }
+
+        // Verify the written parts exist in the ZIP archive
+        using var archive = new ZipArchive(new MemoryStream(xlsxBytes), ZipArchiveMode.Read);
+        Assert.NotNull(archive.GetEntry("xl/pivotTables/pivotTable1.xml"));
+        Assert.NotNull(archive.GetEntry("xl/pivotCache/pivotCacheDefinition1.xml"));
+        Assert.NotNull(archive.GetEntry("xl/pivotCache/pivotCacheRecords1.xml"));
+
+        // Verify content types
+        var ctXml = ReadEntry(archive, "[Content_Types].xml");
+        Assert.Contains("/xl/pivotTables/pivotTable1.xml", ctXml);
+        Assert.Contains("/xl/pivotCache/pivotCacheDefinition1.xml", ctXml);
+        Assert.Contains("/xl/pivotCache/pivotCacheRecords1.xml", ctXml);
+
+        // Load from the written bytes and verify pivot table parts survive
+        using var loaded = new XSSFWorkbook(new MemoryStream(xlsxBytes));
+        using var outStream = new MemoryStream();
+        loaded.write(outStream);
+        outStream.Position = 0;
+
+        using var result = new ZipArchive(outStream, ZipArchiveMode.Read);
+        Assert.NotNull(result.GetEntry("xl/pivotTables/pivotTable1.xml"));
+        Assert.NotNull(result.GetEntry("xl/pivotCache/pivotCacheDefinition1.xml"));
+        Assert.NotNull(result.GetEntry("xl/pivotCache/pivotCacheRecords1.xml"));
     }
 
     private static string ReadEntry(ZipArchive archive, string name)

@@ -52,6 +52,7 @@
 <div class="nav-title">docx Guides</div>
 <ul>
 <li><a href="paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="styles.html">Styles</a></li>
 <li><a class="active" href="tables.html">Tables</a></li>
 <li><a href="images.html">Images</a></li>
 <li><a href="headers-footers.html">Headers &amp; Footers</a></li>
@@ -104,6 +105,17 @@ row1.createCell().addParagraph().createRun().setText(&quot;Value&quot;);
 var row2 = table.createRow();
 row2.createCell().addParagraph().createRun().setText(&quot;Item 1&quot;);
 row2.createCell().addParagraph().createRun().setText(&quot;42&quot;);</code></pre>
+<h2>Width, Header Rows, and Merged Cells</h2>
+<pre><code class="language-csharp">table.setWidth(7200, &quot;dxa&quot;);
+
+var header = table.createRow();
+header.setHeader(true);
+header.setHeight(400, &quot;atLeast&quot;);
+
+var merged = header.createCell();
+merged.setGridSpan(2);
+merged.addParagraph().createRun().setText(&quot;Merged header&quot;);</code></pre>
+<p>Vertical merges can be represented with <code>setVMerge(&quot;restart&quot;)</code> on the first cell and <code>setVMerge(&quot;continue&quot;)</code> on following cells.</p>
 <h2>Reading Tables</h2>
 <pre><code class="language-csharp">using var stream = File.OpenRead(&quot;input.docx&quot;);
 using var doc = new XWPFDocument(stream);
@@ -121,9 +133,9 @@ foreach (var row in rows)
 }</code></pre>
 <h2>Limitations</h2>
 <ul>
-<li>Cell merging is not supported</li>
-<li>Table borders are not supported</li>
-<li>Cell-level formatting (shading, alignment) is not supported</li>
+<li>Grid span, vertical merge, width, row height, header rows, and vertical alignment have modeled APIs.</li>
+<li>Existing borders, shading, cell margins, table layout, and similar unmodeled <code>tblPr</code> / <code>trPr</code> / <code>tcPr</code> children are preserved as raw XML during round-trip.</li>
+<li>API-level creation of detailed border and shading styles is not yet modeled.</li>
 </ul>
 <h2>Full Runnable Example</h2>
 <p>See <code>examples/UsageSamples/Program.cs</code> (<code>CreateDocument</code>):</p>

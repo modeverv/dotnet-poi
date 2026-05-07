@@ -52,6 +52,7 @@
 <div class="nav-title">docx Guides</div>
 <ul>
 <li><a href="../guides/docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../guides/docx/styles.html">Styles</a></li>
 <li><a href="../guides/docx/tables.html">Tables</a></li>
 <li><a href="../guides/docx/images.html">Images</a></li>
 <li><a href="../guides/docx/headers-footers.html">Headers &amp; Footers</a></li>
@@ -114,12 +115,12 @@ textBox.setText(&quot;Hello, World!&quot;);</code></pre>
 <p>Set position and size with <code>setAnchor</code> (x, y, width, height in EMU):</p>
 <pre><code class="language-csharp">textBox.setAnchor(100, 100, 400, 200);</code></pre>
 <p>Format individual text runs:</p>
-<pre><code class="language-csharp">var tp = textBox.addNewTextParagraph();
-var tr = tp.addNewTextRun();
+<pre><code class="language-csharp">var tp = textBox.addParagraph();
+var tr = tp.addRun();
 tr.setText(&quot;Bold title&quot;);
-tr.setBold(true);
-tr.setFontSize(24);
-tr.setFontColor(&quot;FF0000&quot;);</code></pre>
+tr.Bold = true;
+tr.FontSize = 24;
+tr.FontColor = &quot;FF0000&quot;;</code></pre>
 <h3>4. Add an Image</h3>
 <pre><code class="language-csharp">var imageBytes = File.ReadAllBytes(&quot;photo.jpg&quot;);
 var picIdx = prs.addPicture(imageBytes, XSLFPictureData.PICTURE_TYPE_JPEG);

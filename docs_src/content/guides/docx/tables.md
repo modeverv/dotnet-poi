@@ -24,6 +24,22 @@ row2.createCell().addParagraph().createRun().setText("Item 1");
 row2.createCell().addParagraph().createRun().setText("42");
 ```
 
+## Width, Header Rows, and Merged Cells
+
+```csharp
+table.setWidth(7200, "dxa");
+
+var header = table.createRow();
+header.setHeader(true);
+header.setHeight(400, "atLeast");
+
+var merged = header.createCell();
+merged.setGridSpan(2);
+merged.addParagraph().createRun().setText("Merged header");
+```
+
+Vertical merges can be represented with `setVMerge("restart")` on the first cell and `setVMerge("continue")` on following cells.
+
 ## Reading Tables
 
 ```csharp
@@ -45,9 +61,9 @@ foreach (var row in rows)
 
 ## Limitations
 
-- Cell merging is not supported
-- Table borders are not supported
-- Cell-level formatting (shading, alignment) is not supported
+- Grid span, vertical merge, width, row height, header rows, and vertical alignment have modeled APIs.
+- Existing borders, shading, cell margins, table layout, and similar unmodeled `tblPr` / `trPr` / `tcPr` children are preserved as raw XML during round-trip.
+- API-level creation of detailed border and shading styles is not yet modeled.
 
 ## Full Runnable Example
 

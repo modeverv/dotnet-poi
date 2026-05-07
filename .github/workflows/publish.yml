@@ -22,11 +22,11 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
-      - name: Setup Java 11 (for interop fixtures)
+      - name: Setup Java 21 (for interop fixtures)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "11"
+          java-version: "21"
           cache: maven
 
       - name: Cache NuGet packages

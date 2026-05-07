@@ -109,6 +109,10 @@
           "path": "guides/docx/paragraphs.md"
         },
         {
+          "title": "Styles",
+          "path": "guides/docx/styles.md"
+        },
+        {
           "title": "Tables",
           "path": "guides/docx/tables.md"
         },

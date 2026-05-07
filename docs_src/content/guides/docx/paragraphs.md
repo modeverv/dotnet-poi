@@ -31,8 +31,8 @@ r.setStrikeThrough(true);
 ## Paragraph Alignment
 
 ```csharp
-paragraph.setAlignment(ParagraphAlignment.CENTER);
-// LEFT, CENTER, RIGHT, BOTH (justified)
+paragraph.setAlignment(ParagraphAlignment.Center);
+// Left, Center, Right, Both (justified)
 ```
 
 ## Indentation and Spacing
@@ -43,20 +43,33 @@ paragraph.setIndentationRight(300);
 paragraph.setIndentationFirstLine(200);  // first-line indent
 paragraph.setSpacingBefore(200);         // space before in twips
 paragraph.setSpacingAfter(100);
-paragraph.setSpacingBetween(1.5);        // line spacing (1.0, 1.5, 2.0)
+paragraph.setSpacingBetween(276);        // OOXML line value, e.g. 276 = 1.15
+paragraph.setLineSpacingRule(LineSpacingRule.Auto);
 ```
 
 ## Bullet and Numbered Lists
 
 ```csharp
 var bullet = doc.createParagraph();
-bullet.setBullet(true);   // bullet point
+bullet.setBulletList();
 bullet.createRun().setText("First item");
 
 var numbered = doc.createParagraph();
-numbered.setNumbering(1);  // numbered (1, 2, 3...)
+numbered.setNumberedList();
 numbered.createRun().setText("Step one");
 ```
+
+## Paragraph Styles
+
+```csharp
+var heading = doc.createParagraph();
+heading.setStyle("Heading1");
+heading.createRun().setText("Report heading");
+
+var styleId = heading.getStyleID();  // "Heading1"
+```
+
+For more detail, see [Styles](styles.md).
 
 ## Full Runnable Example
 

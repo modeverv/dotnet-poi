@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hyperlinks | dotnet-poi Documentation</title>
+  <title>Styles | dotnet-poi Documentation</title>
   <meta name="description" content="Apache POI-compatible un-official .NET library for Office files, focused on faithful round-trip and Java POI interop.">
   <link rel="stylesheet" href="../../assets/site.css">
 </head>
@@ -52,11 +52,11 @@
 <div class="nav-title">docx Guides</div>
 <ul>
 <li><a href="paragraphs.html">Paragraphs &amp; Runs</a></li>
-<li><a href="styles.html">Styles</a></li>
+<li><a class="active" href="styles.html">Styles</a></li>
 <li><a href="tables.html">Tables</a></li>
 <li><a href="images.html">Images</a></li>
 <li><a href="headers-footers.html">Headers &amp; Footers</a></li>
-<li><a class="active" href="hyperlinks.html">Hyperlinks</a></li>
+<li><a href="hyperlinks.html">Hyperlinks</a></li>
 <li><a href="fields.html">Fields</a></li>
 <li><a href="sections.html">Page Setup</a></li>
 </ul>
@@ -85,29 +85,44 @@
       </nav>
     </aside>
     <main class="content">
-<h1>Hyperlinks</h1>
-<p>Add external hyperlinks to docx paragraphs.</p>
-<h2>Adding a Hyperlink</h2>
+<h1>Styles</h1>
+<p>Apply and inspect paragraph style references in docx documents.</p>
+<h2>Applying a Paragraph Style</h2>
 <pre><code class="language-csharp">using DotnetPoi.XWPF.UserModel;
 
 using var doc = new XWPFDocument();
+var heading = doc.createParagraph();
+heading.setStyle(&quot;Heading1&quot;);
+heading.createRun().setText(&quot;Quarterly report&quot;);
 
-var p = doc.createParagraph();
-var r = p.createRun();
-r.setText(&quot;Visit &quot;);
-r.setColor(&quot;0563C1&quot;);
-r.setUnderline(UnderlinePatterns.Single);
+var body = doc.createParagraph();
+body.setStyle(&quot;Normal&quot;);
+body.createRun().setText(&quot;Generated with dotnet-poi.&quot;);</code></pre>
+<p>The style ID is written as <code>w:pStyle</code> and is preserved when the document is read back and saved again.</p>
+<h2>Reading Style References</h2>
+<pre><code class="language-csharp">using var stream = File.OpenRead(&quot;report.docx&quot;);
+using var doc = new XWPFDocument(stream);
 
-// Add the hyperlink
-var linkRun = p.createRun();
-linkRun.setText(&quot;our website&quot;);
-linkRun.setColor(&quot;0563C1&quot;);
-linkRun.setUnderline(UnderlinePatterns.Single);
-linkRun.setHyperlink(&quot;https://github.com/modeverv/dotnet-poi&quot;);</code></pre>
-<p>Hyperlinks round-trip correctly and are readable by Java POI.</p>
+foreach (var paragraph in doc.getParagraphs())
+{
+    Console.WriteLine(paragraph.getStyleID() ?? &quot;(direct formatting)&quot;);
+}</code></pre>
+<h2>Inspecting styles.xml</h2>
+<pre><code class="language-csharp">var styles = doc.getStyles();
+var heading1 = styles?.getStyle(&quot;Heading1&quot;);
+Console.WriteLine(heading1?.Name);</code></pre>
+<p><code>XWPFStyles</code> reads style IDs, names, types, default flags, and <code>basedOn</code> relationships from <code>word/styles.xml</code>.</p>
+<h2>Default Styles</h2>
+<p>New documents write a default <code>word/styles.xml</code> with Normal and Heading 1-3 definitions, following the Apache POI-style baseline used by this port. Existing <code>word/styles.xml</code> parts are preserved during round-trip.</p>
+<h2>Limitations</h2>
+<ul>
+<li>Paragraph style references are modeled with <code>setStyle()</code> and <code>getStyleID()</code>.</li>
+<li>Character styles and table styles are not yet editable through a public API.</li>
+<li>Full Word style inheritance is not evaluated by dotnet-poi; Word or LibreOffice applies styles when opening the document.</li>
+</ul>
 <h2>Full Runnable Example</h2>
-<p>See <code>examples/UsageSamples/Program.cs</code> (<code>CreateDocument</code>):</p>
-<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples">examples/UsageSamples</a></p>
+<p>See <code>examples/Phase32DocxExample/</code> for docx creation patterns:</p>
+<p><a href="https://github.com/modeverv/dotnet-poi/tree/main/examples/Phase32DocxExample">examples/Phase32DocxExample</a></p>
 
     </main>
   </div>
