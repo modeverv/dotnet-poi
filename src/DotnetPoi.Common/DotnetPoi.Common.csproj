@@ -9,11 +9,8 @@
         <RootNamespace>DotnetPoi</RootNamespace>
     </PropertyGroup>
 
-    <!-- Allow implementation assemblies and split tests to access shared internal helpers during migration. -->
+    <!-- Allow implementation assemblies and split tests to access shared internal helpers. -->
     <ItemGroup>
-        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-            <_Parameter1>DotnetPoi.Core</_Parameter1>
-        </AssemblyAttribute>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>DotnetPoi.POIFS</_Parameter1>
         </AssemblyAttribute>

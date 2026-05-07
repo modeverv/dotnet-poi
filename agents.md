@@ -25,7 +25,7 @@ Apache POI source lives in `poi/` as a git submodule. **Always refer to the orig
 dotnet-poi/
 ├── poi/                        # Apache POI submodule (read-only, do not edit)
 ├── src/
-│   ├── DotnetPoi.Core/         # ★ NuGet: DotnetPoi.Core (all implementations)
+│   ├── DotnetPoi.Legacy/         # ★ NuGet: DotnetPoi.Legacy (HSSF, HWPF, HSLF)
 │   │   ├── SS/                 #   Common interfaces, enums, XML writer
 │   │   ├── POIFS/              #   OLE2 compound document container
 │   │   ├── XSSF/               #   xlsx (Excel 2007+)
@@ -36,7 +36,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests (244) — all formats (+7: pptx group shapes, xlsx auto-shapes, docx header/footer, docx SDT, docx floating images, docx table/rPr raw preservation)
+│   ├── DotnetPoi.Legacy.Tests/      # Legacy tests (HSSF/HWPF/HSLF)
 │   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
 │   ├── DotnetPoi.Interop.Tests/   # Bidirectional compatibility tests
 │   │   ├── java/                #   Maven project (Apache POI dependency)
@@ -61,21 +61,23 @@ The project is split into **two NuGet packages** to decouple Core stability from
 
 | Package | Contents | Stability target |
 |---|---|---|
-| **DotnetPoi.Core** | All format implementations (SS, POIFS, XSSF, HSSF, XWPF, HWPF, XSLF, HSLF) | **Stable v1.0** (release independently) |
+| **DotnetPoi.Ooxml** | OOXML formats (XSSF/xlsx, XWPF/docx, XSLF/pptx) | **Stable v1.0** (release independently) |
+| **DotnetPoi.Legacy** | Legacy binary formats (HSSF/xls, HWPF/doc, HSLF/ppt) | **In development** |
 | **DotnetPoi.Formula** | Formula evaluator (`FormulaEvaluator`) | **v0.x** (iterate freely) |
+| **DotnetPoi.All** | Meta-package — references Ooxml + Legacy + Formula | **Aggregate** |
 
 **Rules:**
-- `Core` MUST NOT reference `Formula` in any way. Zero compile-time dependency.
-- `Formula` references `Core` (it consumes Core types like `ICell`, `IWorkbook`).
-- `Formula` registers itself with `Core` via `XSSFCreationHelper.RegisterFormulaEvaluatorFactory()` in its static constructor. At runtime, `createFormulaEvaluator()` uses lazy assembly discovery (`Type.GetType` + `RuntimeHelpers.RunClassConstructor`) to auto-detect `DotnetPoi.Formula`.
-- All non-evaluator work (formula text read/write, cached value preservation, `setCellFormula`, `getCellFormula`, `calcPr fullCalcOnLoad`) lives in Core. Only actual evaluation lives in Formula.
-- All new features go into Core first unless they are specifically formula evaluation logic.
+- `Ooxml` MUST NOT reference `Formula` in any way. Zero compile-time dependency.
+- `Formula` references `Ooxml` (it consumes Ooxml types like `ICell`, `IWorkbook`).
+- `Formula` registers itself with `Ooxml` via `XSSFCreationHelper.RegisterFormulaEvaluatorFactory()` in its static constructor. At runtime, `createFormulaEvaluator()` uses lazy assembly discovery (`Type.GetType` + `RuntimeHelpers.RunClassConstructor`) to auto-detect `DotnetPoi.Formula`.
+- All non-evaluator work (formula text read/write, cached value preservation, `setCellFormula`, `getCellFormula`, `calcPr fullCalcOnLoad`) lives in Ooxml/Legacy. Only actual evaluation lives in Formula.
+- All new features go into Ooxml/Legacy first unless they are specifically formula evaluation logic.
 
 **Implications for development:**
-- Core can be stabilized and released as v1.0 without waiting for Formula.
-- Formula tests (`DotnetPoi.Formula.Tests`) are independent of Core tests.
+- Ooxml can be stabilized and released as v1.0 without waiting for Formula.
+- Formula tests (`DotnetPoi.Formula.Tests`) are independent of Ooxml/Legacy tests.
 - `createFormulaEvaluator()` must always handle the missing-Formula case with `NotSupportedException`.
-- When modifying Core interfaces that Formula depends on (e.g., `ICell`, `ICellStyle`), consider forward compatibility. Adding non-breaking members is safe; breaking changes require coordinated Formula updates.
+- When modifying Ooxml interfaces that Formula depends on (e.g., `ICell`, `ICellStyle`), consider forward compatibility. Adding non-breaking members is safe; breaking changes require coordinated Formula updates.
 
 Note: For now, formula evaluation and setting formula result values are intentionally omitted in the library; formulas may be preserved as text and cached results are only handled when present.
 
@@ -634,7 +636,7 @@ tests/
 
 4. **Move Common surface**
    - [x] `SS` interfaces/enums、共通 exception、共通 utility、XML writer などを `DotnetPoi.Common` に移す。
-   - [x] `DotnetPoi.Core` 側は移行期間中だけ compatibility facade か project reference として残すか判断する。
+   - [x] `DotnetPoi.Core` 側は移行期間中だけ compatibility facade として残した。空の facade + 全 example を `DotnetPoi.All` に移行後に削除完了 (2025)。
    - [x] `Formula` が参照する workbook/cell/style abstractions はこの段階で `Common` に寄せる。
    - [x] `Common.Tests` を green にしてから次へ進む。
 
