@@ -1,5 +1,34 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — Phase 12 item 1: POI HSSF fixture survey
+
+- Task: Phase 12 実装順 1「POI HSSF tests / `poi/test-data/spreadsheet/*.xls` から代表 fixture を選び、現状の read/write 失敗を `CHECKPOINT.md` に記録する」に対応。
+- Selected representative fixtures from `poi/test-data/spreadsheet/`:
+  - Foundation / workbook stream variants: `empty.xls`, `Simple.xls`, `SimpleMultiCell.xls`, `SampleSS.xls`, `WORKBOOK_in_capitals.xls`, `BOOK_in_capitals.xls`.
+  - Unicode / dates / basic values: `chinese-provinces.xls`, `DateFormats.xls`.
+  - Styles / formatting: `SimpleWithStyling.xls`, `WithExtendedStyles.xls`, `55341_CellStyleBorder.xls`.
+  - Layout / print metadata: `SimpleWithPrintArea.xls`, `RepeatingRowsCols.xls`.
+  - Formulas: `SimpleWithFormula.xls`, `ex47747-sharedFormula.xls`.
+  - Later preservation areas: `WithHyperlink.xls`, `comments.xls`, `drawings.xls`, `SimpleWithImages.xls`, `SimpleMacro.xls`.
+- Current read findings:
+  - 19 selected fixtures open through `HSSFWorkbook` and report expected sheet counts. This confirms the current POIFS reader can handle common FAT/MiniFAT cases for these files and that the thin BIFF scanner can reach the Workbook stream.
+  - `BOOK_in_capitals.xls` fails with `InvalidDataException: The OLE2 document does not contain a Workbook stream.` The current loader accepts `Workbook`, `Book`, and `WORKBOOK`, but not uppercase `BOOK`.
+  - Several fixtures open but expose zero or low cell counts because current BIFF support only consumes `LabelSST`, `Label`, `Number`, `RK`, `BoolErr`, and `Blank`; formula, drawing, comment, image, style, layout, name, hyperlink, and many preservation records are not modeled.
+- Current write/preservation finding:
+  - `HSSFWorkbook.write()` currently writes a new compound file containing only `Workbook`. It drops `SummaryInformation`, `DocumentSummaryInformation`, `CompObj`, VBA streams, drawing/package streams, and all unmodeled BIFF records. This is the main blocker before Phase 12 light-edit round-trip can be considered safe.
+- Changes:
+  - Added Phase 12 representative fixture coverage to `tests/DotnetPoi.Core.Tests/HSSF/UserModel/HSSFWorkbookTests.cs`.
+  - Added a characterization test documenting the current `BOOK_in_capitals.xls` failure.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 22 passed, 0 failed.
+  - Build emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Next:
+  - Phase 12 item 2 should start with POIFS/HSSF preservation: retain original OLE2 streams and unknown BIFF record ranges when opening an existing workbook for light edit.
+  - Small immediate fix candidate: accept uppercase `BOOK` as a workbook stream alias.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
 ## 2026-05-07 JST — agents.md: add Phase 12 xls and Phase 13 doc roadmap
 
 - Task: ユーザー方針「xlsx/docx/pptx は十分進んだので、Phase 12 を xls、Phase 13 を doc 対応にしたい」に合わせて `agents.md` を更新。

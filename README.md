@@ -338,9 +338,6 @@ dotnet-poi/
 ```
 
 > **Architecture note:** All format implementations live under `DotnetPoi.Core/` as a single assembly.
-> The old per-format project directories (`DotnetPoi.XSSF/`, `DotnetPoi.SS/`, etc.) no longer
-> exist as separate `.csproj` files — their source files have been consolidated into Core.
-> Namespaces are unchanged (e.g. `DotnetPoi.XSSF.UserModel`).
 
 ---
 

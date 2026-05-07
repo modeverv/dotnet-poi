@@ -6,6 +6,29 @@ namespace DotnetPoi.HSSF.Tests.UserModel;
 
 public sealed class HSSFWorkbookTests
 {
+    public static IEnumerable<object[]> Phase12RepresentativePoiFixtures()
+    {
+        yield return new object[] { "empty.xls", 3 };
+        yield return new object[] { "Simple.xls", 3 };
+        yield return new object[] { "SimpleMultiCell.xls", 3 };
+        yield return new object[] { "SampleSS.xls", 3 };
+        yield return new object[] { "WORKBOOK_in_capitals.xls", 1 };
+        yield return new object[] { "chinese-provinces.xls", 1 };
+        yield return new object[] { "DateFormats.xls", 3 };
+        yield return new object[] { "SimpleWithStyling.xls", 3 };
+        yield return new object[] { "WithExtendedStyles.xls", 3 };
+        yield return new object[] { "55341_CellStyleBorder.xls", 3 };
+        yield return new object[] { "SimpleWithPrintArea.xls", 3 };
+        yield return new object[] { "RepeatingRowsCols.xls", 4 };
+        yield return new object[] { "SimpleWithFormula.xls", 3 };
+        yield return new object[] { "ex47747-sharedFormula.xls", 1 };
+        yield return new object[] { "WithHyperlink.xls", 3 };
+        yield return new object[] { "comments.xls", 3 };
+        yield return new object[] { "drawings.xls", 8 };
+        yield return new object[] { "SimpleWithImages.xls", 3 };
+        yield return new object[] { "SimpleMacro.xls", 3 };
+    }
+
     [Fact]
     public void Write_StringNumberBooleanCells_RoundTrips()
     {
@@ -48,6 +71,28 @@ public sealed class HSSFWorkbookTests
                 .Select(row.getCell)
                 .Any(cell => cell is not null && cell.getCellType() is CellType.String or CellType.Numeric or CellType.Boolean);
         });
+    }
+
+    [Theory]
+    [MemberData(nameof(Phase12RepresentativePoiFixtures))]
+    public void Read_Phase12RepresentativePoiFixtures_LoadsWorkbookStream(string fileName, int expectedSheetCount)
+    {
+        var sample = FindRepoRoot().Combine(Path.Combine("poi/test-data/spreadsheet", fileName));
+        using var input = sample.OpenRead();
+
+        using var workbook = new HSSFWorkbook(input);
+
+        Assert.Equal(expectedSheetCount, workbook.getNumberOfSheets());
+    }
+
+    [Fact]
+    public void Read_BookUppercasePoiFixture_CurrentlyRequiresWorkbookStreamAliasSupport()
+    {
+        var sample = FindRepoRoot().Combine("poi/test-data/spreadsheet/BOOK_in_capitals.xls");
+        using var input = sample.OpenRead();
+
+        var exception = Assert.Throws<InvalidDataException>(() => new HSSFWorkbook(input));
+        Assert.Equal("The OLE2 document does not contain a Workbook stream.", exception.Message);
     }
 
     private static DirectoryInfo FindRepoRoot()
