@@ -22,7 +22,7 @@
     <!-- ── NuGet package metadata ─────────────────────────────────────── -->
     <PropertyGroup>
         <PackageId>DotnetPoi.Core</PackageId>
-        <VersionPrefix>0.1.0</VersionPrefix>
+        <VersionPrefix>0.5.0</VersionPrefix>
         <PackageVersion>$(VersionPrefix)</PackageVersion>
         <Authors>modeverv</Authors>
         <Description>Faithful .NET port of Apache POI — xlsx, docx, pptx, xls, doc, ppt read/write with zero dependencies.</Description>
