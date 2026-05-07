@@ -240,12 +240,17 @@ public class WriteForDotnetTest {
 
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Data");
-            sheet.createRow(0).createCell(0).setCellValue("Category");
-            sheet.createRow(0).createCell(1).setCellValue("Value");
-            sheet.createRow(1).createCell(0).setCellValue("Food");
-            sheet.createRow(1).createCell(1).setCellValue(100);
-            sheet.createRow(2).createCell(0).setCellValue("Travel");
-            sheet.createRow(2).createCell(1).setCellValue(200);
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("Category");
+            header.createCell(1).setCellValue("Value");
+
+            Row food = sheet.createRow(1);
+            food.createCell(0).setCellValue("Food");
+            food.createCell(1).setCellValue(100);
+
+            Row travel = sheet.createRow(2);
+            travel.createCell(0).setCellValue("Travel");
+            travel.createCell(1).setCellValue(200);
             sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, 2, 0, 1));
 
             try (OutputStream output = Files.newOutputStream(fixture)) {

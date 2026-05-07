@@ -1949,3 +1949,24 @@ Notes:
 - Cause: Java fixture generator `WriteForDotnetTest.writePhaseDocxWithFields()` は POI 5.5.1 に XWPF field creation API が無いため、field code ではなく placeholder text だけを含む `phase-docx-fields.docx` を生成している。一方 C# 側 Direction A テストが skip されておらず、field code を期待していた。
 - Fix: `Read_DocxWithFields_GeneratedByPoi` に `Fact(Skip = ...)` を戻し、Java 側コメントと実 fixture の状態に合わせた。
 - Next: `NUGET_PACKAGES=/tmp/nuget-cache dotnet test` で全体確認する。
+
+## 2026-05-07 JST — GitHub CI failure: Read_AutoFilterSheet_GeneratedByPoi
+
+- Task: GitHub CI の `[A] C# reads Java fixture` で `Read_AutoFilterSheet_GeneratedByPoi` が NRE になる問題の修正。
+- Repro:
+  - `dotnet test tests/DotnetPoi.Interop.Tests/ --no-build -c Debug --filter "Category=ReadFromPoi"` は既存 fixture では通過。
+  - `mvn -q -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest#writePhaseAutoFilterSheet test` で Java fixture を再生成後、`dotnet test tests/DotnetPoi.Interop.Tests/ -c Debug --filter "Read_AutoFilterSheet_GeneratedByPoi"` が同じ NRE で失敗。
+- Cause:
+  - `WriteForDotnetTest.writePhaseAutoFilterSheet()` が同じ行に対して `sheet.createRow(0)` / `createRow(1)` / `createRow(2)` を複数回呼んでいた。
+  - Apache POI では後続の `createRow(n)` で行が作り直され、先に作った A 列セルが消える。
+  - 再生成後の `sheet1.xml` は `dimension ref="B1:B3"` になり、A1/A2/A3 が存在しないため C# テストの `sheet.getRow(0)!.getCell(0)!` が NRE。
+- Plan:
+  - Java fixture generator を row reuse (`var header = sheet.createRow(0)` など) に修正。
+  - `phase-autofilter.xlsx` を再生成して A:B のセルが存在することを確認。
+  - ReadFromPoi フィルタを再実行。
+- Fix:
+  - `WriteForDotnetTest.writePhaseAutoFilterSheet()` を `Row header/food/travel` の再利用に変更。
+  - `phase-autofilter.xlsx` を再生成し、`xl/worksheets/sheet1.xml` が `dimension ref="A1:B3"` かつ A1/A2/A3 を含むことを確認。
+- Verification:
+  - `mvn -q -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=WriteForDotnetTest#writePhaseAutoFilterSheet test` ✅
+  - `dotnet test tests/DotnetPoi.Interop.Tests/ --no-build -c Debug --filter "Category=ReadFromPoi"` ✅ (9 passed, 1 skipped)
