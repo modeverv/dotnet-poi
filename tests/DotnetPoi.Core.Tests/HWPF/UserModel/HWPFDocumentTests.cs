@@ -526,6 +526,97 @@ public class HWPFDocumentTests
         }
     }
 
+    [Fact]
+    public void Phase13LimitedEdit_CombineAppendAndReplace_RoundTripsText()
+    {
+        // Phase 13: sequential appendParagraph then replaceText in a single write
+        using var sourceStream = File.OpenRead("hwpf-fixtures/SampleDoc.doc");
+        using var doc = new HWPFDocument(sourceStream);
+        var originalText = doc.getText();
+
+        // Step 1: append a paragraph
+        doc.appendParagraph("Phase13 combined");
+        // Step 2: replace a word in the original body
+        var placeholder = originalText
+            .Split([' ', '\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)
+            .First(part => part.Length >= 4);
+        const string replacement = "DOTNET_POI_COMBO";
+
+        doc.replaceText(placeholder, replacement);
+
+        using var output = new MemoryStream();
+        doc.write(output);
+        output.Position = 0;
+
+        using var reread = new HWPFDocument(output);
+        var text = reread.getText();
+
+        // Appended text must be present
+        Assert.Contains("Phase13 combined", text);
+        // Replacement must have occurred
+        Assert.Contains(replacement, text);
+        Assert.DoesNotContain(placeholder, text);
+        // Combined character count must be consistent
+        Assert.Equal(text.Length, reread.getCcpText());
+        // Range must compose fully
+        var range = reread.getRange();
+        Assert.Equal(text, range.text());
+        Assert.Equal(range.text(), string.Concat(
+            Enumerable.Range(0, range.numParagraphs()).Select(i => range.getParagraph(i).text())));
+    }
+
+    [Fact]
+    public void Phase14_AfterAppendParagraph_RoundTripFullyReadsRange()
+    {
+        // Phase 14: after appendParagraph, the round-tripped document must
+        // expose a consistent FIB, text model, and Range composition.
+        using var sourceStream = File.OpenRead("hwpf-fixtures/SampleDoc.doc");
+        using var doc = new HWPFDocument(sourceStream);
+        doc.appendParagraph("Phase14 multi-edit roundtrip");
+        doc.appendParagraph("Second appended paragraph");
+
+        byte[] writtenBytes;
+        using (var output = new MemoryStream())
+        {
+            doc.write(output);
+            writtenBytes = output.ToArray();
+        }
+
+        using var reread = new HWPFDocument(new MemoryStream(writtenBytes));
+        var fib = reread.getFileInformationBlock();
+
+        // FIB fcMac must match the WordDocument stream size
+        var cf = CompoundFile.ReadDocument(new MemoryStream(writtenBytes));
+        var main = cf.Streams["WordDocument"];
+        var fcMac = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(28));
+        Assert.Equal(main.Length, fcMac);
+
+        // Secondary story counts must be zeroed
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(76)));
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(80)));
+
+        // Text model is consistent
+        var text = reread.getText();
+        Assert.Contains("Phase14 multi-edit roundtrip", text);
+        Assert.Contains("Second appended paragraph", text);
+        Assert.Equal(text.Length, reread.getCcpText());
+
+        // Range fully composes
+        var range = reread.getRange();
+        Assert.Equal(text, range.text());
+        Assert.Equal(range.text(), string.Concat(
+            Enumerable.Range(0, range.numParagraphs()).Select(i => range.getParagraph(i).text())));
+
+        // All paragraphs and runs must compose correctly
+        for (int i = 0; i < range.numParagraphs(); i++)
+        {
+            var para = range.getParagraph(i);
+            var runText = string.Concat(
+                Enumerable.Range(0, para.numCharacterRuns()).Select(j => para.getCharacterRun(j).text()));
+            Assert.Equal(para.text(), runText);
+        }
+    }
+
     private static string ReplaceOrdinal(string text, string placeholder, string value)
     {
         var index = text.IndexOf(placeholder, StringComparison.Ordinal);

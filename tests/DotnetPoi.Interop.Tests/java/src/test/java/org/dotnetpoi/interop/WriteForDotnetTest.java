@@ -57,6 +57,26 @@ public class WriteForDotnetTest {
     }
 
     @Test
+    void writePhase13SampleDoc() throws IOException {
+        // Phase 13: Direction A — Java POI writes SampleDoc.doc → dotnet-poi reads
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase13-sample-doc.doc");
+        Files.createDirectories(fixture.getParent());
+
+        try (org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument()) {
+            org.apache.poi.hwpf.usermodel.Range range = doc.getRange();
+            range.insertBefore("I am a Java POI generated test document.\r");
+            range.insertAfter("Second paragraph from Java POI.\r");
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                doc.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
     void writePhase12HssfStyles() throws IOException {
         // Phase 12 item 4: Direction A — Java POI writes .xls with styles
         Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase12-hssf-styles.xls");

@@ -100,20 +100,53 @@
 
 ---
 
-### xls / HSSF（~10%）
+### xls / HSSF（~35%）
 
 | カテゴリ | 機能 | 状態 | 備考 |
 |---|---|---|---|
-| 全般 | 基本的な値の書き込み・読み取り | ⚠️ テスト2件のみ | |
-| 全般 | それ以外のすべて（BIFFレコード/スタイル/書式/画像/グラフ/数式/フィルター/ピボット etc.） | ❌ | レガシー形式。優先度低 |
+| **セル値** | 文字列・数値・論理値・空白・エラー | ✅ | BIFF8 の LabelSST/Number/BoolErr/Blank 読み書きと round-trip 確認済 |
+| **シート** | 複数シート / 疎な行・セル / 高列インデックス | ✅ | |
+| **書式** | フォント（名前/サイズ/太字/斜体/色） | ⚠️ 一部対応 | HSSFFont/HSSFCellStyle の基本 round-trip 対応。色は palette index ベース |
+| 〃 | セルスタイル（表示形式/配置/折り返し/罫線/塗り潰し） | ⚠️ 一部対応 | 主要 XF / FormatRecord の読み書き対応。完全な BIFF style parity ではない |
+| **レイアウト** | 列幅 / 行高 / 非表示行・列 | ✅ | |
+| 〃 | セル結合 | ✅ | MergeCells record 対応 |
+| 〃 | 固定ペイン（凍結枠） | ✅ | Pane record 対応 |
+| **数式** | 数式テキスト + キャッシュ値読み取り | ⚠️ 読み取り中心 | 既存 POI fixture の formula/cached result 読み取りあり。新規 BIFF formula token 書き込みは未対応 |
+| 〃 | **数式評価（計算）** | ❌ | HSSFFormulaEvaluator は未移植 |
+| **互換性** | POI 代表 `.xls` fixture 読み込み | ✅ | empty/Simple/SampleSS/DateFormats/styles/formula/hyperlink/comments/drawings/images/macro 等 20 fixture のロード確認 |
+| 〃 | Java POI 双方向 interop | ⚠️ 一部対応 | basic/styles/layout/unicode/comprehensive fixture を C#↔Java で検証 |
+| **Preservation** | OLE2 非 Workbook stream 保存 | ✅ | non-workbook stream と directory metadata を保持 |
+| 〃 | マクロ付き `.xls` の VBA stream 保存 | ✅ | `_VBA_PROJECT_CUR/VBA/*` を保持 |
+| 〃 | 未知 BIFF record 保存 | ✅ | 軽編集時も global/sheet unknown record を保持 |
+| **未対応** | 画像/図形/グラフ/コメント/ハイパーリンク/API編集/フィルター/ピボット | ❌ | 既存 fixture のロード対象には含むが、ユーザーモデルとしての作成・編集は未実装 |
+| **その他** | テスト数 | **18 HSSF Core test methods + interop** | Core 側は POI fixture 20件の theory を含む |
 
 ---
 
-### 旧形式 (doc / HWPF, ppt / HSLF)
+### doc / HWPF（~20%）
+
+| カテゴリ | 機能 | 状態 | 備考 |
+|---|---|---|---|
+| **読み込み** | OLE2 `.doc` オープン / FIB 解析 | ✅ | WordDocument + 0Table/1Table 選択、fallback、CLX 範囲検証あり |
+| **本文** | main document text 抽出 | ✅ | CLX / piece table から本文文字列を復元 |
+| 〃 | 圧縮/Unicode text piece | ✅ | `FcCompressed` 相当の compressed/uncompressed piece 読み取り |
+| **UserModel** | Range / Paragraph / CharacterRun | ⚠️ 一部対応 | paragraph/run 分割、offset、text composition を確認済 |
+| 〃 | 文字書式読み取り | ⚠️ 一部対応 | CHPX/CHPFKP 由来の font name/size/bold/italic/underline/strike の一部 |
+| 〃 | 段落プロパティ読み取り | ⚠️ 最小対応 | justification など一部 PAPX のみ |
+| 〃 | StyleSheet / FontTable | ⚠️ 最小対応 | Normal style fallback 用の最低限 |
+| **編集** | no-op write / round-trip | ✅ | 代表 fixture の stream/storage を byte-for-byte 保持 |
+| 〃 | 本文追記 / 文字列置換 | ⚠️ 限定対応 | main body を単一 Unicode piece として再構築。複雑な既存構造の編集エンジンではない |
+| **Preservation** | OLE stream/storage / 埋め込み OLE | ✅ | ObjectPool、Data stream、未編集 stream/storage を保持 |
+| **互換性** | Java POI interop | ⚠️ 一部対応 | dotnet-poi no-op saved `.doc` を Java POI が読む Direction B fixture あり |
+| **未対応** | 表/画像/API編集/ヘッダー・フッター/脚注/コメント/フィールドのモデル化 | ❌ | 既存 stream は保持対象だが、HWPF usermodel としての作成・編集は未移植 |
+| **その他** | テスト数 | **22 HWPF Core test methods + interop** | POI `document/` fixtures 複数を対象 |
+
+---
+
+### ppt / HSLF
 
 | フォーマット | 状態 | 備考 |
 |---|---|---|
-| doc (HWPF) | ~5% | 読み取りスタブのみ。事実上未対応 |
 | ppt (HSLF) | ~5% | 同上 |
 
 ---
@@ -144,7 +177,7 @@
 | # | 欠損 | 理由 |
 |---|---|---|
 | 10 | SmartArt / アニメーション / トランジション | pptx で新規作成できないが、不明パーツ保存で維持される。プログラマティックに生成するユースケースは稀。 |
-| 11 | xls（HSSF）/ doc（HWPF）/ ppt（HSLF） | レガシー形式。新規開発はほぼ OOXML で行われる。 |
+| 11 | ppt（HSLF）と xls/doc の未対応深部 | レガシー形式。HSSF/HWPF は基礎対応が進んだが、画像・図形・高度な書式・完全編集はまだ重い。新規開発はほぼ OOXML で行われる。 |
 | 12 | 変更履歴 / スパークライン | 特殊用途または複雑すぎる。最初の round-trip 対象としては重い。 |
 
 ---
@@ -161,4 +194,4 @@
 
 ---
 
-*最終更新: 2026-05-18*
+*最終更新: 2026-05-07*

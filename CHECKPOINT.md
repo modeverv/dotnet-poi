@@ -2463,3 +2463,30 @@ Notes:
   - `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs` ✅ (36 HTML files; macOS `CSSM_ModuleLoad` warning printed but generation succeeded)
   - Shell check confirmed every `examples/*/*.csproj` directory name appears in `examples/README.md`.
   - `rg` confirmed old non-existent example names no longer appear in `docs`, `docs_src`, or `examples`.
+
+## 2026-05-07 JST — NOW.md legacy format coverage update
+
+- Task: `NOW.md` の機能対応リストに、追加済みの xls/HSSF と doc/HWPF 対応状況を反映。
+- Finding:
+  - HSSF は旧 `~10% / 基本テスト2件のみ` ではなく、セル型、複数シート、基本スタイル、レイアウト、POI fixture 読み込み、OLE/未知 BIFF preservation、Java interop fixture まで進んでいる。
+  - HWPF は旧 `~5% / 読み取りスタブのみ` ではなく、FIB/CLX/piece table 解析、本文抽出、Range/Paragraph/CharacterRun、限定的な append/replace、no-op round-trip preservation、Java POI no-op read interop まで進んでいる。
+- Implementation:
+  - `NOW.md` の `xls / HSSF` を `~35%` に更新し、機能カテゴリ別の対応/未対応を整理。
+  - `doc / HWPF` セクションを新設して `~20%` とし、読み込み、UserModel、限定編集、preservation、interop を記載。
+  - `ppt / HSLF` は旧形式表から独立させ、痛い欠損リストの表現を HSSF/HWPF の進捗に合わせて修正。
+- Verification:
+  - ドキュメントのみの更新。テストは未実行。
+
+## 2026-05-07 JST — agents.md: add Phase 14 HSLF/ppt implementation track
+
+- Task: `agents.md` に、古い `.ppt` / HSLF を進めるための実装手順を Phase 14 の追加トラックとして記載。
+- Context:
+  - `agents.md` には既に `Phase 14 — Structural Debt` が存在するため、番号を崩さず `Phase 14 追加トラック — ppt/HSLF Practical Bootstrap` として追加した。
+  - 既存 `HSLFSlideShow` は `PowerPoint Document` stream を読み、Slide container と `TextCharsAtom` / `TextBytesAtom` を再帰 scan する最小 reader。
+- Implementation notes added:
+  - 目標は `.ppt` の open / text extraction / no-op preservation / Java POI interop。
+  - 優先順位は fixture survey、OLE2 stream preservation、record tree model、slide list/text extraction、no-op write、Java POI interop、限定 text edit、manual verification/docs。
+  - 代表候補 fixture として `SampleShow.ppt`, `with_textbox.ppt`, `text_shapes.ppt`, `headers_footers.ppt`, `WithComments.ppt`, `pictures.ppt`, `testPPT_oleWorkbook.ppt`, `54880_chinese.ppt`, `PPT95.ppt` 等を列挙。
+  - 編集機能は preservation と interop が安定するまで深追いせず、最初は text extraction と no-op write を優先する方針を明記。
+- Verification:
+  - ドキュメントのみの更新。テストは未実行。

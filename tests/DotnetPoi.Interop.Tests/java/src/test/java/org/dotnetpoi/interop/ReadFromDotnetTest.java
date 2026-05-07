@@ -158,6 +158,31 @@ public class ReadFromDotnetTest {
     }
 
     @Test
+    void readPhase14EditedDoc() throws IOException {
+        // Phase 14: Direction B — Java POI reads dotnet-poi edited .doc
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase14-edited-sample.doc");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase14EditedDoc_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HWPFDocument doc = new HWPFDocument(input)) {
+            WordExtractor extractor = new WordExtractor(doc);
+            String text = extractor.getText();
+            assertNotNull(text);
+            assertTrue(text.length() > 0, "Document text should be non-empty.");
+
+            // Appended text must be present
+            assertTrue(text.contains("Phase14 edited paragraph"),
+                "Edited doc should contain appended text.");
+            assertTrue(text.contains("Second appended"),
+                "Edited doc should contain second appended paragraph.");
+
+            // Original text must still be present
+            assertTrue(text.contains("I am a test document") || text.contains("test document"),
+                "Original document content should survive edits.");
+        }
+    }
+
+    @Test
     void readPhase12HssfUnicode() throws IOException {
         // Phase 12 item 3: Direction B — Java POI reads dotnet-poi .xls with Japanese/Unicode
         Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase12-hssf-unicode.xls");

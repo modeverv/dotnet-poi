@@ -159,6 +159,45 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    public void Write_Phase14EditedDoc_CreatesFixtureForPoi()
+    {
+        // Phase 14: Direction B — dotnet-poi edits SampleDoc.doc → Java POI reads
+        var fixturePath = GetFixturePath("phase14-edited-sample.doc");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        var repoRoot = GetRepoRoot();
+        var sourceFixture = Path.Combine(repoRoot, "poi", "test-data", "document", "SampleDoc.doc");
+        if (!File.Exists(sourceFixture))
+        {
+            sourceFixture = Path.Combine(AppContext.BaseDirectory, "hwpf-fixtures", "SampleDoc.doc");
+        }
+        Assert.True(File.Exists(sourceFixture), $"Source fixture missing: {sourceFixture}");
+
+        using var input = File.OpenRead(sourceFixture);
+        using var doc = new DotnetPoi.HWPF.UserModel.HWPFDocument(input);
+
+        // Make edits: append paragraphs
+        doc.appendParagraph("Phase14 edited paragraph");
+        doc.appendParagraph("Second appended");
+
+        using (var output = File.Create(fixturePath))
+        {
+            doc.write(output);
+        }
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+
+        // Verify round-trip within dotnet-poi
+        using var readBack = File.OpenRead(fixturePath);
+        using var reread = new DotnetPoi.HWPF.UserModel.HWPFDocument(readBack);
+        var text = reread.getText();
+        Assert.Contains("Phase14 edited paragraph", text);
+        Assert.Contains("Second appended", text);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
     public void Write_Phase12HssfUnicode_CreatesFixtureForPoi()
     {
         // Phase 12 item 3: Direction B — Unicode/Japanese sheet names and strings
