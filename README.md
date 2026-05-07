@@ -323,7 +323,6 @@ dotnet-poi/
 │   ├── dev/                        # Docker devbox compose/env/Dockerfile
 │   ├── porter/                     # Porting progress tracker
 │   └── test.sh                     # Local interop test runner
-├── debugtest/                      # Local scratch/debug project
 ├── DotnetPOI.sln                   # Main solution
 ├── global.json                     # .NET SDK pin
 ├── NOW.md                          # Current coverage snapshot
