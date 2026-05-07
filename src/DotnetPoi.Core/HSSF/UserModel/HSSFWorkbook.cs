@@ -9,7 +9,8 @@ public sealed class HSSFWorkbook : IWorkbook
     private readonly List<HSSFSheet> _sheets = new();
     private readonly List<HSSFFont> _fonts = new();
     private readonly List<HSSFCellStyle> _cellStyles = new();
-    private Dictionary<string, byte[]>? _preservedOleStreams;
+    private CompoundFileDocument? _preservedOleDocument;
+    private byte[]? _preservedWorkbookStream;
     private string _workbookStreamName = "Workbook";
     private HSSFCreationHelper? _creationHelper;
     private HSSFDataFormat? _dataFormat;
@@ -110,14 +111,14 @@ public sealed class HSSFWorkbook : IWorkbook
     public void write(Stream stream)
     {
         Guard.ThrowIfNull(stream, nameof(stream));
-        var workbookStream = Biff8Workbook.WriteWorkbook(_sheets);
-        var streams = _preservedOleStreams is null
-            ? new Dictionary<string, byte[]>(StringComparer.Ordinal)
-            : new Dictionary<string, byte[]>(_preservedOleStreams, StringComparer.Ordinal);
+        var workbookStream = Biff8Workbook.WriteWorkbook(_sheets, _preservedWorkbookStream);
+        var document = _preservedOleDocument is null
+            ? new CompoundFileDocument(new Dictionary<string, byte[]>(StringComparer.Ordinal))
+            : new CompoundFileDocument(_preservedOleDocument.Streams, _preservedOleDocument.EntryMetadata);
 
-        RemoveWorkbookStreamAliases(streams);
-        streams[_workbookStreamName] = workbookStream;
-        CompoundFile.Write(stream, streams);
+        RemoveWorkbookStreamAliases(document.Streams);
+        document.Streams[_workbookStreamName] = workbookStream;
+        CompoundFile.Write(stream, document);
     }
 
     public void close()
@@ -128,13 +129,14 @@ public sealed class HSSFWorkbook : IWorkbook
 
     private void Load(Stream stream)
     {
-        var streams = CompoundFile.ReadStreams(stream);
-        if (!TryGetWorkbookStream(streams, out var workbookStream, out var workbookStreamName))
+        var document = CompoundFile.ReadDocument(stream);
+        if (!TryGetWorkbookStream(document.Streams, out var workbookStream, out var workbookStreamName))
         {
             throw new InvalidDataException("The OLE2 document does not contain a Workbook stream.");
         }
 
-        _preservedOleStreams = new Dictionary<string, byte[]>(streams, StringComparer.Ordinal);
+        _preservedOleDocument = document;
+        _preservedWorkbookStream = workbookStream.ToArray();
         _workbookStreamName = workbookStreamName;
         _sheets.Clear();
         Biff8Workbook.ReadWorkbook(workbookStream, this);

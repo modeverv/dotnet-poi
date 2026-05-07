@@ -1,5 +1,85 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — Phase 12 item 2 completed: BIFF unknown record preservation
+
+- Task: Complete Phase 12 item 2 item「Workbook stream 内の unknown BIFF record / unmodeled record ranges を軽編集 round-trip で保持する」。
+- Fixed:
+  - `HSSFWorkbook` now keeps the original Workbook stream bytes when loading an existing `.xls`.
+  - `Biff8Workbook.WriteWorkbook()` accepts the original Workbook stream as a template.
+  - Template-based writing preserves global Workbook records except regenerated `BoundSheet8` offsets and `SST`.
+  - Template-based sheet writing preserves unmodeled sheet records and regenerates only `Dimensions` plus currently-modeled basic cell records (`LabelSST`, `Label`, `Number`, `RK`, `BoolErr`, `Blank`).
+  - Existing SST strings are seeded into the regenerated SST before modeled strings are appended, reducing breakage for preserved unmodeled records that still reference original shared-string indexes.
+- Tests:
+  - Added `Write_LoadedWorkbook_PreservesUnknownBiffRecordsDuringLightEdit`.
+  - The test injects synthetic unknown BIFF records into both the global Workbook section and the first sheet section, edits A1 through HSSF, writes the workbook, and verifies both unknown records survive while the edited cell round-trips.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 28 passed, 0 failed.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter "FullyQualifiedName~CompoundFileTests|FullyQualifiedName~HSSFWorkbookTests|FullyQualifiedName~AgileEncryptionTests" --no-restore` succeeded: 37 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining:
+  - Exact original directory sibling tree shape remains open but is now marked as "必要に応じて"; not required for current semantic preservation.
+  - Further BIFF work should happen in Phase 12 item 3 (value round-trip + Java POI interop A/B), then style/layout.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 2 continued: POIFS DIFAT extension sectors
+
+- Task: Continue Phase 12 item 2 by supporting OLE2 DIFAT extension sectors when FAT sector count exceeds the 109 header DIFAT entries.
+- Fixed:
+  - Added `DifSect` support in `CompoundFile.Write()`.
+  - Updated FAT/DIFAT sector count calculation to include DIFAT extension sectors in the FAT coverage.
+  - Updated header writing to emit first DIFAT sector location and DIFAT sector count.
+  - Added DIFAT sector writing for FAT sector indexes beyond the first 109 header entries.
+  - Updated `ReadFat()` to traverse DIFAT extension sectors and read all FAT sectors.
+- Tests:
+  - Added `tests/DotnetPoi.Core.Tests/POIFS/Crypt/CompoundFileTests.cs`.
+  - Added a large-stream test that writes an 8MB+ stream, asserts the header uses DIFAT extension sectors, and reads the stream back byte-for-byte.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter "FullyQualifiedName~CompoundFileTests|FullyQualifiedName~HSSFWorkbookTests|FullyQualifiedName~AgileEncryptionTests" --no-restore` succeeded: 36 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining:
+  - Workbook stream unknown BIFF preservation remains the main Phase 12 item 2 blocker.
+  - Exact original directory sibling tree shape is still regenerated unless a concrete interop failure requires preserving it.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 2 continued: POIFS directory metadata preservation
+
+- Task: Continue Phase 12 item 2 by preserving OLE2 directory entry metadata through HSSF load/write.
+- Fixed:
+  - Added `CompoundFileDocument`, a metadata-aware POIFS container model with path-qualified streams and per-entry metadata.
+  - Added `CompoundFileEntryMetadata` for entry type, red/black color, CLSID, state bits, creation time, and modified time.
+  - Added `CompoundFile.ReadDocument(Stream)` and `CompoundFile.Write(Stream, CompoundFileDocument)`.
+  - Updated `HSSFWorkbook` to keep the loaded `CompoundFileDocument` and replace only the Workbook stream on write, preserving stream/storage metadata for untouched entries.
+  - Fixed path-aware metadata traversal so metadata from left-sibling directory entries is not lost.
+- Tests:
+  - Added `Write_LoadedWorkbook_PreservesOleDirectoryEntryMetadata`, which creates a workbook compound document with synthetic root/storage/stream metadata and verifies HSSF load/write preserves it.
+- Verification:
+  - `dotnet build src/DotnetPoi.Core/DotnetPoi.Core.csproj --no-restore` succeeded.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 27 passed, 0 failed.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~AgileEncryptionTests --no-restore` succeeded: 8 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining:
+  - The exact original sibling tree shape is still regenerated by the POI-like comparer. Metadata is preserved, but directory node ordering/tree shape is not byte-for-byte stable.
+  - DIFAT extension-sector support and Workbook stream unknown BIFF preservation remain open.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — agents.md: add Phase 12 item 2 progress sublist
+
+- Task: `agents.md` の Phase 12 実装順 2 に進行状況のサブリストを追加する。
+- Changes:
+  - 完了済みとして、HSSFWorkbook の OLE2 stream 保持、root 直下 stream preservation、uppercase `BOOK` alias、POIFS storage path preservation をチェック済みにした。
+  - 未完として、directory entry metadata、DIFAT extension sectors、Workbook stream 内 unknown BIFF record preservation を追加。
+- Verification:
+  - Documentation-only change. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
 ## 2026-05-07 JST — Phase 12 item 2: first POIFS/HSSF container fixes
 
 - Task: Phase 12 実装順 2「POIFS の不足を洗い出し、HSSF を壊している container 問題を先に直す」に対応。
@@ -23,6 +103,30 @@
 - Next:
   - For Phase 12 item 3, value round-trip can proceed on top of this safer stream preservation.
   - Before macro/OLE/drawing preservation is claimed, introduce a structured POIFS document model that round-trips storages and directory metadata instead of flattening names.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 2 continued: POIFS storage path preservation
+
+- Task: Continue Phase 12 item 2 by fixing the next container-level blocker: OLE2 storage hierarchy flattening.
+- Fixed:
+  - Added `CompoundFile.ReadStreamsWithPaths(Stream)` for path-aware stream reads. It traverses the OLE2 directory sibling/child tree and returns storage-qualified names such as `_VBA_PROJECT_CUR/VBA/dir`.
+  - Updated `CompoundFile.Write()` directory construction to understand `/`-separated storage paths, create storage entries, and wire child/sibling trees per storage instead of placing every stream at root.
+  - Kept existing `CompoundFile.ReadStreams(Stream)` behavior for current callers that expect flat leaf names.
+  - Updated `HSSFWorkbook.Load()` to use path-aware stream reads so loading/writing macro-bearing `.xls` fixtures preserves nested storage streams rather than flattening them.
+- Tests:
+  - Added `Write_LoadedMacroPoiFixture_PreservesNestedOleStorageStreams`, using `poi/test-data/spreadsheet/SimpleMacro.xls`.
+  - The test verifies nested VBA streams like `_VBA_PROJECT_CUR/VBA/dir` and `_VBA_PROJECT_CUR/VBA/Module1` survive HSSF load/write/read byte-for-byte.
+- Verification:
+  - `dotnet build src/DotnetPoi.Core/DotnetPoi.Core.csproj --no-restore` succeeded.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 26 passed, 0 failed.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~AgileEncryptionTests --no-restore` succeeded: 8 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining:
+  - Directory metadata such as CLSIDs, timestamps, and original red/black colors are still regenerated rather than preserved.
+  - Unknown BIFF records inside the Workbook stream are still regenerated away by `Biff8Workbook.WriteWorkbook()`.
+  - DIFAT extension-sector support beyond the header DIFAT remains unimplemented/untested.
 - Notes:
   - Existing unrelated dirty worktree changes were left untouched.
   - No commit made, per repository rule.

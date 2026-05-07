@@ -620,6 +620,14 @@ Goal: make interop checks explicit before declaring a format slice “done”.
 
 1. POI HSSF tests / `poi/test-data/spreadsheet/*.xls` から代表 fixture を選び、現状の read/write 失敗を `CHECKPOINT.md` に記録する。
 2. POIFS の不足を洗い出し、HSSF を壊している container 問題を先に直す。
+   - [x] 読み込み済み `.xls` の OLE2 stream を `HSSFWorkbook` が保持し、保存時に Workbook stream だけ差し替える。
+   - [x] `SummaryInformation` / `DocumentSummaryInformation` / `CompObj` など root 直下の非 Workbook stream を byte-for-byte で保持する。
+   - [x] `BOOK_in_capitals.xls` の uppercase `BOOK` Workbook stream alias を read/write で保持する。
+   - [x] POIFS の storage 階層を path-aware に読み書きし、`SimpleMacro.xls` の `_VBA_PROJECT_CUR/VBA/*` stream を保持する。
+   - [x] directory entry metadata（CLSID、timestamps、color、state bits）を保持する。
+   - [ ] 元の directory sibling tree 形状を必要に応じて保持する。
+   - [x] DIFAT extension sectors（header DIFAT 109 entries 超え）を read/write できることを fixture で確認する。
+   - [x] Workbook stream 内の unknown BIFF record / unmodeled record ranges を軽編集 round-trip で保持する。
 3. 値の round-trip と Java POI interop A/B を、文字列・数値・bool/error・blank・複数シートで固める。
 4. style / layout の順に、帳票で効く機能から追加する。
 

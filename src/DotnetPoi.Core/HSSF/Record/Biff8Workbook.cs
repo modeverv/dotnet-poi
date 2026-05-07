@@ -55,7 +55,14 @@ internal static class Biff8Workbook
         }
     }
 
-    public static byte[] WriteWorkbook(IReadOnlyList<HSSFSheet> sheets)
+    public static byte[] WriteWorkbook(IReadOnlyList<HSSFSheet> sheets, byte[]? templateWorkbookStream = null)
+    {
+        return templateWorkbookStream is null
+            ? WriteNewWorkbook(sheets)
+            : WriteWorkbookPreservingRecords(sheets, templateWorkbookStream);
+    }
+
+    private static byte[] WriteNewWorkbook(IReadOnlyList<HSSFSheet> sheets)
     {
         using var stream = new MemoryStream();
         WriteBof(stream, 0x0005);
@@ -96,6 +103,90 @@ internal static class Biff8Workbook
         {
             PatchUInt32(stream, boundSheetOffsetPositions[0], checked((uint)stream.Position));
             WriteSheet(stream, new HSSFSheet(new HSSFWorkbook(), "Sheet1"), strings);
+        }
+
+        return stream.ToArray();
+    }
+
+    private static byte[] WriteWorkbookPreservingRecords(IReadOnlyList<HSSFSheet> sheets, byte[] templateWorkbookStream)
+    {
+        var records = ReadRecords(templateWorkbookStream);
+        var boundSheets = records
+            .Where(record => record.Sid == BoundSheet8)
+            .Select(record => ReadBoundSheet(record.Data))
+            .ToArray();
+        if (boundSheets.Length != sheets.Count || sheets.Count == 0)
+        {
+            return WriteNewWorkbook(sheets);
+        }
+
+        var firstSheetOffset = boundSheets.Min(sheet => sheet.Offset);
+        var globalRecords = records.TakeWhile(record => record.Offset < firstSheetOffset).ToArray();
+        IEnumerable<string> existingStrings = records.FirstOrDefault(record => record.Sid == Sst) is { } sstRecord
+            ? ReadSst(sstRecord.Data)
+            : Array.Empty<string>();
+        var strings = BuildSharedStrings(sheets, existingStrings);
+
+        using var stream = new MemoryStream();
+        var boundSheetOffsetPositions = new List<long>();
+        var wroteBoundSheets = false;
+        var wroteSst = false;
+        foreach (var record in globalRecords)
+        {
+            switch (record.Sid)
+            {
+                case BoundSheet8 when !wroteBoundSheets:
+                    foreach (var sheet in sheets)
+                    {
+                        boundSheetOffsetPositions.Add(stream.Position + 4);
+                        WriteBoundSheet(stream, sheet.SheetName, 0);
+                    }
+
+                    wroteBoundSheets = true;
+                    break;
+                case BoundSheet8:
+                    break;
+                case Sst when !wroteSst:
+                    WriteSst(stream, strings);
+                    wroteSst = true;
+                    break;
+                case Sst:
+                    break;
+                case Eof:
+                    if (!wroteBoundSheets)
+                    {
+                        foreach (var sheet in sheets)
+                        {
+                            boundSheetOffsetPositions.Add(stream.Position + 4);
+                            WriteBoundSheet(stream, sheet.SheetName, 0);
+                        }
+
+                        wroteBoundSheets = true;
+                    }
+
+                    if (!wroteSst)
+                    {
+                        WriteSst(stream, strings);
+                    }
+
+                    WriteRawRecord(stream, record);
+                    break;
+                default:
+                    WriteRawRecord(stream, record);
+                    break;
+            }
+        }
+
+        if (boundSheetOffsetPositions.Count != sheets.Count)
+        {
+            return WriteNewWorkbook(sheets);
+        }
+
+        for (var i = 0; i < sheets.Count; i++)
+        {
+            var sheetOffset = checked((uint)stream.Position);
+            PatchUInt32(stream, boundSheetOffsetPositions[i], sheetOffset);
+            WriteSheetPreservingRecords(stream, sheets[i], strings, GetSheetRecords(records, boundSheets[i].Offset));
         }
 
         return stream.ToArray();
@@ -311,9 +402,19 @@ internal static class Biff8Workbook
         return value;
     }
 
-    private static Dictionary<string, int> BuildSharedStrings(IReadOnlyList<HSSFSheet> sheets)
+    private static Dictionary<string, int> BuildSharedStrings(
+        IReadOnlyList<HSSFSheet> sheets,
+        IEnumerable<string>? existingStrings = null)
     {
         var strings = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var value in existingStrings ?? Array.Empty<string>())
+        {
+            if (!strings.ContainsKey(value))
+            {
+                strings[value] = strings.Count;
+            }
+        }
+
         foreach (var cell in sheets.SelectMany(sheet => sheet.Rows).SelectMany(row => row.Cells))
         {
             if (cell.getCellType() != CellType.String)
@@ -351,7 +452,14 @@ internal static class Biff8Workbook
     {
         WriteBof(stream, 0x0010);
         WriteDimensions(stream, sheet);
+        WriteSheetCells(stream, sheet, strings);
+        WriteWindow2(stream);
+        WriteSelection(stream);
+        WriteRecord(stream, Eof, _ => { });
+    }
 
+    private static void WriteSheetCells(Stream stream, HSSFSheet sheet, IReadOnlyDictionary<string, int> strings)
+    {
         foreach (var cell in sheet.Rows.OrderBy(row => row.getRowNum()).SelectMany(row => row.Cells.OrderBy(cell => cell.getColumnIndex())))
         {
             switch (cell.getCellType())
@@ -384,10 +492,51 @@ internal static class Biff8Workbook
                     break;
             }
         }
+    }
 
-        WriteWindow2(stream);
-        WriteSelection(stream);
-        WriteRecord(stream, Eof, _ => { });
+    private static void WriteSheetPreservingRecords(
+        Stream stream,
+        HSSFSheet sheet,
+        IReadOnlyDictionary<string, int> strings,
+        IReadOnlyList<Record> originalRecords)
+    {
+        if (originalRecords.Count == 0)
+        {
+            WriteSheet(stream, sheet, strings);
+            return;
+        }
+
+        var wroteDimensionsAndCells = false;
+        foreach (var record in originalRecords)
+        {
+            switch (record.Sid)
+            {
+                case Dimensions:
+                    WriteDimensions(stream, sheet);
+                    WriteSheetCells(stream, sheet, strings);
+                    wroteDimensionsAndCells = true;
+                    break;
+                case LabelSst:
+                case Label:
+                case Number:
+                case Rk:
+                case BoolErr:
+                case Blank:
+                    break;
+                case Eof:
+                    if (!wroteDimensionsAndCells)
+                    {
+                        WriteDimensions(stream, sheet);
+                        WriteSheetCells(stream, sheet, strings);
+                    }
+
+                    WriteRawRecord(stream, record);
+                    break;
+                default:
+                    WriteRawRecord(stream, record);
+                    break;
+            }
+        }
     }
 
     private static void WriteWindow2(Stream stream)
@@ -488,6 +637,42 @@ internal static class Biff8Workbook
         BinaryPrimitives.WriteUInt16LittleEndian(((Span<byte>)header).Slice(2), (ushort)data.Length);
         stream.Write(header.ToArray(), 0, header.Length);
         stream.Write(data, 0, data.Length);
+    }
+
+    private static void WriteRawRecord(Stream stream, Record record)
+    {
+        Span<byte> header = stackalloc byte[4];
+        BinaryPrimitives.WriteUInt16LittleEndian(header, record.Sid);
+        BinaryPrimitives.WriteUInt16LittleEndian(((Span<byte>)header).Slice(2), (ushort)record.Data.Length);
+        stream.Write(header.ToArray(), 0, header.Length);
+        stream.Write(record.Data, 0, record.Data.Length);
+    }
+
+    private static IReadOnlyList<Record> GetSheetRecords(IReadOnlyList<Record> records, uint offset)
+    {
+        var start = 0;
+        while (start < records.Count && records[start].Offset < offset)
+        {
+            start++;
+        }
+
+        var sheetRecords = new List<Record>();
+        for (var i = start; i < records.Count; i++)
+        {
+            var record = records[i];
+            if (record.Offset > offset && record.Sid == Bof && i != start)
+            {
+                break;
+            }
+
+            sheetRecords.Add(record);
+            if (record.Offset >= offset && record.Sid == Eof)
+            {
+                break;
+            }
+        }
+
+        return sheetRecords;
     }
 
     private static void WriteUnicodeString(Stream stream, string value, bool shortLength)
