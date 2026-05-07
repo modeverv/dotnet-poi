@@ -1,5 +1,21 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — agents.md: add Phase 12 xls and Phase 13 doc roadmap
+
+- Task: ユーザー方針「xlsx/docx/pptx は十分進んだので、Phase 12 を xls、Phase 13 を doc 対応にしたい」に合わせて `agents.md` を更新。
+- Changes:
+  - `Phase 12 — xls/HSSF Practical Completion` を追加。
+  - HSSF の実装範囲を POIFS foundation、minimal workbook、styles/formats、sheet layout、formula preservation、hyperlinks/comments/names/data validation、drawings/images、manual verification の順に整理。
+  - `.xls` は XML ではなく BIFF record stream なので、record-level semantic parity と unknown record preservation を重視する方針を明記。
+  - `Phase 13 — doc/HWPF Practical Completion` を追加。
+  - HWPF の実装範囲を container/stream preservation、FIB/table stream、text extraction、paragraph/run、safe light editing、tables/headers/fields、images/OLE preservation の順に整理。
+  - Phase 13 は Phase 12 後、HSSF で POIFS の実用性を固めてから進める前提を明記。
+- Verification:
+  - Documentation-only change. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
 ## 2026-05-07 JST — publish.yml: use project package versions and skip duplicate NuGet pushes
 
 - Task: GitHub Actions `publish.yml` がタグ由来の同一 `PackageVersion` を Core/Formula 両方に注入していたため、各 project の NuGet version を source of truth に変更する。

@@ -566,8 +566,148 @@ Goal: make interop checks explicit before declaring a format slice “done”.
 - docx/docm と pptx/pptm は、対応機能の成熟度に応じて Word/PowerPoint/LibreOffice Impress/Writer の確認を追加する。
 - 失敗した場合は、Office 実装依存の問題として `CHECKPOINT.md` に記録し、再現 fixture と証跡を残してから修正する。
 
-メモ:
-tmpディレクトリに参考にできるリソースを配置している。
+### Phase 12 — xls/HSSF Practical Completion
+
+目標: `.xls` を BIFF8 / OLE2 の古い Excel 形式として実用的に read / write / light-edit / round-trip できる状態へ引き上げる。現代 Office 形式（xlsx/docx/pptx）がかなり実用域に入った後の次の主戦場として、業務現場に残る古い Excel ファイル対応を優先する。
+
+このフェーズは **HSSF を最小実用から段階的に完成へ近づける** ためのフェーズ。Apache POI の HSSF 実装・テスト・BIFF record 構造を必ず参照し、OOXML 風の独自モデルに作り替えない。`.xls` は XML ではなく BIFF record stream なので、XML parity ではなく **record-level semantic parity** と **unknown record preservation** を重視する。
+
+前提:
+
+- Phase 4 の POIFS / CFB が HSSF 実用に足りない場合は、HSSF より先に POIFS を補強する。
+- `Core` 内で完結させ、`Formula` へ依存させない。
+- 数式評価はしない。式テキストと cached value の read/write/preserve までを対象にする。
+- 既存 `.xls` を軽微編集して保存する場合、未対応 BIFF record / OLE2 stream をできるだけ壊さず保持する。
+
+優先順位:
+
+1. **POIFS / Workbook stream foundation**
+   - OLE2 container の read/write、Workbook stream、SummaryInformation / DocumentSummaryInformation、unknown stream preservation を安定化する。
+   - FAT / MiniFAT / DIFAT、directory ordering、mini stream cutoff、non-contiguous stream の round-trip を HSSF fixture で確認する。
+
+2. **Minimal workbook read/write**
+   - `HSSFWorkbook` / `HSSFSheet` / `HSSFRow` / `HSSFCell` の基本 API を XSSF / SS interface と揃える。
+   - BOF / EOF、BoundSheetRecord、DimensionsRecord、RowRecord、NumberRecord、LabelSSTRecord、BlankRecord、BoolErrRecord、SST / ExtSST を実装・検証する。
+   - 複数シート、空行/空セル、Unicode 文字列、日本語シート名、日付 numeric value を含む fixtures を作る。
+
+3. **Styles and formats**
+   - FontRecord、ExtendedFormatRecord、FormatRecord、PaletteRecord、StyleRecord を POI 互換 API に寄せて実装する。
+   - data format、font、fill、border、alignment、wrap、locked/hidden、row/column style を優先する。
+   - XSSF と同じ `ICellStyle` / `IFont` API で使える範囲を広げ、HSSF 固有制約（palette / BIFF limits）は POI と同じ例外・丸め方にする。
+
+4. **Sheet layout**
+   - merged regions、column width、row height、hidden rows/columns、default row/column settings、freeze panes、print setup を実装する。
+   - Office / LibreOffice で開いた時に帳票レイアウトが崩れにくいことを Phase 11 の対象に追加する。
+
+5. **Formula preservation**
+   - FormulaRecord / SharedFormulaRecord / ArrayRecord / TableRecord を読み、式テキストと cached result を保持する。
+   - 評価はしない。`FormulaEvaluator` の拡張をこのフェーズに含めない。
+   - Java POI が読める formula workbook を dotnet-poi が生成できること、POI 生成 workbook の式を dotnet-poi が壊さず保存できることを確認する。
+
+6. **Hyperlinks, comments, names, data validation**
+   - NameRecord、HyperlinkRecord、DVRecord / DVALRecord、NoteRecord / TextObjectRecord を段階的に追加する。
+   - API モデル化しきれない record は保存優先。軽編集で消さないことを先に固める。
+
+7. **Drawings and images**
+   - Escher aggregate、ObjRecord、MSODrawingRecord、ContinueRecord、BLIP 画像、ClientAnchor を POI の HSSF drawing model に合わせる。
+   - 画像の新規追加より先に、既存 drawing / chart / comment shape の preservation を優先する。
+
+8. **Manual verification**
+   - Phase 11 の generated documents に `.xls` を正式復帰させる。
+   - Excel / LibreOffice で open → edit → save → reopen し、修復ダイアログなし、値・スタイル・結合・列幅・画像の代表ケースが維持されることを証跡化する。
+
+実装順:
+
+1. POI HSSF tests / `poi/test-data/spreadsheet/*.xls` から代表 fixture を選び、現状の read/write 失敗を `CHECKPOINT.md` に記録する。
+2. POIFS の不足を洗い出し、HSSF を壊している container 問題を先に直す。
+3. 値の round-trip と Java POI interop A/B を、文字列・数値・bool/error・blank・複数シートで固める。
+4. style / layout の順に、帳票で効く機能から追加する。
+
+-- 以下は後回し1 --
+
+5. formula text / cached value preservation を追加する。
+
+-- 以下は後回し2 --
+
+6. hyperlinks/comments/names/data validation を追加する。
+7. drawings/images は preservation → read → write の順で進める。
+8. docs/examples/manual verification を更新し、`.xls` のサポート範囲と制限を明記する。
+
+完了条件:
+
+- dotnet-poi で生成した `.xls` を Excel / LibreOffice / Java POI で開ける。
+- Java POI 生成 `.xls` を dotnet-poi が読み、値・スタイル・レイアウトの代表ケースを正しく取得できる。
+- 既存 `.xls` を読み込み、A1 などの軽微編集をして保存しても、未対応 record / stream が可能な限り保持される。
+- C# round-trip tests、Java POI interop A/B、POIFS preservation tests、Phase 11 manual verification を追加する。
+
+### Phase 13 — doc/HWPF Practical Completion
+
+目標: `.doc` を Word 97-2003 の古い binary Word 形式として、まず text extraction / light-edit / preservation ができる状態へ引き上げる。完全な Word 編集エンジンではなく、古い業務文書・テンプレート・アーカイブ文書を壊しにくく扱う HWPF を目指す。
+
+このフェーズは Phase 12 の後に進める。`.doc` は POIFS 上の複数 stream と複雑な binary table を使うため、HSSF で POIFS の実用性を固めてから着手する。Apache POI の HWPF 実装・テスト・Microsoft の DOC 仕様を参照し、独自のテキスト抽出器に逃げない。
+
+前提:
+
+- POIFS が multi-stream, mini-stream, directory metadata, unknown stream preservation を十分に扱えること。
+- `WordDocument`, `1Table` / `0Table`, `Data`, object pool storage を壊さず保持する。
+- 最初の価値は「読める」「軽微編集しても壊さない」。高度な layout 再構築や完全な tracked changes 編集は後回し。
+
+優先順位:
+
+1. **Container and stream preservation**
+   - `WordDocument`, `1Table` / `0Table`, `Data`, `ObjectPool`, SummaryInformation などの stream / storage を読み、未対応 stream を byte-for-byte で保持する。
+   - FIB を読み、table stream 選択、文字列範囲、piece table 位置を正しく解釈する。
+
+2. **Text extraction**
+   - Piece table、CP ↔ FC mapping、ANSI / UTF-16LE の文字列取得を実装する。
+   - `HWPFDocument.getRange()` / `Range.text()` 相当の最小 API を POI に合わせる。
+   - 日本語、混在 encoding、複数 paragraph、特殊文字、field marker を含む fixture を使う。
+
+3. **Paragraphs and runs**
+   - PAPX / CHPX、FKP、StyleSheet の読み取りを段階的に実装する。
+   - paragraph text、run text、bold/italic/underline/font/size、alignment、indent を代表ケースから対応する。
+   - style inheritance は最初から完璧にせず、POI の API surface に沿って必要な読み取りから追加する。
+
+4. **Safe light editing**
+   - まず no-op read/write round-trip を実装し、byte preservation / semantic preservation を確認する。
+   - 次に append paragraph、単純な text replacement など、範囲を限定した編集 API を追加する。
+   - 編集時に piece table / FIB / PLCF / CHP/PAP を矛盾させないことを最優先にする。
+
+5. **Tables, headers/footers, fields**
+   - table detection、cell text extraction、header/footer text extraction、footnotes/endnotes、bookmarks、fields を読み取り優先で追加する。
+   - API で編集できない要素は preservation を優先する。
+
+6. **Images, OLE, drawings**
+   - PicturesTable、OfficeArt / Escher、embedded OLE object をまず保持する。
+   - 画像抽出、新規画像追加、配置編集は後段。既存文書の軽編集で消さないことを先に達成する。
+
+7. **Manual verification**
+   - Phase 11 の対象に `.doc` を追加し、Word / LibreOffice で open → edit → save → reopen を確認する。
+   - 代表 fixtures は POI test-data と手元生成文書の両方を使う。
+
+実装順:
+
+1. POI HWPF tests / `poi/test-data/document/*.doc` から、単純本文、日本語、表、画像、ヘッダー/フッター、field を含む fixture を選ぶ。
+2. POIFS stream preservation と FIB / table stream 読み取りを固める。
+3. text extraction を `Range` / paragraph / run の順に実装する。
+4. no-op write round-trip を追加し、未対応 stream と binary table を壊さないことを確認する。
+
+-- 以下は後回し1 --
+
+5. append paragraph / simple replacement のような限定編集を追加する。
+
+-- 以下は後回し2 --
+ 
+6. table/header/footer/field/image/OLE は preservation → read → limited write の順で進める。
+7. Java POI interop A/B と Phase 11 manual verification を追加する。
+
+完了条件:
+
+- 代表的な `.doc` から本文・段落・run のテキストと基本 formatting を読める。
+- no-op round-trip と軽微編集後の保存で Word / LibreOffice の修復ダイアログが出ない。
+- Java POI 生成 `.doc` を dotnet-poi が読み、dotnet-poi 保存 `.doc` を Java POI が読める。
+- 未対応の images/OLE/fields/comments 等を、API で触らない限り可能な範囲で保持する。
+
 ---
 
 ## Porting Procedure (Per Class)
