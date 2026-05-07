@@ -38,7 +38,7 @@
 | 〃 | マクロ有効（xlsm） | ✅ | VBA バイト保存 + ラウンドトリップ確認済 |
 | 〃 | **スパークライン** | ❌ | |
 | 〃 | **外部データ接続** | 🔵 不明パーツ保存のみ | `xl/connections.xml` / `xl/externalLinks/*` は round-trip 保持されるが API モデルなし |
-| 〃 | テスト数 | **238** | POI実ファイルを使ったpreservation検証テスト(+4: pptxグループ化, xlsxオートシェイプ, +1 docxヘッダ・フッター, +2 docx SDT)を含む |
+| 〃 | テスト数 | **151 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project。POI実ファイルを使った preservation / interop 系は Interop.Tests 側にも含む |
 
 ---
 
@@ -70,7 +70,7 @@
 | **その他** | マクロ有効（docm） | ✅ | VBA バイト保存 |
 | 〃 | 未知パーツ保存 | ✅ | _preservedEntries 機構実装済 |
 | 〃 | **OLE 埋め込み** | 🔵 不明パーツ保存のみ | `word/embeddings/*` は round-trip 保持される |
-| 〃 | テスト数 | **？**（25 XWPF tests in Core） | |
+| 〃 | テスト数 | **151 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project 内で検証 |
 
 ---
 
@@ -96,7 +96,7 @@
 | **テーマ** | レイアウト・マスター・テーマ | 🔵 不明パーツ保存のみ | 編集不可 |
 | **その他** | 未知パーツ保存 | ✅ | |
 | 〃 | マクロ有効（pptm） | ✅ | VBA バイト保存 |
-| 〃 | テスト数 | **？**（24 XSLF tests in Core） | |
+| 〃 | テスト数 | **151 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project 内で検証 |
 
 ---
 
@@ -119,7 +119,7 @@
 | 〃 | マクロ付き `.xls` の VBA stream 保存 | ✅ | `_VBA_PROJECT_CUR/VBA/*` を保持 |
 | 〃 | 未知 BIFF record 保存 | ✅ | 軽編集時も global/sheet unknown record を保持 |
 | **未対応** | 画像/図形/グラフ/コメント/ハイパーリンク/API編集/フィルター/ピボット | ❌ | 既存 fixture のロード対象には含むが、ユーザーモデルとしての作成・編集は未実装 |
-| **その他** | テスト数 | **18 HSSF Core test methods + interop** | Core 側は POI fixture 20件の theory を含む |
+| **その他** | テスト数 | **221 Legacy.Tests 全体 + interop** | HSSF/HWPF/HSLF の split test project。POI fixture も代表ケースを含む |
 
 ---
 
@@ -139,7 +139,7 @@
 | **Preservation** | OLE stream/storage / 埋め込み OLE | ✅ | ObjectPool、Data stream、未編集 stream/storage を保持 |
 | **互換性** | Java POI interop | ⚠️ 一部対応 | dotnet-poi no-op saved `.doc` を Java POI が読む Direction B fixture あり |
 | **未対応** | 表/画像/API編集/ヘッダー・フッター/脚注/コメント/フィールドのモデル化 | ❌ | 既存 stream は保持対象だが、HWPF usermodel としての作成・編集は未移植 |
-| **その他** | テスト数 | **22 HWPF Core test methods + interop** | POI `document/` fixtures 複数を対象 |
+| **その他** | テスト数 | **221 Legacy.Tests 全体 + interop** | POI `document/` fixtures 複数を対象 |
 
 ---
 
@@ -195,14 +195,16 @@
 
 | プロジェクト | テスト数 | 備考 |
 |---|---|---|
-| Ooxml.Tests | 262 | POI実ファイルpreservation検証テストを含む |
-| Legacy.Tests | 221 | HWPF (97) + HSLF (124) |
-| Formula.Tests | 10 | 数式評価エンジンは未実装のため最小限 |
+| Common.Tests | 79 | shared SS / XML writer / utilities |
+| POIFS.Tests | 11 | OLE2 container |
+| Ooxml.Tests | 151 | XSSF / XWPF / XSLF |
+| Legacy.Tests | 221 | HSSF / HWPF / HSLF |
+| Formula.Tests | 11 | 限定 formula evaluator subset |
 | All.Tests | 7 | 全体 smoke test |
-| Interop.Tests (C#) | 71 | 双方向 interop fixture 検証 (69 pass + 2 skip) |
-| **Total (C#)** | **571** | |
+| Interop.Tests (C#) | 72 | 双方向 interop fixture 検証 (70 pass + 2 skip) |
+| **Total (C#)** | **552** | 550 pass + 2 skip |
 | Java POI 側 (Maven) | 44 tests | うち dotnet-poi 関連 24 tests |
 
 ---
 
-*最終更新: 2025-06-22*
+*最終更新: 2026-05-08*

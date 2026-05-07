@@ -3017,8 +3017,65 @@ Known gaps in current implementation:
 - Verification:
   - Documentation-only update. No build/test required for README changes.
 - Remaining:
-  - `docs_src/content/` のドキュメントも別途 package README 相当として更新可能だが、README.md の更新で一次対応完了。
-  - 各パッケージ (Common/POIFS/Ooxml/Legacy/All) の個別 README.md を package 配下に追加するかは今後の対応とする（現在は各 csproj に `<PackageReadmeFile>` が設定されているが、内容は未作成）。
+- `docs_src/content/` のドキュメントも別途 package README 相当として更新可能だが、README.md の更新で一次対応完了。
+- 各パッケージ (Common/POIFS/Ooxml/Legacy/All) の個別 README.md を package 配下に追加するかは今後の対応とする（現在は各 csproj に `<PackageReadmeFile>` が設定されているが、内容は未作成）。
+
+## 2026-05-08 JST — Release readiness note: possible 1.0 positioning
+
+- User question: 「今って一旦 version 1.0 として公開して良い状況に見える？フルで ppt とか対応する必要はもうないと思う」への現状確認。
+- Assessment:
+  - Full Apache POI parity / full ppt support is not necessary for a 1.0 if the package is positioned as "stable for documented supported workflows" rather than "complete POI clone".
+  - `DotnetPoi.Ooxml` looks closest to 1.0 readiness: xlsx is strongest; docx/pptx are practical but should be documented as partial/preservation-heavy for advanced features.
+  - `DotnetPoi.All` can be 1.0 only as a convenience meta-package if README clearly says Legacy and Formula remain partial. Risk: users may interpret All 1.0 as all formats complete.
+  - `DotnetPoi.Legacy` should probably remain pre-1.0 or be explicitly labeled partial/experimental because `.ppt`/HSLF is still very early and `.doc`/HWPF is limited-edit.
+  - `DotnetPoi.Formula` should remain pre-1.0 unless the supported evaluator subset is intentionally frozen and documented as small.
+- Verification run during assessment:
+  - `dotnet test DotnetPOI.sln --no-restore` passed.
+  - Counts observed: Common 79, POIFS 11, Formula 11, Legacy 221, Interop 70 passed / 2 skipped, Ooxml 151, All 7.
+  - Known warnings: duplicate NuGet generated sync-conflict targets in Ooxml obj, existing XWPF nullable warnings, existing xUnit analyzer warnings.
+- Release blockers before tagging 1.0:
+  - Decide versioning strategy per package (`Ooxml` 1.0 first vs all packages 1.0 together).
+  - Update csproj `VersionPrefix` values (currently 0.1.0 for split packages).
+  - Update README/package READMEs: test counts, Formula version table, support matrix wording, "Core" migration wording, and explicit "not full Apache POI" scope.
+  - Clean or intentionally stage current working tree fixture diffs; do not publish from an ambiguous dirty tree.
+  - Run Release config build/test/pack smoke after version bump.
+
+## 2026-05-08 JST — All/Ooxml 1.0.0 release prep cleanup
+
+- Task: `DotnetPoi.All` and `DotnetPoi.Ooxml` を 1.0.0 として公開するための掃除。
+- Version changes:
+  - `src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj`: `VersionPrefix` を `1.0.0` に更新。
+  - `src/DotnetPoi.All/DotnetPoi.All.csproj`: `VersionPrefix` を `1.0.0` に更新。
+  - `Common`, `POIFS`, `Legacy`, `Formula` は `0.1.0` のまま。`All 1.0.0` は stable OOXML 1.0 + partial Legacy/Formula の convenience meta-package として位置づけた。
+- Docs cleanup:
+  - Root `README.md`: 1.0 の意味を「documented OOXML workflows の安定版」と明記し、full Apache POI parity ではないことを追記。
+  - Root `README.md`: package status table を `All/Ooxml 1.0.x`, `Common/POIFS/Legacy/Formula 0.1.x` に更新。
+  - Root `README.md` / `NOW.md`: test counts を現状に更新（550 passed / 2 skipped）。
+  - `src/DotnetPoi.Ooxml/README.md`: 1.0 support scope を xlsx/docx/pptx 別に追記。
+  - `src/DotnetPoi.All/README.md`: `All 1.0` は convenience package で、Legacy/Formula は partial のままと明記。
+  - `src/DotnetPoi.Formula/README.md`: `DotnetPoi.Core` 旧表現を削除し、`Ooxml/All 1.0.0+` 前提に更新。
+- Publish workflow cleanup:
+  - NuGet flat-container 確認で `DotnetPoi.Common 0.1.0`, `DotnetPoi.POIFS 0.1.0`, `DotnetPoi.Legacy 0.1.0` が未公開 (404) と判明。
+  - `.github/workflows/publish.yml` に `Common` / `POIFS` の version read, NuGet existence check, pack, push, release asset 添付を追加。
+  - Push order は dependency packages (`Common`, `POIFS`) → `Ooxml` / `Legacy` / `Formula` → `All` に調整。
+- Generated noise cleanup:
+  - `obj/*sync-conflict-*` generated files を削除し、MSBuild duplicate import warning の原因を解消。
+  - Interop `from-dotnet-poi` binary fixture diffs は test-generated noise と判断し、release diff から除外するため restored。
+- Verification:
+  - `dotnet build DotnetPOI.sln -c Release --no-incremental` passed.
+  - `dotnet test DotnetPOI.sln --no-build -c Release` passed:
+    - Common 79, POIFS 11, Ooxml 151, Legacy 221, Formula 11, All 7, Interop 70 passed / 2 skipped.
+  - Pack smoke passed for all release-relevant packages:
+    - `DotnetPoi.Common.0.1.0`
+    - `DotnetPoi.POIFS.0.1.0`
+    - `DotnetPoi.Ooxml.1.0.0`
+    - `DotnetPoi.Legacy.0.1.0`
+    - `DotnetPoi.Formula.0.1.0`
+    - `DotnetPoi.All.1.0.0`
+  - Local package install smoke passed: temp console app installed `DotnetPoi.All 1.0.0` from local package output, created/wrote xlsx/docx/pptx in memory, and ran successfully.
+- Remaining before tag:
+  - `.gitignore` had a pre-existing mixed staged/unstaged state around `.claude`; intentionally left untouched.
+  - Known warnings remain: XWPF nullable warnings, xUnit analyzer warnings, UsageSamples nullable warnings. No build/test failures.
 
 ## 2025-06-22 — Phase 15 実装順 5-8 completed: HSLF text extraction / no-op write / interop / status
 
