@@ -19,24 +19,32 @@ public sealed class HWPFDocument : IDisposable
     private const string Stream1Table = "1Table";
 
     // Offsets within the WordDocument stream (fibBase + fibRgW97 + fibRgLw97)
-    // fibBase = 32 bytes; fibRgW97 = 28 bytes; fibRgLw97 = 88 bytes
+    // fibBase = 32 bytes; fibRgW97 = csw*2 bytes; fibRgLw97 = 88 bytes
+    // NOTE: fibRgLw base depends on csw (number of fibRgW entries).
+    //   SampleDoc.doc has csw=14 → fibRgW=28 bytes → fibRgLw base=64.
+    //   dotnet-poi previously assumed csw=12 → fibRgW=24 bytes → base=60 (OFF BY 4).
+    //   The constants below use base=64 (correct for csw=14).
+    //   To fully generalize, read csw from FIB[32] at runtime.
     private const int FibOffsetFlags1          = 10;   // 2-byte flags: bit9=fWhichTblStm
     // fibBase fields
     private const int FibOffsetFcMac            = 28;   // fcMac = total byte length of WordDocument stream
-    // fibRgLw97 fields (base at 60; each field = int32 at 60 + relative_offset)
-    internal const int FibOffsetCcpText         = 72;   // fibRgLw97 base (60) + 0xC
-    private const int FibOffsetCcpFtn           = 76;   // 60 + 0x10
-    private const int FibOffsetCcpHdd           = 80;   // 60 + 0x14 (header/footer story)
-    private const int FibOffsetCcpAtn           = 88;   // 60 + 0x1C (annotation story)
-    private const int FibOffsetCcpEdn           = 92;   // 60 + 0x20 (endnote story)
-    private const int FibOffsetCcpTxbx          = 96;   // 60 + 0x24 (text box story)
-    private const int FibOffsetCcpHdrTxbx       = 100;  // 60 + 0x28 (header text-box story)
+    // fibRgLw97 fields (base at 64; each field = int32 at 64 + relative_offset)
+    internal const int FibOffsetCcpText         = 76;   // fibRgLw97 base (64) + 0xC
+    private const int FibOffsetCcpFtn           = 80;   // 64 + 0x10
+    private const int FibOffsetCcpHdd           = 84;   // 64 + 0x14 (header/footer story)
+    private const int FibOffsetCcpAtn           = 92;   // 64 + 0x1C (annotation story)
+    private const int FibOffsetCcpEdn           = 96;   // 64 + 0x20 (endnote story)
+    private const int FibOffsetCcpTxbx          = 100;  // 64 + 0x24 (text box story)
+    private const int FibOffsetCcpHdrTxbx       = 104;  // 64 + 0x28 (header text-box story)
     internal const int FibOffsetFcClx           = 418;  // fibRgFcLcb start (154) + CLX index 33 * 8
     internal const int FibOffsetLcbClx          = 422;  // fcClx + 4
     // fibRgFcLcb97: starts at byte 154. Each entry = 8 bytes (fc:int32 + lcb:int32)
     // FIBFieldHandler constants: STSHF=0, PLCFBTECHPX=12, STTBFFFN=15
     internal const int FibOffsetFcStshf          = 154 + 0 * 8;       // 154
     internal const int FibOffsetLcbStshf         = 154 + 0 * 8 + 4;   // 158
+    // Index 5 = fcPlcfSea/lcbPlcfSea (reserved, always 0); PlcfSed is at index 6.
+    internal const int FibOffsetFcPlcfSed        = 154 + 6 * 8;       // 202
+    internal const int FibOffsetLcbPlcfSed       = 154 + 6 * 8 + 4;   // 206
     internal const int FibOffsetFcPlcfBteChpx   = 154 + 12 * 8;      // 250
     internal const int FibOffsetLcbPlcfBteChpx  = 154 + 12 * 8 + 4;  // 254
     internal const int FibOffsetFcPlcfBtePapx   = 154 + 13 * 8;      // 258
@@ -522,46 +530,52 @@ public sealed class HWPFDocument : IDisposable
         Array.Resize(ref main, textOffset + textBytes.Length);
         Buffer.BlockCopy(textBytes, 0, main, textOffset, textBytes.Length);
 
+        // Append minimal CHPFKP and PAPFKP pages covering the new text's FC range.
+        // The old FKP pages referenced by the original PlcfBteChpx/PlcfBtePapx covered
+        // the old text's FC range; after replacing the piece table those old FCs no longer
+        // map to valid CPs, so Java POI builds an empty CHPBinTable and crashes in
+        // Range.binarySearchEnd. New FKP pages at 512-byte boundaries fix this.
+        var chpFkpPageOffset = AlignToPage(main.Length);
+        var papFkpPageOffset = chpFkpPageOffset + 512;
+        Array.Resize(ref main, papFkpPageOffset + 512);
+        var chpFkp = BuildMinimalChpFkp(textOffset, textOffset + textBytes.Length);
+        var papFkp = BuildMinimalPapFkp(textOffset, textOffset + textBytes.Length);
+        Buffer.BlockCopy(chpFkp, 0, main, chpFkpPageOffset, 512);
+        Buffer.BlockCopy(papFkp, 0, main, papFkpPageOffset, 512);
+
         var table = _fileSystem.Streams[_fib.SelectedTableStreamName].ToArray();
+
+        // Extend the section table (PlcfSed) so the single section covers all new text.
+        // Java POI's WordToTextConverter limits processing to [0, sectionEndCp); without
+        // this update it stops at the old ccpText and misses any appended paragraphs.
+        var fcPlcfSed = ReadInt32Safe(main, FibOffsetFcPlcfSed);
+        var lcbPlcfSed = ReadInt32Safe(main, FibOffsetLcbPlcfSed);
+        if (fcPlcfSed >= 0 && lcbPlcfSed >= 8 && fcPlcfSed + lcbPlcfSed <= table.Length)
+            WriteInt32(table, fcPlcfSed + 4, text.Length);
+
         var clxOffset = table.Length;
         var clx = BuildSingleUnicodePieceClx(text.Length, textOffset);
         Array.Resize(ref table, clxOffset + clx.Length);
         Buffer.BlockCopy(clx, 0, table, clxOffset, clx.Length);
 
-        // Replace CHPBinTable (PlcBteChpx) and PAPBinTable (PlcBtePapx) with minimal
-        // entries covering only the new piece's FC range, so stale FKP references
-        // to the old document structure are no longer visible to readers.
-        // A PlcBte with lcb=8 and n=(lcb-4)/8=0 has two FC sentinels but zero page
-        // entries, meaning "this range has default formatting" — safe and correct.
-        var newFcEnd = textOffset + textBytes.Length;
-        var minimalBinTable = new byte[8];
-        BinaryPrimitives.WriteInt32LittleEndian(minimalBinTable.AsSpan(0), textOffset); // FC start
-        BinaryPrimitives.WriteInt32LittleEndian(minimalBinTable.AsSpan(4), newFcEnd);   // FC end (sentinel)
+        var plcfChpxOffset = table.Length;
+        var plcfChpx = BuildPlcfBte(textOffset, textOffset + textBytes.Length, chpFkpPageOffset / 512);
+        Array.Resize(ref table, table.Length + plcfChpx.Length);
+        Buffer.BlockCopy(plcfChpx, 0, table, plcfChpxOffset, plcfChpx.Length);
 
-        var chpxTableOffset = table.Length;
-        Array.Resize(ref table, table.Length + minimalBinTable.Length);
-        Buffer.BlockCopy(minimalBinTable, 0, table, chpxTableOffset, minimalBinTable.Length);
+        var plcfPapxOffset = table.Length;
+        var plcfPapx = BuildPlcfBte(textOffset, textOffset + textBytes.Length, papFkpPageOffset / 512);
+        Array.Resize(ref table, table.Length + plcfPapx.Length);
+        Buffer.BlockCopy(plcfPapx, 0, table, plcfPapxOffset, plcfPapx.Length);
 
-        var papxTableOffset = table.Length;
-        Array.Resize(ref table, table.Length + minimalBinTable.Length);
-        Buffer.BlockCopy(minimalBinTable, 0, table, papxTableOffset, minimalBinTable.Length);
-
-        // Update all FIB fc/lcb fields that reference the modified structures
-        if (main.Length >= FibOffsetLcbPlcfBteChpx + 4)
-        {
-            WriteInt32(main, FibOffsetFcPlcfBteChpx, chpxTableOffset);
-            WriteInt32(main, FibOffsetLcbPlcfBteChpx, minimalBinTable.Length);
-        }
-        if (main.Length >= FibOffsetLcbPlcfBtePapx + 4)
-        {
-            WriteInt32(main, FibOffsetFcPlcfBtePapx, papxTableOffset);
-            WriteInt32(main, FibOffsetLcbPlcfBtePapx, minimalBinTable.Length);
-        }
         WriteInt32(main, FibOffsetCcpText, text.Length);
         WriteInt32(main, FibOffsetFcClx, clxOffset);
         WriteInt32(main, FibOffsetLcbClx, clx.Length);
+        WriteInt32(main, FibOffsetFcPlcfBteChpx, plcfChpxOffset);
+        WriteInt32(main, FibOffsetLcbPlcfBteChpx, plcfChpx.Length);
+        WriteInt32(main, FibOffsetFcPlcfBtePapx, plcfPapxOffset);
+        WriteInt32(main, FibOffsetLcbPlcfBtePapx, plcfPapx.Length);
 
-        // Phase 14 item 12: rebuild remaining FIB fields for full consistency.
         RebuildFibAfterEdit(main);
 
         _fileSystem.Streams[StreamWordDocument] = main;
@@ -619,6 +633,40 @@ public sealed class HWPFDocument : IDisposable
     }
 
     private static int AlignEven(int value) => (value + 1) & ~1;
+
+    private static int AlignToPage(int value) => (value + 511) & ~511;
+
+    // CHPFKP with 1 run, default formatting (rgb[0]=0), covering [fcStart, fcEnd).
+    private static byte[] BuildMinimalChpFkp(int fcStart, int fcEnd)
+    {
+        var fkp = new byte[512];
+        BinaryPrimitives.WriteInt32LittleEndian(fkp.AsSpan(0), fcStart);
+        BinaryPrimitives.WriteInt32LittleEndian(fkp.AsSpan(4), fcEnd);
+        // rgb[0] at (crun+1)*4 = 8: 0 → default CHPX
+        fkp[511] = 1; // crun
+        return fkp;
+    }
+
+    // PAPFKP with 1 paragraph, default formatting (BxPap.wordOffset=0), covering [fcStart, fcEnd).
+    private static byte[] BuildMinimalPapFkp(int fcStart, int fcEnd)
+    {
+        var fkp = new byte[512];
+        BinaryPrimitives.WriteInt32LittleEndian(fkp.AsSpan(0), fcStart);
+        BinaryPrimitives.WriteInt32LittleEndian(fkp.AsSpan(4), fcEnd);
+        // BxPap[0] at (cpara+1)*4 = 8: wordOffset=0 → default PAPX, 12 reserved bytes
+        fkp[511] = 1; // cpara
+        return fkp;
+    }
+
+    // PlcfBte with 1 entry: 2 FC int32 values + 1 page-number int32 = 12 bytes.
+    private static byte[] BuildPlcfBte(int fcStart, int fcEnd, int pageNumber)
+    {
+        var result = new byte[12];
+        BinaryPrimitives.WriteInt32LittleEndian(result.AsSpan(0), fcStart);
+        BinaryPrimitives.WriteInt32LittleEndian(result.AsSpan(4), fcEnd);
+        BinaryPrimitives.WriteInt32LittleEndian(result.AsSpan(8), pageNumber);
+        return result;
+    }
 
     private static string ReplaceOrdinal(string text, string placeholder, string value)
     {

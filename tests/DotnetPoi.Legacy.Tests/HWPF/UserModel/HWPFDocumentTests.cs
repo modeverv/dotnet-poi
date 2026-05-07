@@ -441,13 +441,15 @@ public class HWPFDocumentTests
         var fcMac = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(28));
         Assert.Equal(main.Length, fcMac);
 
-        // Secondary story character counts must all be 0
-        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(76)));  // ccpFtn
-        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(80)));  // ccpHdd
-        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(88)));  // ccpAtn
-        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(92)));  // ccpEdn
-        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(96)));  // ccpTxbx
-        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(100))); // ccpHdrTxbx
+        // ccpText (offset 76) = new text length, must be non-zero after edit
+        Assert.NotEqual(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(76)));
+        // Secondary story character counts (ccpFtn=80, ccpHdd=84, ccpAtn=92, ccpEdn=96, ccpTxbx=100, ccpHdrTxbx=104) must be 0
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(80)));  // ccpFtn
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(84)));  // ccpHdd
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(92)));  // ccpAtn
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(96)));  // ccpEdn
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(100))); // ccpTxbx
+        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(104))); // ccpHdrTxbx
     }
 
     [Fact]
@@ -477,8 +479,8 @@ public class HWPFDocumentTests
         var main = cf.Streams["WordDocument"];
         var lcbChpx = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(254));
         var lcbPapx = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(262));
-        Assert.Equal(8, lcbChpx); // minimal: 2 FC values, 0 pages
-        Assert.Equal(8, lcbPapx);
+        Assert.Equal(12, lcbChpx); // 2 FC int32 values + 1 FKP page-number int32 = 12 bytes
+        Assert.Equal(12, lcbPapx);
 
         // The CHPBinTable FC values cover the new text's FC range
         var tblName = fib.DeclaredTableStreamName;
@@ -591,8 +593,9 @@ public class HWPFDocumentTests
         var fcMac = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(28));
         Assert.Equal(main.Length, fcMac);
 
-        // Secondary story counts must be zeroed
-        Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(76)));
+        // ccpText (offset 76) must be the new text length (non-zero)
+        Assert.NotEqual(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(76)));
+        // ccpFtn (offset 80) must be zeroed
         Assert.Equal(0, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(80)));
 
         // Text model is consistent
