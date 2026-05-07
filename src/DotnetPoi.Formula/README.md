@@ -23,7 +23,7 @@ dotnet add package DotnetPoi.Formula
 <PackageReference Include="DotnetPoi.Formula" Version="..." />
 ```
 
-> Requires **DotnetPoi.Core** 0.1.0+ and **.NET 8.0+** or **.NET Framework 4.7.2+**.
+> Requires **DotnetPoi.Ooxml** (or **DotnetPoi.All**) 0.1.0+ and **.NET 8.0+** or **.NET Framework 4.7.2+**.
 
 ---
 
@@ -42,7 +42,7 @@ dotnet add package DotnetPoi.Formula
 | Programmatic calculation for simple arithmetic and listed functions | Template fill → save → open in Excel |
 | SUM, AVERAGE, COUNT, MIN, MAX, CONCATENATE and basic operators | Full Excel-compatible calculation |
 
-> All formula **text preservation** (`setCellFormula`, `getCellFormula`, cached `<v>` value) lives in **DotnetPoi.Core** and works without this package.
+> All formula **text preservation** (`setCellFormula`, `getCellFormula`, cached `<v>` value) lives in **DotnetPoi.Ooxml** and works without this package.
 >
 > Full formula evaluation is not a current project goal. Excel-compatible calculation should be delegated to Excel, LibreOffice, Apache POI, or another calculation engine when accuracy across the full formula language matters.
 

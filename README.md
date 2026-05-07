@@ -25,6 +25,21 @@ For most users, **`DotnetPoi.All`** is the simplest choice — it includes all f
 <PackageReference Include="DotnetPoi.All" Version="..." />
 ```
 
+### Dependency Picker
+
+Decide what you need, then install the matching packages:
+
+| Scenario | Packages to install | Notes |
+|---|---|---|
+| **OOXML** (xlsx / docx / pptx) <br/>read/write | `DotnetPoi.Ooxml` | Modern Office 2007+ formats only — minimal footprint |
+| **OOXML** + formula evaluator | `DotnetPoi.Ooxml`<br/>`DotnetPoi.Formula` | Add `createFormulaEvaluator()` support when needed |
+| **Legacy binary** (xls / doc / ppt) <br/>read/write | `DotnetPoi.Legacy` | BIFF-based Office 97-2003 formats |
+| **Legacy binary** + formula evaluator | `DotnetPoi.Legacy`<br/>`DotnetPoi.Formula` | |
+| **All formats**, no formula evaluator | `DotnetPoi.Ooxml`<br/>`DotnetPoi.Legacy` | Two packages, excludes formula engine (smaller attack surface) |
+| **Everything** (all formats + formula) | `DotnetPoi.All` | One dependency, all features — recommended for most users |
+
+Transitive dependencies (`DotnetPoi.Common`, `DotnetPoi.POIFS`) are resolved automatically by NuGet.
+
 ### Granular Packages
 
 | Package | Contents | Best for |
