@@ -40,4 +40,4 @@ Headers and footers are preserved on round-trip.
 
 See `examples/UsageSamples/Program.cs` (`CreateDocument`):
 
-[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples)

@@ -52,4 +52,4 @@ For template-based workflows, start from an existing xlsm that contains the macr
 
 See `examples/UsageSamples/Program.cs` (`CreateMacroWorkbookRoundTrip`):
 
-[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples)

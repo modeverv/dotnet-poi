@@ -61,4 +61,4 @@ Page settings, final-section columns, and raw paragraph-level `sectPr` section b
 
 See `examples/UsageSamples/Program.cs` (`CreateDocument`):
 
-[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/main/examples/UsageSamples)
+[examples/UsageSamples](https://github.com/modeverv/dotnet-poi/tree/master/examples/UsageSamples)
