@@ -1,5 +1,24 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — publish.yml: use project package versions and skip duplicate NuGet pushes
+
+- Task: GitHub Actions `publish.yml` がタグ由来の同一 `PackageVersion` を Core/Formula 両方に注入していたため、各 project の NuGet version を source of truth に変更する。
+- Changes:
+  - `.github/workflows/publish.yml` の `Extract version from tag` を廃止し、`dotnet msbuild -getProperty:PackageId/PackageVersion` で `DotnetPoi.Core.csproj` と `DotnetPoi.Formula.csproj` から metadata を読むように変更。
+  - `dotnet pack` から `-p:PackageVersion="$VERSION"` を削除し、各 `.csproj` の `PackageVersion` をそのまま使うようにした。
+  - publish 前に NuGet flat-container API で `PackageId + PackageVersion` の存在確認を行い、既に存在する package は `dotnet nuget push` 自体をスキップするようにした。
+  - GitHub Release notes は tag version 前提ではなく、Core/Formula それぞれの project version と NuGet status (`missing` / `exists`) を表示するように更新。
+- Verification:
+  - `dotnet msbuild ... -getProperty:PackageVersion` returned Core `0.5.0`, Formula `0.1.0`.
+  - `dotnet msbuild ... -getProperty:PackageId` returned `DotnetPoi.Core`, `DotnetPoi.Formula`.
+  - Ruby YAML parse succeeded for `.github/workflows/publish.yml`.
+  - `dotnet pack src/DotnetPoi.Core/DotnetPoi.Core.csproj -c Release -o /tmp/dotnet-poi-publish-check` created `DotnetPoi.Core.0.5.0.nupkg` / `.snupkg`.
+  - `dotnet pack src/DotnetPoi.Formula/DotnetPoi.Formula.csproj -c Release -o /tmp/dotnet-poi-publish-check` created `DotnetPoi.Formula.0.1.0.nupkg` / `.snupkg`.
+- Notes:
+  - Local pack emitted `NU1900` vulnerability-data warnings because this environment could not reach `https://api.nuget.org/v3/index.json`; packaging still succeeded.
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
 ## 2026-05-07 JST — Phase 9 docs: document recently completed docx features
 
 - Task: Read `agents.md`, `NOW.md`, `DOC_PLAN.md`, existing `docs_src/`, and source/tests to identify implemented features that were not yet accurately documented.

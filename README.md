@@ -10,7 +10,7 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 [![NuGet Formula](https://img.shields.io/nuget/v/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
 [![NuGet Formula Downloads](https://img.shields.io/nuget/dt/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
-![Status](https://img.shields.io/badge/status-beta-orange)
+![Status](https://img.shields.io/badge/status-practical%20OOXML%20workflows-brightgreen)
 ![Tests](https://img.shields.io/badge/tests-309%20passing-brightgreen)
 
 ## NuGet Package Strategy
@@ -51,9 +51,11 @@ dotnet-poi ships as **two separate NuGet packages** with a clear separation of c
 
 ## Status
 
-Current status: **beta** — `DotnetPoi.Core` v0.5.0 and `DotnetPoi.Formula` v0.5.0 are published on [NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core).
+Current status: **practical for covered OOXML workflows** — `DotnetPoi.Core` v0.5.0 and `DotnetPoi.Formula` v0.5.0 are published on [NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core).
 
-The strongest format today is **xlsx / XSSF**. It has broad support for common workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. Some advanced workbook features are still preservation-only rather than editable API models, but ordinary `.xlsx` workflows are well beyond the original bootstrap stage.
+The project has moved beyond the original bootstrap/beta stage for common OOXML work. The strongest format today is **xlsx / XSSF**, with broad support for workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. **docx / XWPF** and **pptx / XSLF** are also useful for practical generation, light editing, and loss-resistant round-trips of many real files.
+
+This does **not** mean the whole Apache POI surface is complete. Advanced OOXML features such as chart creation and comment editing are still limited, some features are preservation-only rather than modeled APIs, formula evaluation remains intentionally narrow, and legacy binary formats (`.xls`, `.doc`, `.ppt`) are still early. In short: **use it today for the supported OOXML workflows shown below; check the matrix before relying on an advanced or legacy feature.**
 
 Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not modeled for creation or editing / ❌ not implemented / — not applicable.
 

@@ -94,57 +94,98 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
-      - name: Extract version from tag
-        id: version
+      - name: Read package versions
+        id: packages
         run: |
           TAG="${{ github.ref_name }}"
-          VERSION="${TAG#v}"          # strip leading "v" → "0.1.0"
+
+          CORE_ID="$(dotnet msbuild src/DotnetPoi.Core/DotnetPoi.Core.csproj -nologo -getProperty:PackageId)"
+          CORE_VERSION="$(dotnet msbuild src/DotnetPoi.Core/DotnetPoi.Core.csproj -nologo -getProperty:PackageVersion)"
+          FORMULA_ID="$(dotnet msbuild src/DotnetPoi.Formula/DotnetPoi.Formula.csproj -nologo -getProperty:PackageId)"
+          FORMULA_VERSION="$(dotnet msbuild src/DotnetPoi.Formula/DotnetPoi.Formula.csproj -nologo -getProperty:PackageVersion)"
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "core_id=$CORE_ID" >> "$GITHUB_OUTPUT"
+          echo "core_version=$CORE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "formula_id=$FORMULA_ID" >> "$GITHUB_OUTPUT"
+          echo "formula_version=$FORMULA_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check existing NuGet packages
+        id: nuget
+        run: |
+          check_package() {
+            local id="$1"
+            local version="$2"
+            local normalized_id="${id,,}"
+            local normalized_version="${version,,}"
+            local url="https://api.nuget.org/v3-flatcontainer/${normalized_id}/${normalized_version}/${normalized_id}.${normalized_version}.nupkg"
+            local status
+
+            status="$(curl -sSL -o /dev/null -w "%{http_code}" "$url")"
+            if [ "$status" = "200" ]; then
+              echo "exists"
+            elif [ "$status" = "404" ]; then
+              echo "missing"
+            else
+              echo "Unexpected NuGet response for $id $version: HTTP $status" >&2
+              exit 1
+            fi
+          }
+
+          CORE_STATUS="$(check_package "${{ steps.packages.outputs.core_id }}" "${{ steps.packages.outputs.core_version }}")"
+          FORMULA_STATUS="$(check_package "${{ steps.packages.outputs.formula_id }}" "${{ steps.packages.outputs.formula_version }}")"
+
+          echo "core_status=$CORE_STATUS" >> "$GITHUB_OUTPUT"
+          echo "formula_status=$FORMULA_STATUS" >> "$GITHUB_OUTPUT"
+          echo "${{ steps.packages.outputs.core_id }} ${{ steps.packages.outputs.core_version }}: $CORE_STATUS"
+          echo "${{ steps.packages.outputs.formula_id }} ${{ steps.packages.outputs.formula_version }}: $FORMULA_STATUS"
 
       - name: Pack NuGet packages
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           dotnet pack src/DotnetPoi.Core/DotnetPoi.Core.csproj \
             -c Release \
-            -p:PackageVersion="$VERSION" \
             -o /tmp/nuget-publish
 
           dotnet pack src/DotnetPoi.Formula/DotnetPoi.Formula.csproj \
             -c Release \
-            -p:PackageVersion="$VERSION" \
             -o /tmp/nuget-publish
 
-      - name: Push to NuGet.org
+      - name: Push missing packages to NuGet.org
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          dotnet nuget push /tmp/nuget-publish/DotnetPoi.Core.*.nupkg \
-            --api-key "$NUGET_API_KEY" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+          if [ "${{ steps.nuget.outputs.core_status }}" = "missing" ]; then
+            dotnet nuget push "/tmp/nuget-publish/${{ steps.packages.outputs.core_id }}.${{ steps.packages.outputs.core_version }}.nupkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json
+          else
+            echo "Skipping ${{ steps.packages.outputs.core_id }} ${{ steps.packages.outputs.core_version }} because it already exists on NuGet.org."
+          fi
 
-          dotnet nuget push /tmp/nuget-publish/DotnetPoi.Formula.*.nupkg \
-            --api-key "$NUGET_API_KEY" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+          if [ "${{ steps.nuget.outputs.formula_status }}" = "missing" ]; then
+            dotnet nuget push "/tmp/nuget-publish/${{ steps.packages.outputs.formula_id }}.${{ steps.packages.outputs.formula_version }}.nupkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json
+          else
+            echo "Skipping ${{ steps.packages.outputs.formula_id }} ${{ steps.packages.outputs.formula_version }} because it already exists on NuGet.org."
+          fi
 
       - name: Generate release notes
         id: release_notes
         run: |
           cat > /tmp/release-notes.md << 'EOF'
-          ## DotnetPoi.Core ${{ steps.version.outputs.version }} / DotnetPoi.Formula ${{ steps.version.outputs.version }}
+          ## ${{ steps.packages.outputs.tag }}
 
           See [CHANGELOG / CHECKPOINT](https://github.com/${{ github.repository }}/blob/master/CHECKPOINT.md) for detailed working notes.
 
           ### NuGet packages
-          - `DotnetPoi.Core` — ${{ steps.version.outputs.version }}
-          - `DotnetPoi.Formula` — ${{ steps.version.outputs.version }}
+          - `DotnetPoi.Core` — ${{ steps.packages.outputs.core_version }} (${{ steps.nuget.outputs.core_status }})
+          - `DotnetPoi.Formula` — ${{ steps.packages.outputs.formula_version }} (${{ steps.nuget.outputs.formula_status }})
 
           ### Installation
           ```shell
-          dotnet add package DotnetPoi.Core --version ${{ steps.version.outputs.version }}
-          dotnet add package DotnetPoi.Formula --version ${{ steps.version.outputs.version }}
+          dotnet add package DotnetPoi.Core --version ${{ steps.packages.outputs.core_version }}
+          dotnet add package DotnetPoi.Formula --version ${{ steps.packages.outputs.formula_version }}
           ```
 
           ### Test results
@@ -158,8 +199,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: "v${{ steps.version.outputs.version }}"
+          tag_name: ${{ steps.packages.outputs.tag }}
+          name: "${{ steps.packages.outputs.tag }}"
           body_path: ${{ steps.release_notes.outputs.notes_path }}
           files: |
             /tmp/nuget-publish/DotnetPoi.Core.*.nupkg
