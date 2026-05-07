@@ -39,6 +39,8 @@ dependency-reduced-pom.xml
 __pycache__
 
 999_gabage
+
+.claude
 999_gabage/*
 
 tmp-*
