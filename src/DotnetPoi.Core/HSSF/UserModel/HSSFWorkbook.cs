@@ -208,6 +208,8 @@ public sealed class HSSFWorkbook : IWorkbook
 
     internal int getNumberOfCellStyles() => _cellStyles.Count;
 
+    internal HSSFDataFormat GetOrCreateDataFormat() => createDataFormat();
+
     private static readonly string[] WorkbookStreamAliases =
     {
         "Workbook",

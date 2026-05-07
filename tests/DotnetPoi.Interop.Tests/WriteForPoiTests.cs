@@ -123,6 +123,42 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    public void Write_Phase13NoOpDoc_CreatesFixtureForPoi()
+    {
+        // Phase 13 item 4: Direction B — dotnet-poi no-op saves SampleDoc.doc → Java POI reads
+        var fixturePath = GetFixturePath("phase13-noop-sample.doc");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        // Find SampleDoc.doc from the POI test-data directory
+        var repoRoot = GetRepoRoot();
+        var sourceFixture = Path.Combine(repoRoot, "poi", "test-data", "document", "SampleDoc.doc");
+        if (!File.Exists(sourceFixture))
+        {
+            // Fall back to Core Tests hwpf-fixtures if available
+            sourceFixture = Path.Combine(AppContext.BaseDirectory, "hwpf-fixtures", "SampleDoc.doc");
+        }
+        Assert.True(File.Exists(sourceFixture), $"Source fixture missing: {sourceFixture}");
+
+        using var input = File.OpenRead(sourceFixture);
+        using var doc = new DotnetPoi.HWPF.UserModel.HWPFDocument(input);
+        var originalText = doc.getText();
+
+        using (var output = File.Create(fixturePath))
+        {
+            doc.write(output);
+        }
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+
+        // Verify round-trip within dotnet-poi
+        using var readBack = File.OpenRead(fixturePath);
+        using var reread = new DotnetPoi.HWPF.UserModel.HWPFDocument(readBack);
+        Assert.Equal(originalText, reread.getText());
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
     public void Write_Phase12HssfUnicode_CreatesFixtureForPoi()
     {
         // Phase 12 item 3: Direction B — Unicode/Japanese sheet names and strings
@@ -835,5 +871,16 @@ public class WriteForPoiTests
         }
 
         throw new DirectoryNotFoundException("Could not locate tests/DotnetPoi.Interop.Tests/fixtures.");
+    }
+
+    private static string GetRepoRoot()
+    {
+        var directory = AppContext.BaseDirectory;
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory, "DotnetPOI.sln"))) return directory;
+            directory = Directory.GetParent(directory)?.FullName;
+        }
+        throw new DirectoryNotFoundException("Could not locate repository root.");
     }
 }

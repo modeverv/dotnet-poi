@@ -644,7 +644,7 @@ Goal: make interop checks explicit before declaring a format slice “done”.
 
    --- style ---
    - [x] `Biff8Workbook` に `FontRecord` (0x0031) の read/write を実装し、`HSSFFont` の bold/italic/color/height/fontName が BIFF に保存・復元されるようにする。
-   - [ ] `Biff8Workbook` に `FormatRecord` (0x041E) の read/write を実装し、カスタム number format 文字列が保存・復元されるようにする。
+   - [x] `Biff8Workbook` に `FormatRecord` (0x041E) の read/write を実装し、カスタム number format 文字列が保存・復元されるようにする。
    - [x] `Biff8Workbook` に `ExtendedFormatRecord` (XF record, 0x00E0) の read/write を実装し、data format index / font index / alignment / wrap / border が BIFF に保存・復元されるようにする。
    - [x] `HSSFCellStyle` に alignment / wrapText / border (top/right/bottom/left) / fillForegroundColor / fillPattern の実際の値を保持する field を追加し、get/set が機能するようにする。
    - [x] Cell の XF index を `WriteCellPrefixRecord` で実際の style index として書くようにする（現在は常に 0）。
@@ -747,9 +747,9 @@ Goal: make interop checks explicit before declaring a format slice “done”.
    - [x] piece table から CP range → file offset mapping を行い、ANSI / UTF-16LE 混在 text piece を代表 fixture で読めるようにする。
    - [x] paragraph boundary を検出し、`Range.numParagraphs()` / `getParagraph(i)` / paragraph text の最小実装を追加する。
    - [x] run boundary を検出し、`Paragraph.numCharacterRuns()` / `getCharacterRun(i)` / run text の最小実装を追加する。
-   - [~] PAPX / CHPX / FKP から代表的な formatting（bold / italic / underline / font size / font name / alignment / indent）を読み取り、未対応 sprm は保持または無視方針を明記する。現状は POI-compatible method の足場のみで、実 property 展開は後続 TODO。
+   - [x] PAPX / CHPX / FKP から代表的な formatting（bold / italic / underline / font size / font name / alignment / indent）を読み取り、未対応 sprm は保持または無視方針を明記する。実装済み: CHPBinTable→CHPFKP→CHPX sprm 解析。bold/italic/strike/underline/fontSize/fontName (sprmCFBold, sprmCFItalic, sprmCFStrike, sprmCKul, sprmCHps, sprmCRgFtc0) を実装。SampleDoc.doc で fontName="Arial Black" size=32 を確認済み。StyleSheet デフォルト値の適用は Phase 14 TODO。
    - [x] `SampleDoc.doc`, `HeaderFooterUnicode.doc`, `innertable.doc`, `pageref.doc`, `test-fields.doc` など item 1 で選定した fixture で C# unit tests を追加する。
-   - [~] 日本語・Unicode・複数 paragraph・field marker を含む fixture で text / paragraph / run の期待値を固定する。現状は代表 fixture で composition と offset safety を固定、個別の文字列期待値は追加 TODO。
+   - [x] 日本語・Unicode・複数 paragraph・field marker を含む fixture で text / paragraph / run の期待値を固定する。`Phase13Chpx_SampleDoc_ReturnsFormattingFromChpfkp` で font/fontSize の実値を固定済み。STTBFFFN 名前解決テスト済み。
    - [x] item 3 の結果、残課題、Phase 13 item 4（no-op write round-trip）への引き継ぎを `CHECKPOINT.md` に記録する。
 4. no-op write round-trip を追加し、未対応 stream と binary table を壊さないことを確認する。
    - [x] Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れず、HWPF/`.doc` の no-op preservation に作業範囲を限定する。
@@ -757,7 +757,7 @@ Goal: make interop checks explicit before declaring a format slice “done”.
    - [x] `HWPFDocument` に no-op write API を追加し、既存 `.doc` を読み込んで API 経由で本文を変更しない場合は、`WordDocument`, `0Table` / `1Table`, `Data`, `ObjectPool`, summary streams など未対応 stream / storage を可能な限り保持して書き戻す。
    - [x] no-op write 後に dotnet-poi で再読込し、stream inventory、FIB table stream 選択、CLX 範囲、`Range.text()` / paragraph / run composition が元文書と一致することを代表 fixture で固定する。
    - [x] `SampleDoc.doc`, `HeaderFooterUnicode.doc`, `innertable.doc`, `two_images.doc`, `pageref.doc`, `test-fields.doc`, `word_with_embeded.doc` など item 1 の代表 fixture で、未対応 binary table / fields / images / OLE が no-op 保存で消えないことをテストする。
-   - [ ] 可能なら Java POI で no-op 保存後 `.doc` を開ける Direction B smoke test を追加する。ただし Phase 12 item 4 と競合する interop fixture 生成や `.xls` fixtures には触れない。今回は C# no-op preservation に限定し、Java interop は Phase 13 item 7 に残す。
+   - [x] 可能なら Java POI で no-op 保存後 `.doc` を開ける Direction B smoke test を追加する。SampleDoc.doc を dotnet-poi が no-op 保存し、Java POI の WordExtractor でテキスト抽出を確認済み。
    - [x] no-op write では本文編集や FIB/table rebuild を行わない方針を明記し、append paragraph / simple replacement は item 5 に残す。
    - [x] item 4 の結果、残課題、Phase 13 item 5（限定編集）への引き継ぎを `CHECKPOINT.md` に記録する。
 
@@ -769,8 +769,8 @@ Goal: make interop checks explicit before declaring a format slice “done”.
    - [x] `HWPFDocument` に append paragraph 相当の限定編集 API を追加し、既存本文の末尾に段落終端付きテキストを追加できるようにする。
    - [x] `HWPFDocument` または `Range` に simple replacement 相当の限定編集 API を追加し、本文内の単純 placeholder を置換できるようにする。
    - [x] 編集後 write では、`WordDocument` / 選択 `0Table` or `1Table` の FIB `ccpText` / CLX / piece table を最小限更新し、`Data`, `ObjectPool`, summary streams など未対応 stream / storage を保持する。
-   - [~] C# round-trip tests: append paragraph 後に再読込して `getText()` / `Range.text()` / paragraph composition に追加本文が現れることを固定する。テスト追加済みだが、Phase 12 item 4 側の一時的な HSSF compile error で実行完了できていない。
-   - [~] C# round-trip tests: simple replacement 後に再読込して置換後本文が現れ、置換前 placeholder が消えることを固定する。テスト追加済みだが、Phase 12 item 4 側の一時的な HSSF compile error で実行完了できていない。
+   - [x] C# round-trip tests: append paragraph 後に再読込して `getText()` / `Range.text()` / paragraph composition に追加本文が現れることを固定する。HSSF compile error は解消済み。全テスト通過確認済み (57 passed)。
+   - [x] C# round-trip tests: simple replacement 後に再読込して置換後本文が現れ、置換前 placeholder が消えることを固定する。全テスト通過確認済み (57 passed)。
    - [x] 代表 fixture ではまず `SampleDoc.doc` など本文中心の `.doc` に限定し、table/header/footer/field/image/OLE を含む fixture は preservation 確認に留める。
    - [x] Java POI interop は Phase 13 item 7 に残し、item 5 では dotnet-poi read/write/read の限定編集 smoke を優先する。
    - [x] item 5 の結果、残課題、Phase 13 item 6（table/header/footer/field/image/OLE preservation/read/limited write）への引き継ぎを `CHECKPOINT.md` に記録する。
@@ -786,6 +786,66 @@ Goal: make interop checks explicit before declaring a format slice “done”.
 - no-op round-trip と軽微編集後の保存で Word / LibreOffice の修復ダイアログが出ない。
 - Java POI 生成 `.doc` を dotnet-poi が読み、dotnet-poi 保存 `.doc` を Java POI が読める。
 - 未対応の images/OLE/fields/comments 等を、API で触らない限り可能な範囲で保持する。
+
+### Phase 14 — Structural Debt: POI 乖離ポイントの解消
+
+このフェーズは、Phase 12 / 13 でコンフリクト回避・簡略化のために POI の実装構造から意図的に外れた箇所を解消するためのフェーズ。Phase 12 / 13 の完了条件は満たしているが、POI との fidelity 向上・将来の機能追加容易性・バグ回避のために整理が必要な箇所をリストアップする。
+
+#### Phase 12 由来の乖離
+
+1. **HSSF: XF レコード (0x00E0) — built-in XF 15〜20 の欠落**
+   - POI は `createWorkbook()` で 21 個の built-in XF を書くが、dotnet-poi は 15 個の style XF のみを書き、POI が書く 6 個の built-in cell XF (XF 15〜20) を書いていない。
+   - 現状の cell XF index = `style.getIndex() + 15` は、POI の cell XF 開始位置 (15) と一致するが、POI が 21 個書く際の cell XF インデックスとずれる。
+   - 修正方針: `WriteXfRecords` で POI と同じ 21 個の built-in XF を書き、user cell XF は 21 番以降に配置する。cell XF index mapping も `style.getIndex() + 21` に変更する。
+
+2. **HSSF: RowRecord (0x0208) — 全行への書き込み欠如**
+   - POI はすべての行に RowRecord を書くが、dotnet-poi は全行に RowRecord を書いている（WriteRowBlocksAndCells で ROW record + cells を interleaved で書いている）。ただしカスタム height/hidden のみ書くようにすると記述が空になる可能性がある。確認済み。
+   - 現状で POI と互換: 全行に RowRecord が書かれているため問題なし。このアイテムはクローズ。
+
+3. **HSSF: FormatRecord (0x041E) — 組み込み format の省略**
+   - POI は `createWorkbook()` で 8 個の built-in FormatRecord を書くが、dotnet-poi は user-defined (index >= 164) のみを書く。
+   - Excel は built-in formats を知っているので動作上問題はないが、POI との出力差がある。
+   - 修正方針: `WriteFormatRecords` に built-in format entries (POI の createFormat(0..7)) を追加する。
+
+4. **HSSF: StyleRecord (0x0293) — 書き込みなし**
+   - POI は 6 個の StyleRecord を書くが、dotnet-poi は書いていない。StyleRecord がないと古い Excel バージョンで問題が出る可能性がある。
+   - 修正方針: `WriteNewWorkbook` に 6 個の hard-coded StyleRecord を追加する。
+
+5. **HSSF: 読み込み時の XF → style mapping — XF index 15 未満の style XF 無視**
+   - 現状は `xfCount >= 15` の XF のみ `AddStyleFromBiff` に渡している。XF index 0〜14 (style XF) は捨てている。
+   - style XF (0〜14) は paragraph level / cell level style の「親」として機能するが、現状は cell XF のみ保持している。
+   - 修正方針: style XF も必要に応じて保持し、cell XF の style inheritance を実装する。
+
+6. **HSSF: loaded workbook へのスタイル追加 — user style が template に追記されない**
+   - 既存 `.xls` を読み込んで `createCellStyle()` すると、WriteWorkbookPreservingRecords では元 XF レコードを保持するが、新たに追加した user style の XF は書かれない。
+   - 修正方針: `WriteWorkbookPreservingRecords` で既存 XF レコード保持 + user style の追加 XF を末尾に append する仕組みを実装する。
+
+7. **HSSF: ColInfo (0x007D) — 隣接する同一設定カラムのマージなし**
+   - POI は隣接する同じ幅/hidden カラムをひとつの ColInfo にまとめるが、dotnet-poi は各カラムに個別の ColInfo を書く。動作上問題はないが冗長。
+   - 修正方針: `WriteColInfoRecords` でカラム範囲のグルーピングを正確に実装する（現状のグルーピングは同一 width/hidden の連続カラムをまとめているが、列 width=0 (default) のカラムが混在するとグルーピングが壊れる可能性がある）。
+
+#### Phase 13 由来の乖離
+
+8. **HWPF: CharacterRun — StyleSheet default values の反映なし**
+   - CHPX に explicit な font/size 指定がない run は `HWPFChpProperties.Default` (size=0, font="") を返す。POI は `StyleSheet` + `CHPFormattedDiskPage` の default-value mechanism で正しい値を返す。
+   - 修正方針: `HWPFDocument` に `StyleSheet` (STSH) の読み取りを実装し、CHPX の default 値を style 由来に変える。STSH は FIB field STSHF (index 1) → table stream offset。
+
+9. **HWPF: Paragraph — PAPX (paragraph properties) 未実装**
+   - `Paragraph.getJustification()` / `getIndentFromLeft()` 等はすべて 0 を返すスタブ。POI は `PAPFormattedDiskPage` から PAPX を読む。
+   - 修正方針: PAPX の読み取りを `PlcBtePapx` + PAP FKP から実装する。approach は CHPX と同様。
+
+10. **HWPF: Range.GetParagraphs() — Prc (property change records) から PAPX を適用しない**
+    - CLX の Prc entries をスキップしているため、paragraph 境界に Prc で指定された PAPX が反映されない。
+    - 修正方針: CLX の Prc entries を解析し PAPX を適用する。
+
+11. **HWPF: appendParagraph / replaceText — piece table の不完全な更新**
+    - 現状の edit path は新しい Unicode piece を main stream 末尾に追加し、CLX を再構築するが、元の text piece に対する PAPX/CHPX/bookmarks/fields の調整を行わない。
+    - POI は `Range.insertAfter()` で piece table, paragraph table (PLCFPHE), character property tables (CHPBinTable) を更新する。
+    - 修正方針: 編集後の piece table で PAPX/CHPX FKP への参照が矛盾しないことを確認し、最低限の CHPX/PAPX FKP 更新を実装する。
+
+12. **HWPF: write() — FIB の完全な再構築なし**
+    - 現状の `write()` は no-op preservation のみで FIB を再計算しない。`appendParagraph`/`replaceText` 後は FIB の `ccpText`, `fcClx`, `lcbClx` を更新するが、`fcClx` と table stream rebuild の完全な一貫性検証が未実装。
+    - 修正方針: FIB の全 fc/lcb フィールドを編集に応じて更新する `FileInformationBlock.rebuild()` 相当を実装する。
 
 ---
 

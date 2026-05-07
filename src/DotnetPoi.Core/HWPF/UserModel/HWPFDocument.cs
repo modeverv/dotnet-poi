@@ -20,16 +20,24 @@ public sealed class HWPFDocument : IDisposable
 
     // Offsets within the WordDocument stream (fibBase + fibRgW97 + fibRgLw97)
     // fibBase = 32 bytes; fibRgW97 = 28 bytes; fibRgLw97 = 88 bytes
-    private const int FibOffsetFlags1     = 10;   // 2-byte flags: bit9=fWhichTblStm
-    private const int FibOffsetCcpText    = 72;   // fibRgLw97 base (60) + 0xC = 72
-    private const int FibOffsetFcClx      = 418;  // fibRgFcLcb start (154) + CLX index 33 * 8
-    private const int FibOffsetLcbClx     = 422;  // fcClx + 4
+    private const int FibOffsetFlags1          = 10;   // 2-byte flags: bit9=fWhichTblStm
+    private const int FibOffsetCcpText         = 72;   // fibRgLw97 base (60) + 0xC = 72
+    private const int FibOffsetFcClx           = 418;  // fibRgFcLcb start (154) + CLX index 33 * 8
+    private const int FibOffsetLcbClx          = 422;  // fcClx + 4
+    // fibRgFcLcb97: starts at byte 154. Each entry = 8 bytes (fc:int32 + lcb:int32)
+    // FIBFieldHandler constants: PLCFBTECHPX=12, STTBFFFN=15
+    private const int FibOffsetFcPlcfBteChpx   = 154 + 12 * 8;      // 250
+    private const int FibOffsetLcbPlcfBteChpx  = 154 + 12 * 8 + 4;  // 254
+    private const int FibOffsetFcSttbfffn       = 154 + 15 * 8;      // 274
+    private const int FibOffsetLcbSttbfffn      = 154 + 15 * 8 + 4;  // 278
 
     private byte[] _mainStream;
     private readonly CompoundFileDocument _fileSystem;
     private HWPFFileInformationBlock _fib;
     private HWPFTextModel _textModel;
     private string _text;
+    private string[] _fontTable = Array.Empty<string>();
+    private List<(int CpStart, int CpEnd, HWPFChpProperties Chp)> _chpSegments = new();
 
     public HWPFDocument(Stream stream)
     {
@@ -42,6 +50,8 @@ public sealed class HWPFDocument : IDisposable
         _fib = HWPFFileInformationBlock.Read(mainStream, streams);
         _textModel = ExtractTextModel(mainStream, _fib);
         _text = _textModel.Text;
+        _fontTable = ReadFontTable(mainStream, streams, _fib);
+        _chpSegments = ReadChpSegments(mainStream, _fib, _textModel, _fontTable);
     }
 
     /// <summary>
@@ -54,7 +64,7 @@ public sealed class HWPFDocument : IDisposable
     public int getCcpText() => _fib.CcpText;
 
     /// <summary>Returns the main document range. Ported from HWPFDocument.getRange().</summary>
-    public Range getRange() => new(0, _text.Length, _textModel);
+    public Range getRange() => new(0, _text.Length, _textModel, _chpSegments);
 
     /// <summary>Returns parsed File Information Block fields used by the current HWPF reader.</summary>
     public HWPFFileInformationBlock getFileInformationBlock() => _fib;
@@ -234,6 +244,134 @@ public sealed class HWPFDocument : IDisposable
         catch { /* skip corrupt pieces */ }
     }
 
+    // ─── CHPX / formatting ──────────────────────────────────────────────────────
+
+    private static string[] ReadFontTable(byte[] main, IReadOnlyDictionary<string, byte[]> streams, HWPFFileInformationBlock fib)
+    {
+        var fc = ReadInt32Safe(main, FibOffsetFcSttbfffn);
+        var lcb = ReadInt32Safe(main, FibOffsetLcbSttbfffn);
+        if (lcb <= 4 || fib.SelectedTableStream is null || fc < 0 || fc + lcb > fib.SelectedTableStream.Length)
+            return Array.Empty<string>();
+
+        var tbl = fib.SelectedTableStream.AsSpan(fc, lcb);
+        // STTBFFFN: short cstd | short cbExtra | FFN[0..cstd-1]
+        // FFN fixed header: cbFfnM1(1) + info(1) + wWeight(2) + chs(1) + ixchSzAlt(1) + panose(10) + fontSig(24) = 40 bytes
+        // Font name (Unicode, null-terminated) starts at offset 40 within each FFN
+        if (tbl.Length < 4) return Array.Empty<string>();
+        var cstd = BinaryPrimitives.ReadInt16LittleEndian(tbl);
+        if (cstd < 0 || cstd > 256) cstd = 16;
+        var pos = 4; // skip cstd + cbExtra
+        var names = new List<string>(cstd);
+        for (var i = 0; i < cstd && pos < tbl.Length; i++)
+        {
+            var cbFfnM1 = tbl[pos];
+            var ffnLen = cbFfnM1 + 1;
+            if (pos + ffnLen > tbl.Length) break;
+            const int nameOffset = 40; // fixed header size per POI Ffn.java
+            if (nameOffset < ffnLen)
+            {
+                var nameStart = pos + nameOffset;
+                var nameEnd = nameStart;
+                while (nameEnd + 1 < pos + ffnLen && !(tbl[nameEnd] == 0 && tbl[nameEnd + 1] == 0))
+                    nameEnd += 2;
+                names.Add(nameEnd > nameStart
+                    ? Encoding.Unicode.GetString(tbl.Slice(nameStart, nameEnd - nameStart).ToArray())
+                    : string.Empty);
+            }
+            else names.Add(string.Empty);
+            pos += ffnLen;
+        }
+        return names.ToArray();
+    }
+
+    /// <summary>
+    /// Reads all CHPFKP runs and returns a sorted list of (CP_start, CP_end, CHPX) segments.
+    /// Ported from org.apache.poi.hwpf.model.CHPBinTable / CHPFKP.
+    /// </summary>
+    private static List<(int CpStart, int CpEnd, HWPFChpProperties Chp)> ReadChpSegments(
+        byte[] main, HWPFFileInformationBlock fib, HWPFTextModel model, string[] fontTable)
+    {
+        var result = new List<(int, int, HWPFChpProperties)>();
+
+        var fcChpx = ReadInt32Safe(main, FibOffsetFcPlcfBteChpx);
+        var lcbChpx = ReadInt32Safe(main, FibOffsetLcbPlcfBteChpx);
+        if (lcbChpx <= 4 || fib.SelectedTableStream is null || fcChpx < 0 || fcChpx + lcbChpx > fib.SelectedTableStream.Length)
+            return result;
+
+        var tbl = fib.SelectedTableStream.AsSpan(fcChpx, lcbChpx);
+        var n = (lcbChpx - 4) / 8;
+        if (n <= 0) return result;
+
+        var fcStarts = new int[n + 1];
+        for (var i = 0; i <= n; i++)
+            fcStarts[i] = BinaryPrimitives.ReadInt32LittleEndian(tbl.Slice(i * 4));
+        var pages = new uint[n];
+        for (var i = 0; i < n; i++)
+            pages[i] = BinaryPrimitives.ReadUInt32LittleEndian(tbl.Slice((n + 1) * 4 + i * 4));
+
+        for (var pageIdx = 0; pageIdx < n; pageIdx++)
+        {
+            var pageOffset = (int)pages[pageIdx] * 512;
+            if (pageOffset < 0 || pageOffset + 512 > main.Length) continue;
+
+            var fkp = main.AsSpan(pageOffset, 512);
+            var crun = fkp[511];
+            if (crun == 0 || 4 * (crun + 1) > 512) continue;
+
+            var rgbOffset = 4 * (crun + 1);
+            for (var r = 0; r < crun; r++)
+            {
+                var runFcStart = BinaryPrimitives.ReadInt32LittleEndian(fkp.Slice(r * 4));
+                var runFcEnd   = BinaryPrimitives.ReadInt32LittleEndian(fkp.Slice((r + 1) * 4));
+
+                // Convert FC → CP using piece table
+                var cpStart = FcToCp(runFcStart, model);
+                var cpEnd   = FcToCp(runFcEnd,   model);
+                if (cpStart < 0 || cpEnd <= cpStart) continue;
+
+                HWPFChpProperties chp;
+                var chpxByteOff = fkp[rgbOffset + r];
+                if (chpxByteOff == 0)
+                {
+                    chp = HWPFChpProperties.Default;
+                }
+                else
+                {
+                    var chpxAbsolute = chpxByteOff * 2;
+                    if (chpxAbsolute >= 512) { chp = HWPFChpProperties.Default; }
+                    else
+                    {
+                        var cbChpx = fkp[chpxAbsolute];
+                        if (chpxAbsolute + 1 + cbChpx > 512) { chp = HWPFChpProperties.Default; }
+                        else chp = HWPFChpProperties.ParseChpx(fkp.Slice(chpxAbsolute + 1, cbChpx), fontTable);
+                    }
+                }
+                result.Add((cpStart, cpEnd, chp));
+            }
+        }
+        result.Sort((a, b) => a.Item1.CompareTo(b.Item1));
+        return result;
+    }
+
+    private static int FcToCp(int fc, HWPFTextModel model)
+    {
+        foreach (var piece in model.Pieces)
+        {
+            int pieceByteLen = piece.Compressed ? (piece.End - piece.Start) : (piece.End - piece.Start) * 2;
+            int pieceFileEnd = piece.FileOffset + pieceByteLen;
+            if (fc < piece.FileOffset || fc > pieceFileEnd) continue;
+            int offsetFromStart = fc - piece.FileOffset;
+            int cpOffset = piece.Compressed ? offsetFromStart : offsetFromStart / 2;
+            return piece.Start + cpOffset;
+        }
+        return -1;
+    }
+
+    // Keep for backward compat — now unused internally
+    private static HWPFChpProperties[] ReadPieceChpProps(
+        byte[] main, HWPFFileInformationBlock fib, HWPFTextModel model, string[] fontTable)
+        => Array.Empty<HWPFChpProperties>();
+
     private static int ReadInt32(byte[] data, int offset) =>
         BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(offset));
 
@@ -339,12 +477,15 @@ public sealed class HWPFDocument : IDisposable
 public class Range
 {
     private readonly HWPFTextModel _model;
+    internal readonly List<(int CpStart, int CpEnd, HWPFChpProperties Chp)> _chpSegments;
     private IReadOnlyList<Paragraph>? _paragraphs;
     private IReadOnlyList<CharacterRun>? _characterRuns;
 
-    internal Range(int start, int end, HWPFTextModel model)
+    internal Range(int start, int end, HWPFTextModel model,
+        List<(int CpStart, int CpEnd, HWPFChpProperties Chp)>? chpSegments = null)
     {
         _model = model;
+        _chpSegments = chpSegments ?? new List<(int, int, HWPFChpProperties)>();
         Start = Clamp(start, 0, model.Text.Length);
         End = Clamp(end, Start, model.Text.Length);
     }
@@ -377,12 +518,12 @@ public class Range
         for (var i = Start; i < End; i++)
         {
             if (!IsParagraphTerminator(text[i])) continue;
-            paragraphs.Add(new Paragraph(paragraphStart, i + 1, _model));
+            paragraphs.Add(new Paragraph(paragraphStart, i + 1, _model, _chpSegments));
             paragraphStart = i + 1;
         }
 
         if (paragraphStart < End || paragraphs.Count == 0 && Start == End)
-            paragraphs.Add(new Paragraph(paragraphStart, End, _model));
+            paragraphs.Add(new Paragraph(paragraphStart, End, _model, _chpSegments));
 
         _paragraphs = paragraphs;
         return _paragraphs;
@@ -393,19 +534,52 @@ public class Range
         if (_characterRuns is not null) return _characterRuns;
 
         var runs = new List<CharacterRun>();
-        foreach (var piece in _model.Pieces)
+        if (_chpSegments.Count > 0)
         {
-            var start = Math.Max(Start, piece.Start);
-            var end = Math.Min(End, piece.End);
-            if (start < end)
-                runs.Add(new CharacterRun(start, end, _model, piece));
+            // Build runs from CHPFKP segment boundaries intersected with this Range,
+            // filling gaps with default-properties runs so that all text is covered.
+            var cursor = Start;
+            foreach (var seg in _chpSegments)
+            {
+                var segStart = Math.Max(Start, seg.CpStart);
+                var segEnd   = Math.Min(End, seg.CpEnd);
+                if (segStart >= End) break;
+                if (segEnd <= Start) continue;
+                // Fill gap before this segment
+                if (cursor < segStart)
+                    runs.Add(new CharacterRun(cursor, segStart, _model, FindPiece(cursor), HWPFChpProperties.Default));
+                // Add this segment
+                runs.Add(new CharacterRun(segStart, segEnd, _model, FindPiece(segStart), seg.Chp));
+                cursor = Math.Max(cursor, segEnd);
+            }
+            // Fill gap after last segment
+            if (cursor < End)
+                runs.Add(new CharacterRun(cursor, End, _model, FindPiece(cursor), HWPFChpProperties.Default));
+        }
+        else
+        {
+            // Fallback: one run per text piece
+            foreach (var piece in _model.Pieces)
+            {
+                var start = Math.Max(Start, piece.Start);
+                var end = Math.Min(End, piece.End);
+                if (start < end)
+                    runs.Add(new CharacterRun(start, end, _model, piece, HWPFChpProperties.Default));
+            }
         }
 
         if (runs.Count == 0 && Start < End)
-            runs.Add(new CharacterRun(Start, End, _model, null));
+            runs.Add(new CharacterRun(Start, End, _model, null, HWPFChpProperties.Default));
 
         _characterRuns = runs;
         return _characterRuns;
+    }
+
+    private HWPFTextPiece? FindPiece(int cpStart)
+    {
+        foreach (var piece in _model.Pieces)
+            if (cpStart >= piece.Start && cpStart < piece.End) return piece;
+        return null;
     }
 
     private static bool IsParagraphTerminator(char ch) =>
@@ -421,8 +595,9 @@ public class Range
 /// <summary>Minimal read-only port of org.apache.poi.hwpf.usermodel.Paragraph.</summary>
 public sealed class Paragraph : Range
 {
-    internal Paragraph(int start, int end, HWPFTextModel model)
-        : base(start, end, model)
+    internal Paragraph(int start, int end, HWPFTextModel model,
+        List<(int CpStart, int CpEnd, HWPFChpProperties Chp)>? chpSegments = null)
+        : base(start, end, model, chpSegments)
     {
     }
 
@@ -439,24 +614,27 @@ public sealed class Paragraph : Range
 public sealed class CharacterRun : Range
 {
     private readonly HWPFTextPiece? _piece;
+    private readonly HWPFChpProperties _chp;
 
-    internal CharacterRun(int start, int end, HWPFTextModel model, HWPFTextPiece? piece)
-        : base(start, end, model)
+    internal CharacterRun(int start, int end, HWPFTextModel model, HWPFTextPiece? piece, HWPFChpProperties chp)
+        : base(start, end, model, null)
     {
         _piece = piece;
+        _chp = chp;
     }
 
-    public bool isBold() => false;
+    public bool isBold() => _chp.Bold;
 
-    public bool isItalic() => false;
+    public bool isItalic() => _chp.Italic;
 
-    public bool isStrikeThrough() => false;
+    public bool isStrikeThrough() => _chp.Strike;
 
-    public int getUnderlineCode() => 0;
+    public int getUnderlineCode() => _chp.Underline;
 
-    public int getFontSize() => 0;
+    /// <summary>Font size in half-points (e.g., 22 = 11pt). Returns 0 if unknown.</summary>
+    public int getFontSize() => _chp.FontSizeHalfPoints;
 
-    public string getFontName() => string.Empty;
+    public string getFontName() => _chp.FontName;
 
     public bool isCompressed() => _piece?.Compressed ?? false;
 }
@@ -552,6 +730,69 @@ public sealed class HWPFFileInformationBlock
             selectedTableStreamName,
             usedFallback,
             tableStream);
+    }
+}
+
+/// <summary>Character properties parsed from CHPX sprms.</summary>
+internal sealed class HWPFChpProperties
+{
+    internal static HWPFChpProperties Default { get; } = new();
+
+    internal bool Bold { get; set; }
+    internal bool Italic { get; set; }
+    internal bool Strike { get; set; }
+    internal byte Underline { get; set; }
+    internal int FontSizeHalfPoints { get; set; } // 0 = unknown
+    internal string FontName { get; set; } = string.Empty;
+
+    internal static HWPFChpProperties ParseChpx(ReadOnlySpan<byte> chpx, string[] fontTable)
+    {
+        var props = new HWPFChpProperties();
+        var pos = 0;
+        while (pos + 2 <= chpx.Length)
+        {
+            var sprm = BinaryPrimitives.ReadUInt16LittleEndian(chpx.Slice(pos));
+            pos += 2;
+            // spra = bits 13-15 of sprm
+            var spra = (sprm >> 13) & 0x07;
+            int opSize;
+            switch (spra)
+            {
+                case 0: case 1: opSize = 1; break;
+                case 2: case 4: opSize = 2; break;
+                case 3: opSize = 4; break;
+                case 7: opSize = 3; break;
+                case 5: // variable: cbGrpprl byte + cbGrpprl bytes
+                    opSize = pos < chpx.Length ? chpx[pos] + 1 : 0;
+                    break;
+                case 6: // variable complex
+                    opSize = pos < chpx.Length ? chpx[pos] + 1 : 0;
+                    break;
+                default: return props; // unknown
+            }
+            if (pos + opSize > chpx.Length) break;
+            var operand = chpx.Slice(pos, opSize);
+            pos += opSize;
+
+            switch (sprm)
+            {
+                case 0x0835: props.Bold = operand[0] != 0 && operand[0] != 128; break; // sprmCFBold
+                case 0x0836: props.Italic = operand[0] != 0 && operand[0] != 128; break; // sprmCFItalic
+                case 0x0837: props.Strike = operand[0] != 0 && operand[0] != 128; break; // sprmCFStrike
+                case 0x2A3E: props.Underline = operand[0]; break; // sprmCKul
+                case 0x4A43: // sprmCHps: font size in half-points
+                    props.FontSizeHalfPoints = BinaryPrimitives.ReadUInt16LittleEndian(operand);
+                    break;
+                case 0x4A4F: case 0x4A51: case 0x4A53: // sprmCRgFtc0/1/2: font index
+                    if (sprm == 0x4A4F) // ASCII font
+                    {
+                        var idx = BinaryPrimitives.ReadUInt16LittleEndian(operand);
+                        if (idx < fontTable.Length) props.FontName = fontTable[idx];
+                    }
+                    break;
+            }
+        }
+        return props;
     }
 }
 

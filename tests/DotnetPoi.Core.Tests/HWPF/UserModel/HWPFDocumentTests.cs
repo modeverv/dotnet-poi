@@ -322,6 +322,56 @@ public class HWPFDocumentTests
     }
 
     [Fact]
+    public void Phase13Chpx_SampleDoc_ReturnsFormattingFromChpfkp()
+    {
+        // Phase 13 item 3: CHPX formatting from CHPFKP
+        // SampleDoc.doc para 6 = "It’s Arial Black in 16 point"
+        // POI TestRangeProperties expects: font="Arial Black", fontSize=32 (half-points)
+        using var stream = File.OpenRead("hwpf-fixtures/SampleDoc.doc");
+        using var doc = new HWPFDocument(stream);
+        var range = doc.getRange();
+
+        // Find the paragraph with "Arial Black" text
+        CharacterRun? arialBlackRun = null;
+        for (int i = 0; i < range.numParagraphs(); i++)
+        {
+            var para = range.getParagraph(i);
+            for (int j = 0; j < para.numCharacterRuns(); j++)
+            {
+                var run = para.getCharacterRun(j);
+                if (run.getFontName() == "Arial Black" || run.getFontSize() == 32)
+                {
+                    arialBlackRun = run;
+                    break;
+                }
+            }
+            if (arialBlackRun is not null) break;
+        }
+
+        Assert.NotNull(arialBlackRun);
+        Assert.Equal("Arial Black", arialBlackRun!.getFontName());
+        Assert.Equal(32, arialBlackRun.getFontSize()); // 32 half-points = 16pt
+    }
+
+    [Fact]
+    public void Phase13Chpx_SampleDoc_DefaultRunHasNoExplicitFormatting()
+    {
+        // Phase 13 item 3: runs with no explicit CHPX have default (0/empty) properties
+        using var stream = File.OpenRead("hwpf-fixtures/SampleDoc.doc");
+        using var doc = new HWPFDocument(stream);
+        var range = doc.getRange();
+
+        // Paragraph 0: "I am a test document" — no explicit font/size in CHPX
+        var para0 = range.getParagraph(0);
+        Assert.True(para0.numCharacterRuns() >= 1);
+        var run0 = para0.getCharacterRun(0);
+        Assert.Equal("I am a test document\r", run0.text());
+        // Default run has no explicit font/size from CHPX (uses style sheet defaults)
+        Assert.False(run0.isBold());
+        Assert.False(run0.isItalic());
+    }
+
+    [Fact]
     public void Phase13LimitedEdit_AppendParagraph_RoundTripsText()
     {
         using var sourceStream = File.OpenRead("hwpf-fixtures/SampleDoc.doc");

@@ -30,4 +30,17 @@ public sealed class HSSFDataFormat : IDataFormat
 
     public string? getFormat(short index) =>
         _formatsByIndex.TryGetValue(index, out var fmt) ? fmt : null;
+
+    internal void AddBiffFormat(short index, string format)
+    {
+        if (!_formatsByIndex.ContainsKey(index))
+        {
+            _formatsByIndex[index] = format;
+            _formatsByString[format] = index;
+            if (index >= _nextCustomIndex) _nextCustomIndex = (short)(index + 1);
+        }
+    }
+
+    internal IEnumerable<KeyValuePair<short, string>> GetUserDefinedFormats() =>
+        _formatsByIndex.Where(kv => kv.Key >= 164);
 }

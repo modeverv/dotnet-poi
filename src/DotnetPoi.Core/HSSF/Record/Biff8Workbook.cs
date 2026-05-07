@@ -23,6 +23,7 @@ internal static class Biff8Workbook
     private const ushort CodePage = 0x0042;
     private const ushort Window1 = 0x003D;
     private const ushort FontRecord = 0x0031;
+    private const ushort FormatRecord = 0x041E;
     private const ushort XfRecord = 0x00E0;
     private const ushort RowRecord = 0x0208;
     private const ushort ColInfo = 0x007D;
@@ -46,6 +47,9 @@ internal static class Biff8Workbook
                     if (fontCount == 4) { workbook.AddFontFromBiff(new HSSFFont(4)); fontCount++; }
                     workbook.AddFontFromBiff(ReadFont(record.Data, fontCount));
                     fontCount++;
+                    break;
+                case FormatRecord:
+                    ReadFormatRecord(workbook, record.Data);
                     break;
                 case XfRecord:
                     // XF indices 0-14 are style XF (parent styles), 15+ are cell XF
@@ -74,6 +78,42 @@ internal static class Biff8Workbook
         {
             var sheet = workbook.createSheet(boundSheet.Name);
             ReadSheet(records, boundSheet.Offset, sheet, sharedStrings);
+        }
+    }
+
+    private static void ReadFormatRecord(HSSFWorkbook workbook, ReadOnlySpan<byte> data)
+    {
+        if (data.Length < 5) return;
+        var index = BinaryPrimitives.ReadInt16LittleEndian(data);
+        var len = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(2));
+        var unicode = data[4] != 0;
+        var byteCount = len * (unicode ? 2 : 1);
+        if (data.Length < 5 + byteCount) return;
+        var format = unicode
+            ? Encoding.Unicode.GetString(data.Slice(5, byteCount).ToArray())
+            : Encoding.GetEncoding("ISO-8859-1").GetString(data.Slice(5, byteCount).ToArray());
+        workbook.GetOrCreateDataFormat().AddBiffFormat(index, format);
+    }
+
+    private static void WriteFormatRecords(Stream stream, HSSFWorkbook workbook)
+    {
+        foreach (var kv in workbook.GetOrCreateDataFormat().GetUserDefinedFormats())
+        {
+            var idx = kv.Key;
+            var format = kv.Value;
+            WriteRecord(stream, FormatRecord, payload =>
+            {
+                Span<byte> header = stackalloc byte[4];
+                BinaryPrimitives.WriteInt16LittleEndian(header, idx);
+                BinaryPrimitives.WriteUInt16LittleEndian(header.Slice(2), (ushort)Math.Min(format.Length, ushort.MaxValue));
+                payload.Write(header.ToArray(), 0, header.Length);
+                var compressed = format.All(ch => ch <= 0x00FF);
+                payload.WriteByte(compressed ? (byte)0 : (byte)1);
+                var bytes = compressed
+                    ? Encoding.GetEncoding("ISO-8859-1").GetBytes(format)
+                    : Encoding.Unicode.GetBytes(format);
+                payload.Write(bytes, 0, bytes.Length);
+            });
         }
     }
 
@@ -179,6 +219,9 @@ internal static class Biff8Workbook
 
         // Write Font records: 4 defaults + user-defined fonts
         WriteFontRecords(stream, workbook);
+
+        // Write user-defined FormatRecord entries (index >= 164)
+        WriteFormatRecords(stream, workbook);
 
         // Write 15 built-in style XF + user cell XF records
         WriteXfRecords(stream, workbook);

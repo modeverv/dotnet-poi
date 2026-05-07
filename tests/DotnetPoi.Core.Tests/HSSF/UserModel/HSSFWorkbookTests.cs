@@ -134,6 +134,44 @@ public sealed class HSSFWorkbookTests
     }
 
     [Fact]
+    public void Write_UserDefinedNumberFormat_RoundTrip()
+    {
+        // Phase 12 item 4: FormatRecord (0x041E) round-trip
+        using var workbook = new HSSFWorkbook();
+        var df = workbook.createDataFormat();
+        var fmtIdx1 = df.getFormat("0.000");
+        var fmtIdx2 = df.getFormat("yyyy-mm-dd");
+        var fmtIdx3 = df.getFormat("#,##0.00 \"€\"");
+
+        var style = workbook.createCellStyle();
+        style.setDataFormat(fmtIdx2);
+
+        var sheet = workbook.createSheet("Formats");
+        var row = sheet.createRow(0);
+        var cell = row.createCell(0);
+        cell.setCellValue(44927.0); // numeric date
+        cell.setCellStyle(style);
+
+        using var ms = new MemoryStream();
+        workbook.write(ms);
+        ms.Position = 0;
+
+        using var read = new HSSFWorkbook(ms);
+        var rDf = read.createDataFormat();
+
+        // Custom formats must survive round-trip
+        Assert.Equal("0.000", rDf.getFormat(fmtIdx1));
+        Assert.Equal("yyyy-mm-dd", rDf.getFormat(fmtIdx2));
+        Assert.Equal("#,##0.00 \"€\"", rDf.getFormat(fmtIdx3));
+
+        // Cell style should reference the correct format
+        var rCell = read.getSheetAt(0).getRow(0)!.getCell(0)!;
+        var rStyle = (HSSFCellStyle)rCell.getCellStyle();
+        Assert.Equal(fmtIdx2, rStyle.getDataFormat());
+        Assert.Equal("yyyy-mm-dd", rStyle.getDataFormatString());
+    }
+
+    [Fact]
     public void Write_AllCellTypes_RoundTrip()
     {
         // Phase 12 item 3: C# round-trip for all 5 cell types

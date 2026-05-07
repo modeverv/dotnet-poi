@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.extractor.WordExtractor;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -135,6 +137,23 @@ public class ReadFromDotnetTest {
             assertEquals(3, merged.getLastRow());
             assertEquals(0, merged.getFirstColumn());
             assertEquals(2, merged.getLastColumn());
+        }
+    }
+
+    @Test
+    void readPhase13NoOpDoc() throws IOException {
+        // Phase 13 item 4: Direction B — Java POI reads dotnet-poi no-op saved .doc
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase13-noop-sample.doc");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase13NoOpDoc_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HWPFDocument doc = new HWPFDocument(input)) {
+            WordExtractor extractor = new WordExtractor(doc);
+            String text = extractor.getText();
+            assertNotNull(text);
+            assertTrue(text.length() > 0, "Document text should be non-empty.");
+            assertTrue(text.contains("I am a test document") || text.contains("test document"),
+                "Document text should contain expected content.");
         }
     }
 

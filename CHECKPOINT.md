@@ -1,5 +1,26 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — Phase 12/13 remaining items + Phase 14 structure debt
+
+- Task: Phase 12/13 の未完了・部分完了アイテムを全て対応し、Phase 14 として構造的負債をリストアップ。
+- Completed:
+  - **Phase 12 item 4 FormatRecord**: `Biff8Workbook` に FormatRecord (0x041E) read/write を実装。`HSSFDataFormat.AddBiffFormat` / `GetUserDefinedFormats` を追加。user-defined formats が write → read で round-trip することをテスト固定。
+  - **Phase 13 item 3 CHPX formatting**: `HWPFDocument` に CHPBinTable → CHPFKP → CHPX sprm 解析を実装。`ReadChpSegments()` が FC→CP 変換を行い、全 CP 範囲に CHPX プロパティをマップ。`HWPFChpProperties.ParseChpx()` で sprmCFBold/sprmCFItalic/sprmCFStrike/sprmCKul/sprmCHps/sprmCRgFtc0 を解析。`ReadFontTable()` の STTBFFFN 名前オフセットを 26→40 (POI Ffn.java に合わせた正確な値) に修正。CharacterRun.isBold/isItalic/getFontSize/getFontName が実際の CHPX 値を返すようになった。SampleDoc.doc の Arial Black 16pt が size=32, font="Arial Black" として読み取れることを確認・テスト固定。
+  - **Phase 13 item 3 Unicode string assertions**: `Phase13Chpx_SampleDoc_ReturnsFormattingFromChpfkp` / `Phase13Chpx_SampleDoc_DefaultRunHasNoExplicitFormatting` テストを追加し、formatting 値と default run 挙動を固定。
+  - **Phase 13 item 4 Java POI Direction B smoke**: `Write_Phase13NoOpDoc_CreatesFixtureForPoi` (C# side) と `readPhase13NoOpDoc` (Java side) を追加。pom.xml に poi-scratchpad 依存を追加。Java POI の WordExtractor で dotnet-poi no-op 保存 .doc を読み取り確認済み。
+  - **Phase 13 item 5 round-trip tests**: HSSF compile error 解消後に全テスト通過確認。append paragraph / replace text の round-trip tests が 57 passed で安定。
+  - **Phase 14 構造的負債リスト**: agents.md に Phase 14 を追加し、Phase 12/13 での POI 乖離 12 点 (HSSF 7点 + HWPF 5点) を TODO としてリストアップ。
+- Test counts after this session:
+  - HWPFDocumentTests: 57 passed (+2 CHPX tests added)
+  - HSSFWorkbookTests: 35 passed (+1 FormatRecord test added)
+  - Interop tests: Phase 13 Direction B 1 test added
+- Key limitation (Phase 14 target):
+  - CharacterRun のスタイルシート default values (font/size が CHPX に明示されない run は size=0/font="" を返す)
+  - HSSF: POI と同じ 21 built-in XF records を書いていない (15 のみ)
+  - HSSF: FormatRecord で built-in 8 formats を書いていない
+  - HSSF: StyleRecord を書いていない
+  - HWPF: PAPX (paragraph properties) 未実装
+
 ## 2026-05-07 JST — Phase 12 item 4 completed: style/layout BIFF records
 
 - Task: Phase 12 実装順 4「style / layout の順に、帳票で効く機能から追加する」の主要サブタスクを完了。
