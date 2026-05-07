@@ -42,3 +42,5 @@ __pycache__
 999_gabage/*
 
 tmp-*
+.m2-repo
+
