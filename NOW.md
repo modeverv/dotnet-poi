@@ -143,11 +143,20 @@
 
 ---
 
-### ppt / HSLF
+### ppt / HSLF（~12%）
 
-| フォーマット | 状態 | 備考 |
-|---|---|---|
-| ppt (HSLF) | ~5% | 同上 |
+| カテゴリ | 機能 | 状態 | 備考 |
+|---|---|---|---|
+| **読み込み** | OLE2 `.ppt` オープン / stream inventory | ✅ | PowerPoint Document, Current User, summary streams 検出 |
+| **レコードツリー** | record header (recType/recInstance/recLen/offset/raw bytes) | ✅ | container/atom 階層を保持。unknown record を保持 |
+| **スライド** | slide count / slide order (persist pointer) | ✅ | 13 fixture survey 完了。incorrect_slide_order.ppt で正しい順序 |
+| **テキスト** | TextCharsAtom / TextBytesAtom 抽出 | ✅ | UTF-16LE / CP1252 対応。title/body 分離 (TextHeaderAtom) |
+| 〃 | 中国語・空テキストボックス・複数テキストブロック | ⚠️ 一部対応 | 例外は出さない。文字化けや欠損は fixture 依存で要改善 |
+| **編集** | no-op write / round-trip | ✅ | CompoundFile.Write で OLE2 を byte-for-byte 保持 |
+| **Preservation** | OLE stream/storage / 画像 / コメント / OLE | ✅ | RoundTrip_NoOpWrite_PreservesSpecialStreams で確認 |
+| **互換性** | C# round-trip tests | ✅ | 124 HSLF test methods (survey + stream + record + persist + text + write) |
+| 〃 | Java POI interop Direction B | ⚠️ C#側完了 | `Write_Phase15HslfNoOp_CreatesFixtureForPoi` 追加済。Java 側 test は未追加 |
+| **未対応** | スライド作成/図形編集/画像追加/ヘッダーフッター/アニメーション | ❌ | 編集は no-op 保存のみ。新規作成は不可 |
 
 ---
 
@@ -177,7 +186,7 @@
 | # | 欠損 | 理由 |
 |---|---|---|
 | 10 | SmartArt / アニメーション / トランジション | pptx で新規作成できないが、不明パーツ保存で維持される。プログラマティックに生成するユースケースは稀。 |
-| 11 | ppt（HSLF）と xls/doc の未対応深部 | レガシー形式。HSSF/HWPF は基礎対応が進んだが、画像・図形・高度な書式・完全編集はまだ重い。新規開発はほぼ OOXML で行われる。 |
+| 11 | ppt（HSLF）と xls/doc の未対応深部 | HSLF は open/text extraction/no-op preservation/round-trip まで対応済。スライド作成・図形編集・画像追加は未対応。HSSF/HWPF も基礎対応は進んだが、画像・図形・高度な書式・完全編集はまだ重い。新規開発はほぼ OOXML で行われる。 |
 | 12 | 変更履歴 / スパークライン | 特殊用途または複雑すぎる。最初の round-trip 対象としては重い。 |
 
 ---
@@ -186,12 +195,14 @@
 
 | プロジェクト | テスト数 | 備考 |
 |---|---|---|
-| Core.Tests | 244 | POI実ファイルpreservation検証テスト(+4: pptxグループ化, xlsxオートシェイプ, docxヘッダ・フッター, docx SDT, docx floating images)を含む |
+| Ooxml.Tests | 262 | POI実ファイルpreservation検証テストを含む |
+| Legacy.Tests | 221 | HWPF (97) + HSLF (124) |
 | Formula.Tests | 10 | 数式評価エンジンは未実装のため最小限 |
-| Interop.Tests (C#) | 55 | 双方向 interop fixture 検証 + preservation tests（auto filter/protection/active sheet/docx fields 追加） |
-| **Total (C#)** | **309** | |
-| Java POI 側 (Maven) | 44 tests | うち dotnet-poi 関連 24 tests（auto filter/protection/active sheet/docx fields 追加） |
+| All.Tests | 7 | 全体 smoke test |
+| Interop.Tests (C#) | 71 | 双方向 interop fixture 検証 (69 pass + 2 skip) |
+| **Total (C#)** | **571** | |
+| Java POI 側 (Maven) | 44 tests | うち dotnet-poi 関連 24 tests |
 
 ---
 
-*最終更新: 2026-05-07*
+*最終更新: 2025-06-22*

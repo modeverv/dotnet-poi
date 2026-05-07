@@ -480,6 +480,31 @@ public class ReadPoiGeneratedTests
         }
     }
 
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "Legacy")]
+    public void Read_Phase15HslfSampleShow_GeneratedByPoi()
+    {
+        // Phase 15: Direction A — Java POI writes a .ppt → dotnet-poi reads
+        var fixturePath = GetFixturePath("phase15-hslf-sample.ppt");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest#writePhase15HslfSampleShow before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var prs = new DotnetPoi.HSLF.UserModel.HSLFSlideShow(stream);
+        Assert.NotNull(prs);
+
+        var slides = prs.getSlides();
+        Assert.True(slides.Count >= 2, "Should have at least 2 slides.");
+
+        // Verify text extraction works — fixture uses basic_test_ppt_file.ppt as template
+        // (Java POI's HSLFTextParagraph.setText() modifies shape-level text but not SLWT atoms)
+        if (slides.Count >= 1)
+        {
+            var slide0Text = slides[0].getTitle();
+            Assert.Contains("This is a test title", slide0Text);
+        }
+    }
+
     private static string GetFixturePath(string fileName)
     {
         var directory = AppContext.BaseDirectory;

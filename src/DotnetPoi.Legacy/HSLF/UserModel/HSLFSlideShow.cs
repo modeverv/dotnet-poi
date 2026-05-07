@@ -18,12 +18,13 @@ public sealed class HSLFSlideShow : IDisposable
     private const string StreamPowerPointDocument = "PowerPoint Document";
 
     // Record type constants from RecordTypes.java
-    internal const ushort RecTypeSlide          = 1006;
-    internal const ushort RecTypeSlidePersistAtom = 1011;
+    internal const ushort RecTypeSlide             = 1006;
+    internal const ushort RecTypeSlidePersistAtom  = 1011;
     internal const ushort RecTypeSlideListWithText = 4080;
-    internal const ushort RecTypeTextCharsAtom  = 4000;  // UTF-16LE text
-    internal const ushort RecTypeTextBytesAtom  = 4008;  // CP1252 text
-    internal const byte   ContainerVersionFlag  = 0x0F;  // low nibble of verAndInstance
+    internal const ushort RecTypeTextHeaderAtom    = 3999;
+    internal const ushort RecTypeTextCharsAtom     = 4000;  // UTF-16LE text
+    internal const ushort RecTypeTextBytesAtom     = 4008;  // CP1252 text
+    internal const byte   ContainerVersionFlag     = 0x0F;  // low nibble of verAndInstance
 
     private readonly CompoundFileDocument _fileSystem;
     private readonly IReadOnlyList<HSLFRecord> _topLevelRecords;
@@ -89,6 +90,16 @@ public sealed class HSLFSlideShow : IDisposable
     public byte[]? getStreamBytes(string name) =>
         _fileSystem.Streams.TryGetValue(name, out var data) ? data : null;
 
+    /// <summary>
+    /// No-op write: preserves all OLE2 streams byte-for-byte without modifying
+    /// the PowerPoint Document stream.
+    /// </summary>
+    public void write(Stream stream)
+    {
+        Guard.ThrowIfNull(stream, nameof(stream));
+        CompoundFile.Write(stream, _fileSystem);
+    }
+
     public void Dispose() { }
 
     /// <summary>
@@ -107,8 +118,9 @@ public sealed class HSLFSlideShow : IDisposable
     /// 5. For each SlideAtomsSet in order:
     ///    - Read refID from SlidePersistAtom
     ///    - Extract text from TextBytesAtom/TextCharsAtom
+    ///    - Read TextHeaderAtom type to classify title vs body vs notes
     ///    - Try to find matching Slide (1006) via persist map
-    ///    - Create HSLFSlide with the text (no text in Slide container tree)
+    ///    - Create HSLFSlide with typed text blocks
     /// 6. Fall back to record-appearance order if the SLWT-based approach fails
     /// </summary>
     private void BuildSlidesWithPersistPointers()
@@ -189,16 +201,34 @@ public sealed class HSLFSlideShow : IDisposable
         // Step 6: For each SlideAtomsSet in SLWT order, create HSLFSlide
         foreach (var (refId, textBlocks) in slideSets)
         {
-            // Extract text from the SLWT text blocks (the actual text lives here)
-            var slideTexts = new List<string>();
+            // Extract text blocks with their TextHeaderAtom type
+            var slideBlocks = new List<HSLFTextBlock>();
+            TextPlaceholderType currentType = TextPlaceholderType.Body; // default
+
             foreach (var block in textBlocks)
             {
                 if (block is HSLFRecordAtom atom)
                 {
-                    if (atom.RecType == RecTypeTextBytesAtom && atom.Body.Length >= 1)
-                        slideTexts.Add(LocaleUtil1252Hslf.GetString(atom.Body));
+                    if (atom.RecType == RecTypeTextHeaderAtom && atom.Body.Length >= 4)
+                    {
+                        // TextHeaderAtom stores the text type as a 4-byte int32
+                        int rawType = BinaryPrimitives.ReadInt32LittleEndian(atom.Body.Slice(0, 4));
+                        currentType = (TextPlaceholderType)rawType;
+                    }
+                    else if (atom.RecType == RecTypeTextBytesAtom && atom.Body.Length >= 1)
+                    {
+                        string text = LocaleUtil1252Hslf.GetString(atom.Body);
+                        slideBlocks.Add(new HSLFTextBlock(text, currentType));
+                        // After a text atom, reset type to Body (next text without explicit header
+                        // is assumed body)
+                        currentType = TextPlaceholderType.Body;
+                    }
                     else if (atom.RecType == RecTypeTextCharsAtom && atom.Body.Length >= 2)
-                        slideTexts.Add(Encoding.Unicode.GetString(atom.Body.ToArray()));
+                    {
+                        string text = Encoding.Unicode.GetString(atom.Body.ToArray());
+                        slideBlocks.Add(new HSLFTextBlock(text, currentType));
+                        currentType = TextPlaceholderType.Body;
+                    }
                 }
             }
 
@@ -208,7 +238,7 @@ public sealed class HSLFSlideShow : IDisposable
                 usedOffsets.Add(offset);
             }
 
-            _slides.Add(new HSLFSlide(slideTexts));
+            _slides.Add(new HSLFSlide(slideBlocks));
         }
 
         // Append any Slide records not referenced by persist pointers
@@ -217,9 +247,9 @@ public sealed class HSLFSlideShow : IDisposable
         {
             if (!usedOffsets.Contains(kv.Key))
             {
-                var slideTexts = new List<string>();
-                ExtractTextsFromTree(kv.Value, slideTexts);
-                _slides.Add(new HSLFSlide(slideTexts));
+                var slideBlocks = new List<HSLFTextBlock>();
+                ExtractBlocksFromTree(kv.Value, slideBlocks);
+                _slides.Add(new HSLFSlide(slideBlocks));
             }
         }
     }
@@ -271,9 +301,9 @@ public sealed class HSLFSlideShow : IDisposable
     {
         if (record.IsContainer && record.RecType == RecTypeSlide)
         {
-            var slideTexts = new List<string>();
-            ExtractTextsFromTree(record, slideTexts);
-            _slides.Add(new HSLFSlide(slideTexts));
+            var slideBlocks = new List<HSLFTextBlock>();
+            ExtractBlocksFromTree(record, slideBlocks);
+            _slides.Add(new HSLFSlide(slideBlocks));
         }
 
         if (record.Children is not null)
@@ -369,6 +399,74 @@ public sealed class HSLFSlideShow : IDisposable
                 ExtractTextsFromTree(child, texts);
         }
     }
+
+    /// <summary>
+    /// Extracts typed text blocks from a record tree (used for fallback slides).
+    /// Without a TextHeaderAtom context, blocks are assumed Body type.
+    /// </summary>
+    private static void ExtractBlocksFromTree(HSLFRecord record, List<HSLFTextBlock> blocks)
+    {
+        if (record is HSLFRecordAtom atom)
+        {
+            switch (atom.RecType)
+            {
+                case RecTypeTextCharsAtom:
+                    if (atom.Body.Length >= 2)
+                        blocks.Add(new HSLFTextBlock(
+                            Encoding.Unicode.GetString(atom.Body.ToArray()),
+                            TextPlaceholderType.Body));
+                    break;
+
+                case RecTypeTextBytesAtom:
+                    if (atom.Body.Length >= 1)
+                        blocks.Add(new HSLFTextBlock(
+                            LocaleUtil1252Hslf.GetString(atom.Body),
+                            TextPlaceholderType.Body));
+                    break;
+            }
+        }
+
+        if (record.Children is not null)
+        {
+            foreach (var child in record.Children)
+                ExtractBlocksFromTree(child, blocks);
+        }
+    }
+}
+
+/// <summary>
+/// Identifies the type of a text block on a slide, matching POI's
+/// TextHeaderAtom.rtCharsType / TextPlaceholder constants.
+/// </summary>
+public enum TextPlaceholderType
+{
+    Title       = 0,
+    Body        = 1,
+    Notes       = 2,
+    Other       = 3,
+    CenterBody  = 5,
+    CenterTitle = 6,
+    HalfBody    = 7,
+    QuarterBody = 8,
+}
+
+/// <summary>
+/// Represents a single text block on a slide, with its type from TextHeaderAtom.
+/// Ported from org.apache.poi.hslf.record.TextHeaderAtom.
+/// </summary>
+public sealed class HSLFTextBlock
+{
+    internal HSLFTextBlock(string text, TextPlaceholderType type)
+    {
+        Text = text ?? string.Empty;
+        Type = type;
+    }
+
+    /// <summary>The decoded text content.</summary>
+    public string Text { get; }
+
+    /// <summary>The placeholder type (title, body, notes, etc.).</summary>
+    public TextPlaceholderType Type { get; }
 }
 
 /// <summary>
@@ -377,18 +475,39 @@ public sealed class HSLFSlideShow : IDisposable
 /// </summary>
 public sealed class HSLFSlide
 {
-    private readonly IReadOnlyList<string> _texts;
+    private readonly IReadOnlyList<HSLFTextBlock> _textBlocks;
 
-    internal HSLFSlide(IReadOnlyList<string> texts)
+    internal HSLFSlide(IReadOnlyList<HSLFTextBlock> textBlocks)
     {
-        _texts = texts;
+        _textBlocks = textBlocks;
     }
 
-    /// <summary>Returns all text runs on this slide.</summary>
-    public IReadOnlyList<string> getTextParagraphs() => _texts;
+    /// <summary>Returns all text runs on this slide as plain strings.</summary>
+    public IReadOnlyList<string> getTextParagraphs() =>
+        _textBlocks.Select(b => b.Text).ToList().AsReadOnly();
 
-    /// <summary>Returns the title text (first text run), or empty string.</summary>
-    public string getTitle() => _texts.Count > 0 ? _texts[0] : string.Empty;
+    /// <summary>Returns all text blocks with their placeholder type.</summary>
+    public IReadOnlyList<HSLFTextBlock> getTextBlocks() => _textBlocks;
+
+    /// <summary>
+    /// Returns the title text (first TextPlaceholderType.Title or CenterTitle block),
+    /// or empty string if no title block is found.
+    /// </summary>
+    public string getTitle()
+    {
+        var title = _textBlocks.FirstOrDefault(
+            b => b.Type == TextPlaceholderType.Title ||
+                 b.Type == TextPlaceholderType.CenterTitle);
+        return title?.Text ?? string.Empty;
+    }
+
+    /// <summary>Returns body text paragraphs (Body, CenterBody, HalfBody, QuarterBody types).</summary>
+    public IReadOnlyList<string> getBodyParagraphs() =>
+        _textBlocks.Where(b => b.Type == TextPlaceholderType.Body ||
+                               b.Type == TextPlaceholderType.CenterBody ||
+                               b.Type == TextPlaceholderType.HalfBody ||
+                               b.Type == TextPlaceholderType.QuarterBody)
+                   .Select(b => b.Text).ToList().AsReadOnly();
 }
 
 internal static class LocaleUtil1252Hslf

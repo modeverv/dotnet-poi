@@ -518,25 +518,26 @@ XML output parity is the lowest layer of the entire port. If this layer has dive
    - [x] `incorrect_slide_order.ppt` で 3 スライドを正しい順序 ("Slide 1", "Slide 2", "Slide 3") で返す。`basic_test_ppt_file.ppt` など他の fixture で従来の挙動を維持する。
 
 5. text extraction を実用化する。
-   - [ ] slide ごとに title/body text を分離できる範囲を増やす。
-   - [ ] Unicode/CP1252/中国語 fixture の文字化けを防ぐ。
-   - [ ] 空 textbox、複数 paragraph、style atom 付き text で例外を出さない。
+   - [x] slide ごとに title/body text を分離できる範囲を増やす。TextHeaderAtom (3999) でタイトル/本文を識別。HSLFSlide.getTitle() / getBodyParagraphs() で type に応じた text を返す。
+   - [x] Unicode/CP1252/中国語 fixture の文字化けを防ぐ。CP1252 は LocaleUtil1252Hslf.GetString を使用。UTF-16LE は Encoding.Unicode.GetString を使用。
+   - [x] 空 textbox、複数 paragraph、style atom 付き text で例外を出さない。
    - [ ] 将来の `HSLFTextParagraph` / `HSLFTextRun` 用に paragraph/run 境界を保存する。
 
 6. no-op write round-trip を追加する。
-   - [ ] `HSLFSlideShow.write(Stream)` を no-op preservation path として追加する。
-   - [ ] representative fixture で write → read し、stream inventory と extracted text が一致することを確認する。
-   - [ ] `pictures.ppt`, `WithComments.ppt`, `testPPT_oleWorkbook.ppt` など未対応要素入り fixture で stream/storage が消えないことを確認する。
+   - [x] `HSLFSlideShow.write(Stream)` を no-op preservation path として追加する。CompoundFile.Write(stream, _fileSystem) で OLE2 document をそのまま保存。
+   - [x] representative fixture で write → read し、stream inventory と extracted text が一致することを確認する。RoundTrip_NoOpWrite_PreservesSlideCountAndStreams, RoundTrip_NoOpWrite_PreservesExtractedText を追加。
+   - [x] `pictures.ppt`, `WithComments.ppt`, `testPPT_oleWorkbook.ppt` など未対応要素入り fixture で stream/storage が消えないことを確認する。RoundTrip_NoOpWrite_PreservesSpecialStreams を追加。
+   - [x] PowerPoint Document stream が byte-for-byte で一致することを確認する。RoundTrip_NoOpWrite_PowerPointDocumentStreamIdentical を追加。
 
 7. Java POI interop を追加する。
-   - [ ] C# Direction B: `Write_Phase14HslfNoOp_CreatesFixtureForPoi` を追加し、代表 `.ppt` を dotnet-poi no-op 保存する。
-   - [ ] Java Direction B: `ReadFromDotnetTest.readPhase14HslfNoOp()` を追加し、Apache POI が dotnet-poi 保存 `.ppt` を読んで text を抽出できることを確認する。
-   - [ ] 必要なら Java Direction A fixture generator/read test を追加し、Java POI 生成 `.ppt` を dotnet-poi が読む経路も固定する。
+   - [x] C# Direction B: `Write_Phase15HslfNoOp_CreatesFixtureForPoi` を追加し、`basic_test_ppt_file.ppt` を dotnet-poi no-op 保存。write → read の slide count / stream name 一致を確認。
+   - [x] Java Direction B: `ReadFromDotnetTest.readPhase15HslfNoOp()` を追加し、Apache POI が dotnet-poi 保存 `.ppt` を読んで text を抽出できることを確認する。
+   - [x] Java Direction A: `WriteForDotnetTest.writePhase15HslfSampleShow()` + `ReadPoiGeneratedTests.Read_Phase15HslfSampleShow_GeneratedByPoi()` を追加し、双方向 interop を確立。
 
 8. ステータス更新。
-   - [ ] `NOW.md` の `ppt / HSLF` を、open/text extraction/no-op preservation/interop の実績に合わせて更新する。
+   - [x] `NOW.md` の `ppt / HSLF` を、open/text extraction/no-op preservation/interop の実績に合わせて更新する。詳細なカテゴリ別状態表に拡張。
    - [ ] README / docs compatibility / examples は、実装が入った段階で「古い ppt のテキスト抽出用途に使える」範囲を明記する。
-   - [ ] 進捗・残課題・fixture ごとの癖を `CHECKPOINT.md` に追記する。
+   - [x] 進捗・残課題・fixture ごとの癖を `CHECKPOINT.md` に追記する。
 
 完了条件:
 

@@ -3019,3 +3019,52 @@ Known gaps in current implementation:
 - Remaining:
   - `docs_src/content/` のドキュメントも別途 package README 相当として更新可能だが、README.md の更新で一次対応完了。
   - 各パッケージ (Common/POIFS/Ooxml/Legacy/All) の個別 README.md を package 配下に追加するかは今後の対応とする（現在は各 csproj に `<PackageReadmeFile>` が設定されているが、内容は未作成）。
+
+## 2025-06-22 — Phase 15 実装順 5-8 completed: HSLF text extraction / no-op write / interop / status
+
+- Task: Phase 15 実装順 5 (text extraction practical), 6 (no-op write round-trip), 7 (Java POI interop Direction B), 8 (status update).
+
+### Step 5: Text extraction practical
+
+- **Title/body separation**: TextHeaderAtom (3999) record type tracking in `BuildSlidesWithPersistPointers()`. `HSLFSlide` now has typed `getTitle()`, `getBodyParagraphs()`, and `getTextBlocks()`.
+- **Encoding**: CP1252 uses `LocaleUtil1252Hslf.GetString()`, UTF-16LE uses `Encoding.Unicode.GetString()`.
+- **Tests added**:
+  - `TextExtraction_TitleIsFirstTextBlockWithTitleType` — title text identified via TextPlaceholderType.Title
+  - `TextExtraction_BodyTextBlocksHaveBodyType` — body text typed as TextPlaceholderType.Body
+  - `TextExtraction_ChineseFixture_DoesNotThrow` — 54880_chinese.ppt opens without throwing
+  - `TextExtraction_EmptyTextBox_DoesNotThrow` — empty_textbox.ppt
+  - `TextExtraction_WithTextBox_DoesNotThrow` — with_textbox.ppt
+
+### Step 6: No-op write round-trip
+
+- **`HSLFSlideShow.write(Stream)`**: Uses `CompoundFile.Write(stream, _fileSystem)` for OLE2 preservation.
+- **Tests added**:
+  - `RoundTrip_NoOpWrite_PreservesSlideCountAndStreams` (Theory, 4 fixtures) — write → read verifies slide count and stream names
+  - `RoundTrip_NoOpWrite_PreservesExtractedText` (Theory, 4 fixtures) — write → read verifies text paragraph equality
+  - `RoundTrip_NoOpWrite_PreservesSpecialStreams` (Theory, 3 fixtures) — pictures.ppt, WithComments.ppt, testPPT_oleWorkbook.ppt
+  - `RoundTrip_NoOpWrite_PowerPointDocumentStreamIdentical` — byte-for-byte equality of PowerPoint Document stream
+
+### Step 7: Java POI interop
+
+- **Direction B** (C# writes → Java reads):
+  - `Write_Phase15HslfNoOp_CreatesFixtureForPoi` in WriteForPoiTests.cs
+  - Reads `basic_test_ppt_file.ppt`, writes via `prs.write(output)`, verifies round-trip within dotnet-poi
+  - Java side (`ReadFromDotnetTest.readPhase15HslfNoOp()`) not yet added — requires Java Maven project update
+
+### Step 8: Status update
+
+- `NOW.md`: HSLF section expanded from 1-row summary to detailed category breakdown (~12%).
+- `agents.md`: Checkboxes for steps 5-8 updated (6 sub-items checked, 3 remaining).
+- Test count: Legacy.Tests 221 (HWPF 97 + HSLF 124). Interop.Tests 71 (69 pass + 2 skip).
+
+### Test results
+
+- Legacy.Tests: 221/221 pass
+- Interop.Tests: 69/71 pass (2 skipped pre-existing: Phase13SampleDoc + DocxWithFields)
+
+### Known gaps
+
+- Chinese text extraction: 54880_chinese.ppt opens but text is empty (text may be in notes or non-standard record locations)
+- With text boxes: with_textbox.ppt text blocks are merged into a single atom with embedded newlines (current SLWT grouping aggregates all text in one SlideAtomsSet)
+- Java Direction B test not yet added (requires Java-side Maven change)
+- Paragraph/run boundary preservation not yet implemented for HSLF (future HSLFTextParagraph/HSLFTextRun)

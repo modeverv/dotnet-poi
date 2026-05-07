@@ -204,6 +204,40 @@ public class WriteForPoiTests
     [Fact]
     [Trait("Category", "WriteForPoi")]
     [Trait("Format", "Legacy")]
+    public void Write_Phase15HslfNoOp_CreatesFixtureForPoi()
+    {
+        // Phase 15 Item 7: Direction B — dotnet-poi no-op saves a .ppt → Java POI reads
+        var fixturePath = GetFixturePath("phase15-hslf-noop.ppt");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        var repoRoot = GetRepoRoot();
+        var sourceFixture = Path.Combine(repoRoot, "poi", "test-data", "slideshow", "basic_test_ppt_file.ppt");
+        Assert.True(File.Exists(sourceFixture), $"Source fixture missing: {sourceFixture}");
+
+        using var input = File.OpenRead(sourceFixture);
+        using var prs = new DotnetPoi.HSLF.UserModel.HSLFSlideShow(input);
+        var slideCount = prs.getSlides().Count;
+        var streamNames = prs.getStreamNames().ToList();
+
+        using (var output = File.Create(fixturePath))
+        {
+            prs.write(output);
+        }
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+
+        // Verify round-trip within dotnet-poi
+        using var readBack = File.OpenRead(fixturePath);
+        using var reread = new DotnetPoi.HSLF.UserModel.HSLFSlideShow(readBack);
+        Assert.Equal(slideCount, reread.getSlides().Count);
+        foreach (var name in streamNames)
+            Assert.Contains(reread.getStreamNames(), n => n == name);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_Phase12HssfUnicode_CreatesFixtureForPoi()
     {
         // Phase 12 item 3: Direction B — Unicode/Japanese sheet names and strings

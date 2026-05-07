@@ -399,7 +399,7 @@ public class HSLFSlideShowTests
             if (atom.RecType == 4000 && atom.Body.Length >= 2)
                 texts.Add(System.Text.Encoding.Unicode.GetString(atom.Body.ToArray()));
             else if (atom.RecType == 4008 && atom.Body.Length >= 1)
-                texts.Add(System.Text.Encoding.GetEncoding(1252).GetString(atom.Body.ToArray()));
+                texts.Add(DotnetPoi.HSLF.UserModel.LocaleUtil1252Hslf.GetString(atom.Body));
         }
         if (record.Children is not null)
         {
@@ -515,6 +515,276 @@ public class HSLFSlideShowTests
             {
                 foreach (var nested in Flatten(child))
                     yield return nested;
+            }
+        }
+    }
+
+    // ── Phase 15 実装順 5: title/body text extraction ──────────────────────────
+
+    /// <summary>
+    /// Slide titles are correctly identified via TextHeaderAtom type.
+    /// basic_test_ppt_file.ppt has "This is a test title" as title type.
+    /// </summary>
+    [Fact]
+    public void TextExtraction_TitleIsFirstTextBlockWithTitleType()
+    {
+        using var stream = File.OpenRead("hslf-fixtures/basic_test_ppt_file.ppt");
+        using var prs = new HSLFSlideShow(stream);
+        var slides = prs.getSlides();
+        Assert.True(slides.Count >= 1);
+        var slide0 = slides[0];
+        Assert.Contains("This is a test title", slide0.getTitle());
+        var titleBlocks = slide0.getTextBlocks()
+            .Where(b => b.Type == TextPlaceholderType.Title || b.Type == TextPlaceholderType.CenterTitle)
+            .ToList();
+        Assert.True(titleBlocks.Count > 0,
+            "Should have at least one title-type text block");
+    }
+
+    /// <summary>
+    /// Body text is correctly identified via TextHeaderAtom type.
+    /// </summary>
+    [Fact]
+    public void TextExtraction_BodyTextBlocksHaveBodyType()
+    {
+        using var stream = File.OpenRead("hslf-fixtures/SampleShow.ppt");
+        using var prs = new HSLFSlideShow(stream);
+        var slides = prs.getSlides();
+        foreach (var slide in slides)
+        {
+            var bodyBlocks = slide.getTextBlocks()
+                .Where(b => b.Type == TextPlaceholderType.Body)
+                .ToList();
+            if (slide.getBodyParagraphs().Count > 0)
+            {
+                Assert.True(bodyBlocks.Count > 0,
+                    $"Slide with body text should have Body-type blocks (title='{slide.getTitle()}')");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 54880_chinese.ppt does not throw on open. Text may be in notes
+    /// or special records not yet parsed; at minimum the fixture opens.
+    /// </summary>
+    [Fact]
+    public void TextExtraction_ChineseFixture_DoesNotThrow()
+    {
+        using var stream = File.OpenRead("hslf-fixtures/54880_chinese.ppt");
+        using var prs = new HSLFSlideShow(stream);
+        var slides = prs.getSlides();
+        Assert.True(slides.Count >= 1,
+            "54880_chinese.ppt should have at least 1 slide");
+        // Text extraction should not throw even if the slide text is empty
+        foreach (var slide in slides)
+        {
+            _ = slide.getTitle();
+            _ = slide.getTextParagraphs();
+            _ = slide.getTextBlocks();
+        }
+    }
+
+    /// <summary>
+    /// Empty text boxes do not cause exceptions.
+    /// </summary>
+    [Fact]
+    public void TextExtraction_EmptyTextBox_DoesNotThrow()
+    {
+        using var stream = File.OpenRead("hslf-fixtures/empty_textbox.ppt");
+        using var prs = new HSLFSlideShow(stream);
+        // Should open without throwing
+        foreach (var slide in prs.getSlides())
+        {
+            var title = slide.getTitle();
+            var paragraphs = slide.getTextParagraphs();
+            _ = title;
+            _ = paragraphs;
+        }
+    }
+
+    /// <summary>
+    /// with_textbox.ppt opens and extracts text (multiple text boxes
+    /// may be merged into one text atom with embedded newlines).
+    /// </summary>
+    [Fact]
+    public void TextExtraction_WithTextBox_DoesNotThrow()
+    {
+        using var stream = File.OpenRead("hslf-fixtures/with_textbox.ppt");
+        using var prs = new HSLFSlideShow(stream);
+        var slides = prs.getSlides();
+        Assert.True(slides.Count >= 1);
+        foreach (var slide in slides)
+        {
+            _ = slide.getTitle();
+            _ = slide.getTextParagraphs();
+            _ = slide.getTextBlocks();
+        }
+    }
+
+    // ── Phase 15 実装順 6: no-op write round-trip ─────────────────────────────
+
+    /// <summary>
+    /// No-op write preserves all streams for a simple fixture.
+    /// Write → read back → verify slide count and stream names.
+    /// </summary>
+    [Theory]
+    [InlineData("hslf-fixtures/basic_test_ppt_file.ppt")]
+    [InlineData("hslf-fixtures/SampleShow.ppt")]
+    [InlineData("hslf-fixtures/with_textbox.ppt")]
+    [InlineData("hslf-fixtures/text_shapes.ppt")]
+    public void RoundTrip_NoOpWrite_PreservesSlideCountAndStreams(string fixturePath)
+    {
+        byte[] originalBytes;
+        using (var stream = File.OpenRead(fixturePath))
+        using (var ms = new MemoryStream())
+        {
+            stream.CopyTo(ms);
+            originalBytes = ms.ToArray();
+        }
+
+        // First read: capture state
+        int slideCount;
+        List<string> streamNames;
+        using (var stream = new MemoryStream(originalBytes))
+        using (var prs = new HSLFSlideShow(stream))
+        {
+            slideCount = prs.getSlides().Count;
+            streamNames = prs.getStreamNames().ToList();
+        }
+
+        // Write
+        byte[] written;
+        using (var stream = new MemoryStream(originalBytes))
+        using (var prs = new HSLFSlideShow(stream))
+        using (var output = new MemoryStream())
+        {
+            prs.write(output);
+            written = output.ToArray();
+        }
+
+        // Read back
+        using (var input2 = new MemoryStream(written))
+        using (var prs2 = new HSLFSlideShow(input2))
+        {
+            Assert.Equal(slideCount, prs2.getSlides().Count);
+            var names2 = prs2.getStreamNames().ToList();
+            Assert.True(streamNames.Count <= names2.Count,
+                $"Round-tripped document should have at least the same number of streams");
+            foreach (var name in streamNames)
+                Assert.Contains(names2, n => n == name);
+        }
+    }
+
+    /// <summary>
+    /// No-op write preserves extracted text for simple fixtures.
+    /// </summary>
+    [Theory]
+    [InlineData("hslf-fixtures/basic_test_ppt_file.ppt")]
+    [InlineData("hslf-fixtures/SampleShow.ppt")]
+    [InlineData("hslf-fixtures/with_textbox.ppt")]
+    [InlineData("hslf-fixtures/text_shapes.ppt")]
+    public void RoundTrip_NoOpWrite_PreservesExtractedText(string fixturePath)
+    {
+        byte[] originalBytes;
+        using (var stream = File.OpenRead(fixturePath))
+        using (var ms = new MemoryStream())
+        {
+            stream.CopyTo(ms);
+            originalBytes = ms.ToArray();
+        }
+
+        // Extract texts before
+        List<string> beforeTexts;
+        using (var stream = new MemoryStream(originalBytes))
+        using (var prs = new HSLFSlideShow(stream))
+        {
+            beforeTexts = prs.getSlides()
+                .SelectMany(s => s.getTextParagraphs())
+                .ToList();
+        }
+
+        // Write
+        byte[] written;
+        using (var stream = new MemoryStream(originalBytes))
+        using (var prs = new HSLFSlideShow(stream))
+        using (var output = new MemoryStream())
+        {
+            prs.write(output);
+            written = output.ToArray();
+        }
+
+        // Extract texts after
+        List<string> afterTexts;
+        using (var stream = new MemoryStream(written))
+        using (var prs = new HSLFSlideShow(stream))
+        {
+            afterTexts = prs.getSlides()
+                .SelectMany(s => s.getTextParagraphs())
+                .ToList();
+        }
+
+        Assert.Equal(beforeTexts.Count, afterTexts.Count);
+        for (int i = 0; i < beforeTexts.Count; i++)
+            Assert.Equal(beforeTexts[i], afterTexts[i]);
+    }
+
+    /// <summary>
+    /// No-op write preserves pictures, comments, and OLE streams.
+    /// </summary>
+    [Theory]
+    [InlineData("hslf-fixtures/pictures.ppt")]
+    [InlineData("hslf-fixtures/WithComments.ppt")]
+    [InlineData("hslf-fixtures/testPPT_oleWorkbook.ppt")]
+    public void RoundTrip_NoOpWrite_PreservesSpecialStreams(string fixturePath)
+    {
+        byte[] written;
+        using (var stream = File.OpenRead(fixturePath))
+        using (var prs = new HSLFSlideShow(stream))
+        {
+            using (var output = new MemoryStream())
+            {
+                prs.write(output);
+                written = output.ToArray();
+            }
+        }
+
+        using (var stream = new MemoryStream(written))
+        using (var prs = new HSLFSlideShow(stream))
+        {
+            Assert.True(prs.hasStream("PowerPoint Document"),
+                "Round-tripped document must have 'PowerPoint Document' stream");
+        }
+    }
+
+    /// <summary>
+    /// The PowerPoint Document stream bytes are preserved byte-for-byte
+    /// after a no-op write (no editing performed).
+    /// </summary>
+    [Fact]
+    public void RoundTrip_NoOpWrite_PowerPointDocumentStreamIdentical()
+    {
+        var fixture = "hslf-fixtures/basic_test_ppt_file.ppt";
+
+        using (var stream = File.OpenRead(fixture))
+        using (var prs = new HSLFSlideShow(stream))
+        {
+            var originalPpt = prs.getStreamBytes("PowerPoint Document");
+            Assert.NotNull(originalPpt);
+
+            using (var output = new MemoryStream())
+            {
+                prs.write(output);
+                var writtenBytes = output.ToArray();
+
+                using (var input2 = new MemoryStream(writtenBytes))
+                using (var prs2 = new HSLFSlideShow(input2))
+                {
+                    var roundTrippedPpt = prs2.getStreamBytes("PowerPoint Document");
+                    Assert.NotNull(roundTrippedPpt);
+                    Assert.True(originalPpt.Length == roundTrippedPpt.Length,
+                        $"PowerPoint Document stream length should match ({originalPpt.Length} == {roundTrippedPpt.Length})");
+                    Assert.Equal(originalPpt, roundTrippedPpt);
+                }
             }
         }
     }

@@ -13,6 +13,7 @@ import java.nio.file.Paths;
 
 import org.apache.poi.hwpf.HWPFDocument;
 import org.apache.poi.hwpf.extractor.WordExtractor;
+import org.apache.poi.hslf.usermodel.HSLFSlideShow;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -850,6 +851,21 @@ public class ReadFromDotnetTest {
 
             // Paragraph 2: "Hello " + MERGEFIELD
             assertTrue(paragraphs.get(2).getText().contains("Hello"));
+        }
+    }
+
+    @Test
+    void readPhase15HslfNoOp() throws IOException {
+        // Phase 15 Item 7: Direction B — Java POI reads dotnet-poi no-op saved .ppt
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase15-hslf-noop.ppt");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase15HslfNoOp_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSLFSlideShow ppt = new HSLFSlideShow(input)) {
+
+            var slides = ppt.getSlides();
+            assertNotNull(slides);
+            assertTrue(slides.size() > 0, "No-op preserved .ppt should have slides.");
         }
     }
 

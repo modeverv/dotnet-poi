@@ -3,6 +3,7 @@ package org.dotnetpoi.interop;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +19,8 @@ import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.hslf.usermodel.HSLFSlideShow;
+import org.apache.poi.hslf.usermodel.HSLFTextParagraph;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -62,7 +65,10 @@ public class WriteForDotnetTest {
         Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase13-sample-doc.doc");
         Files.createDirectories(fixture.getParent());
 
-        try (org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument()) {
+        // Read SampleDoc.doc as a template (HWPFDocument has no zero-arg constructor in POI 5.5.1)
+        Path template = findRepoRoot().resolve("poi/test-data/document/SampleDoc.doc");
+        try (InputStream templateInput = Files.newInputStream(template);
+             org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument(templateInput)) {
             org.apache.poi.hwpf.usermodel.Range range = doc.getRange();
             range.insertBefore("I am a Java POI generated test document.\r");
             range.insertAfter("Second paragraph from Java POI.\r");
@@ -485,6 +491,34 @@ public class WriteForDotnetTest {
 
             try (OutputStream output = Files.newOutputStream(fixture)) {
                 doc.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhase15HslfSampleShow() throws IOException {
+        // Phase 15: Direction A — Java POI writes .ppt → dotnet-poi reads
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase15-hslf-sample.ppt");
+        Files.createDirectories(fixture.getParent());
+
+        Path template = findRepoRoot().resolve("poi/test-data/slideshow/basic_test_ppt_file.ppt");
+        try (InputStream templateInput = Files.newInputStream(template);
+             HSLFSlideShow ppt = new HSLFSlideShow(templateInput)) {
+
+            // Modify the first slide's title text via SLWT-linked paragraphs
+            var slides = ppt.getSlides();
+            if (!slides.isEmpty()) {
+                var textParas = slides.get(0).getTextParagraphs();
+                if (!textParas.isEmpty() && !textParas.get(0).isEmpty()) {
+                    HSLFTextParagraph.setText(textParas.get(0), "Modified by Java POI");
+                }
+            }
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                ppt.write(output);
             }
         }
 
