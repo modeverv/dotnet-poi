@@ -18,7 +18,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="../../src/DotnetPoi.Core/DotnetPoi.Core.csproj" />
+        <ProjectReference Include="../../src/DotnetPoi.Common/DotnetPoi.Common.csproj" />
+        <ProjectReference Include="../../src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj" />
+        <ProjectReference Include="../../src/DotnetPoi.Legacy/DotnetPoi.Legacy.csproj" />
         <ProjectReference Include="../../src/DotnetPoi.Formula/DotnetPoi.Formula.csproj" />
     </ItemGroup>
 

@@ -6,37 +6,68 @@ An **unofficial**, faithful port of [Apache POI](https://poi.apache.org/) for .N
 [![Examples](https://github.com/modeverv/dotnet-poi/actions/workflows/examples.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/examples.yml)
 [![XML Parity](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml/badge.svg)](https://github.com/modeverv/dotnet-poi/actions/workflows/xml-parity-fixtures.yml)
 [![NuGet Core](https://img.shields.io/nuget/v/DotnetPoi.Core)](https://www.nuget.org/packages/DotnetPoi.Core)
-[![NuGet Core Downloads](https://img.shields.io/nuget/dt/DotnetPoi.Core)](https://www.nuget.org/packages/DotnetPoi.Core)
+[![NuGet Ooxml](https://img.shields.io/nuget/v/DotnetPoi.Ooxml)](https://www.nuget.org/packages/DotnetPoi.Ooxml)
 [![NuGet Formula](https://img.shields.io/nuget/v/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
-[![NuGet Formula Downloads](https://img.shields.io/nuget/dt/DotnetPoi.Formula)](https://www.nuget.org/packages/DotnetPoi.Formula)
+[![NuGet All](https://img.shields.io/nuget/v/DotnetPoi.All)](https://www.nuget.org/packages/DotnetPoi.All)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Status](https://img.shields.io/badge/status-practical%20OOXML%20workflows-brightgreen)
-![Tests](https://img.shields.io/badge/tests-309%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-441%20passing-brightgreen)
 
 ## NuGet Package Strategy
 
-dotnet-poi ships as **two separate NuGet packages** with a clear separation of concerns:
+dotnet-poi has migrated from a single `DotnetPoi.Core` package to a **multi-package architecture** with clear separation of concerns. This enables OOXML stability to advance independently of legacy binary format development.
 
-| Package | Contents | When to use |
-|---|---|---|
-| **DotnetPoi.Core** | All format implementations (XSSF/xlsx, HSSF/xls, XWPF/docx, XSLF/pptx, HWPF/doc, HSLF/ppt, POIFS) + common interfaces + XML writer | Always — required for any read/write operation |
-| **DotnetPoi.Formula** | Limited formula evaluator (`IFormulaEvaluator`, `FormulaEvaluator`, `CellValue`) | Only when you need the supported small evaluator subset |
+### Recommended Package
 
-**Design principle:** `Core` has zero knowledge of `Formula`. Adding `DotnetPoi.Formula` to your project automatically enables `createFormulaEvaluator()` via lazy assembly discovery at runtime. Without it, the call throws a clear `NotSupportedException`.
+For most users, **`DotnetPoi.All`** is the simplest choice — it includes all format support with a single dependency:
 
 ```xml
-<!-- Simple read/write only -->
-<PackageReference Include="DotnetPoi.Core" Version="..." />
+<PackageReference Include="DotnetPoi.All" Version="..." />
+```
 
-<!-- Add formula evaluation -->
-<PackageReference Include="DotnetPoi.Core" Version="..." />
+### Granular Packages
+
+| Package | Contents | Best for |
+|---|---|---|
+| **DotnetPoi.Ooxml** | XSSF (xlsx/xlsm), XWPF (docx/docm), XSLF (pptx/pptm) + OPC/openxml package + shared POIFS foundation | Users who work with modern Office 2007+ formats only |
+| **DotnetPoi.Legacy** | HSSF (xls), HWPF (doc), HSLF (ppt) | Users who need legacy binary format support |
+| **DotnetPoi.Formula** | Formula evaluator (`IFormulaEvaluator`, `FormulaEvaluator`, `CellValue`) | Only when you need the supported formula evaluator subset |
+| **DotnetPoi.Common** | SS interfaces, shared enums, common exceptions, XML writer foundation | Base dependency (included transitively by all packages above) |
+| **DotnetPoi.POIFS** | OLE2/CFB compound file container, encryption helpers | OLE2 container foundation (included transitively by Ooxml and Legacy) |
+| **DotnetPoi.All** | All of the above in a single meta-package | Users who want everything with one dependency |
+
+### Legacy `DotnetPoi.Core`
+
+`DotnetPoi.Core` v0.5.x is still published and acts as a **facade** that references Ooxml, Legacy, POIFS, and Common. Code written against `DotnetPoi.Core` will continue to compile. However, new projects should prefer the granular packages or `DotnetPoi.All` for a cleaner dependency graph.
+
+**Migration path:** Replace `<PackageReference Include="DotnetPoi.Core" />` with `<PackageReference Include="DotnetPoi.All" />` — namespaces and public API surface are unchanged.
+
+```xml
+<!-- Before -->
+<PackageReference Include="DotnetPoi.Core" Version="0.5.0" />
+
+<!-- After -->
+<PackageReference Include="DotnetPoi.All" Version="0.1.0" />
+```
+
+### Design Principle
+
+All format packages have **zero knowledge of `Formula`**. Adding `DotnetPoi.Formula` to your project automatically enables `createFormulaEvaluator()` via lazy assembly discovery at runtime. Without it, the call throws a clear `NotSupportedException`.
+
+```xml
+<!-- OOXML-only projects: no formula engine pulled in -->
+<PackageReference Include="DotnetPoi.Ooxml" Version="..." />
+
+<!-- Add formula evaluation when needed -->
+<PackageReference Include="DotnetPoi.Ooxml" Version="..." />
 <PackageReference Include="DotnetPoi.Formula" Version="..." />
 ```
 
 **Why this split:**
-- **Core can be stable early** — all spreadsheet read/write/format logic is self-contained. No dependency on the formula engine.
-- **Formula can stay narrow** — full Excel-compatible evaluation is not a current project goal and can remain separate from Core.
-- **Smaller dependency for simple use cases** — users who only need xlsx read/write don't pull in the entire formula engine.
+- **Ooxml can be stable early** — all OOXML read/write/format logic is self-contained. No dependency on legacy binary development.
+- **Legacy can evolve safely** — HSSF/HWPF/HSLF development can proceed without destabilizing OOXML users.
+- **Formula stays narrow** — full Excel-compatible evaluation is not a current project goal and can remain separate.
+- **Smaller dependency for simple use cases** — users who only need xlsx don't pull in legacy format code.
 - **Security** — applications handling untrusted documents can omit the formula evaluator entirely, reducing the attack surface.
 
 ## Philosophy
@@ -51,9 +82,17 @@ dotnet-poi ships as **two separate NuGet packages** with a clear separation of c
 
 ## Status
 
-Current status: **practical for covered OOXML workflows** — `DotnetPoi.Core` v0.5.0 and `DotnetPoi.Formula` v0.5.0 are published on [NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core).
+Current status: **practical for covered OOXML workflows** — packages are available on [NuGet.org](https://www.nuget.org/).
 
-The project has moved beyond the original bootstrap/beta stage for common OOXML work. The strongest format today is **xlsx / XSSF**, with broad support for workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. **docx / XWPF** and **pptx / XSLF** are also useful for practical generation, light editing, and loss-resistant round-trips of many real files.
+| Package | NuGet ID | Version | Status |
+|---|---|---|---|
+| **All** | `DotnetPoi.All` | 0.1.x | Meta-package (smoke-tested) |
+| **OOXML** | `DotnetPoi.Ooxml` | 0.1.x | Stable for common xlsx/docx/pptx workflows |
+| **Legacy** | `DotnetPoi.Legacy` | 0.1.x | In-development (HSSF/HWPF/HSLF) |
+| **Formula** | `DotnetPoi.Formula` | 0.5.x | Narrow evaluator subset |
+| **Core** (legacy) | `DotnetPoi.Core` | 0.5.x | Deprecated facade — prefer Ooxml/All |
+
+The strongest format today is **xlsx / XSSF**, with broad support for workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. **docx / XWPF** and **pptx / XSLF** are also useful for practical generation, light editing, and loss-resistant round-trips of many real files.
 
 This does **not** mean the whole Apache POI surface is complete. Advanced OOXML features such as chart creation and comment editing are still limited, some features are preservation-only rather than modeled APIs, and formula evaluation remains intentionally narrow. Legacy binary formats have improved: `.xls` now has practical basic workbook read/write, styling/layout slices, preservation, and Java POI interop coverage; `.doc` can extract body text and perform limited body edits with preservation. `.ppt` is still at the earliest reader stage. In short: **use it today for the supported workflows shown below; check the matrix before relying on an advanced or legacy feature.**
 
@@ -180,13 +219,18 @@ Lower priority gaps include SmartArt, animations, transitions, `ppt` legacy dept
 
 Tracked in [NOW.md](./NOW.md):
 
-| Project | Tests | Notes |
-|---|---:|---|
-| Core.Tests | 244 | +3 POI test-file preservation verification tests, +1 xlsx auto-shape, +1 docx header/footer preservation, +2 docx SDT preservation, +1 docx floating anchor images preservation. |
-| Formula.Tests | 10 | Minimal formula package coverage. |
-| Interop.Tests (C#) | 55 | Bidirectional Java/.NET fixtures and preservation tests. |
-| **Total (C#)** | **309** | |
-| Java POI side (Maven) | 44 | Java fixture generation/readback tests. |
+| Package | Test Project | Tests | Notes |
+|---|---|---|---:|
+| **All packages** | Core.Tests | 441 | All format tests (includes OOXML + Legacy + POIFS + Common) |
+| **OOXML** | Ooxml.Tests | — | OOXML-specific split tests |
+| **Legacy** | Legacy.Tests | — | Legacy-specific split tests |
+| **Formula** | Formula.Tests | 10 | Minimal formula package coverage |
+| **Common** | Common.Tests | — | Shared SS/utility tests |
+| **POIFS** | POIFS.Tests | — | OLE2 container tests |
+| **All** | All.Tests | — | Meta-package smoke tests |
+| **Interop** | Interop.Tests (C#) | 70 | Bidirectional Java/.NET fixtures + preservation |
+| **Total (C#)** | | **511+** | |
+| Java POI side (Maven) | | 44+ | Java fixture generation/readback tests |
 
 ---
 
@@ -206,7 +250,7 @@ This project employs a multi-layered testing strategy to ensure maximum fidelity
 
 ## Quick Start
 
-Published to **[NuGet.org](https://www.nuget.org/packages/DotnetPoi.Core)** — `dotnet add package DotnetPoi.Core`.
+Published to **[NuGet.org](https://www.nuget.org/packages/DotnetPoi.All)** — `dotnet add package DotnetPoi.All`.
 
 ```bash
 git clone --recurse-submodules https://github.com/modeverv/dotnet-poi
@@ -310,19 +354,27 @@ dotnet-poi/
 │   └── java-upgrade/           # Java upgrade helper hooks/scripts
 ├── poi/                        # Apache POI submodule (read-only reference)
 ├── src/
-│   ├── DotnetPoi.Core/         # NuGet: DotnetPoi.Core
-│   │   ├── SS/                 # Common interfaces, usermodel types, XML writer
-│   │   ├── POIFS/              # OLE2 / CFB container and Agile encryption support
+│   ├── DotnetPoi.Common/       # Shared interfaces, enums, utilities, XML writer
+│   ├── DotnetPoi.POIFS/        # OLE2 / CFB container and Agile encryption support
+│   ├── DotnetPoi.Ooxml/        # XSSF (xlsx/xlsm), XWPF (docx/docm), XSLF (pptx/pptm)
 │   │   ├── XSSF/               # xlsx / xlsm
-│   │   ├── HSSF/               # xls / BIFF basic workbook + preservation
 │   │   ├── XWPF/               # docx / docm
+│   │   └── XSLF/               # pptx / pptm
+│   ├── DotnetPoi.Legacy/       # HSSF (xls), HWPF (doc), HSLF (ppt)
+│   │   ├── HSSF/               # xls / BIFF basic workbook + preservation
 │   │   ├── HWPF/               # doc text extraction + limited body editing
-│   │   ├── XSLF/               # pptx / pptm
 │   │   └── HSLF/               # ppt minimal reader
-│   └── DotnetPoi.Formula/      # NuGet: DotnetPoi.Formula
-│       └── UserModel/          # FormulaEvaluator implementation
+│   ├── DotnetPoi.Formula/      # NuGet: DotnetPoi.Formula
+│   │   └── UserModel/          # FormulaEvaluator implementation
+│   ├── DotnetPoi.Core/         # Legacy facade (references all above)
+│   └── DotnetPoi.All/          # Meta-package referencing everything
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests grouped by module
+│   ├── DotnetPoi.Common.Tests/     # Common package tests
+│   ├── DotnetPoi.POIFS.Tests/      # POIFS container tests
+│   ├── DotnetPoi.Ooxml.Tests/      # OOXML format tests
+│   ├── DotnetPoi.Legacy.Tests/     # Legacy format tests
+│   ├── DotnetPoi.Core.Tests/       # Legacy facade tests
+│   ├── DotnetPoi.All.Tests/        # All-package smoke tests
 │   ├── DotnetPoi.Formula.Tests/    # Formula package tests
 │   ├── DotnetPoi.Interop.Tests/    # Java/.NET compatibility tests
 │   │   ├── java/                   # Maven project using Apache POI
@@ -358,7 +410,7 @@ dotnet-poi/
 └── README.md
 ```
 
-> **Architecture note:** All format implementations live under `DotnetPoi.Core/` as a single assembly.
+> **Architecture note:** Format implementations are now split across `DotnetPoi.Ooxml` (OOXML formats) and `DotnetPoi.Legacy` (legacy binary formats), with `DotnetPoi.Common` and `DotnetPoi.POIFS` as shared foundations. `DotnetPoi.Core` is maintained as a backward-compatibility facade.
 
 ---
 

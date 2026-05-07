@@ -77,6 +77,18 @@
 </ul>
 </div>
 <div class="nav-section">
+<div class="nav-title">doc (HWPF)</div>
+<ul>
+<li><a href="../guides/doc/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">ppt (HSLF)</div>
+<ul>
+<li><a href="../guides/ppt/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
 <div class="nav-title">Reference</div>
 <ul>
 <li><a href="../reference/examples-index.html">Examples Index</a></li>
@@ -156,20 +168,40 @@
 <tr><td>Other</td><td>pptm macro preservation</td><td>✅</td><td>VBA bytes preserved</td></tr>
 </tbody>
 </table>
-<h2>xls / HSSF (~10%)</h2>
+<h2>xls / HSSF (~35%)</h2>
 <table>
 <thead><tr><th>Category</th><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>General</td><td>basic value read/write</td><td>⚠️</td><td>2 tests only</td></tr>
-<tr><td>General</td><td>everything else (BIFF records, styles, images, charts, formulas, filters, pivots)</td><td>❌</td><td>Legacy format, low priority</td></tr>
+<tr><td>Cell values</td><td>string, numeric, boolean, blank, error</td><td>✅</td><td>BIFF8 LabelSST/Number/BoolErr/Blank round-trip covered</td></tr>
+<tr><td>Sheets</td><td>multiple sheets, sparse rows/cells, high column indexes</td><td>✅</td></tr>
+<tr><td>Styles</td><td>fonts, data formats, alignment, wrap, borders, fills</td><td>⚠️</td><td>Common HSSFFont/HSSFCellStyle round-trip works; not full BIFF style parity</td></tr>
+<tr><td>Layout</td><td>column width, row height, hidden rows/columns, merged regions, freeze panes</td><td>✅</td></tr>
+<tr><td>Formulas</td><td>formula text + cached value read</td><td>⚠️</td><td>Existing POI formula fixtures can be read; new BIFF formula token writing and evaluation are not implemented</td></tr>
+<tr><td>Compatibility</td><td>representative Apache POI <code>.xls</code> fixtures load</td><td>✅</td><td>Includes basic, styles, formulas, hyperlinks, comments, drawings, images, macro files as load/preservation cases</td></tr>
+<tr><td>Interop</td><td>Java POI bidirectional fixtures</td><td>⚠️</td><td>basic/styles/layout/unicode/comprehensive coverage</td></tr>
+<tr><td>Preservation</td><td>non-Workbook OLE streams, VBA streams, unknown BIFF records</td><td>✅</td><td>Light edits preserve unmodeled streams/records where possible</td></tr>
+<tr><td>Not modeled</td><td>images/shapes/charts/comments/hyperlink editing/filters/pivots</td><td>❌</td><td>Some are load/preservation fixtures, but not public usermodel creation/edit APIs</td></tr>
 </tbody>
 </table>
-<h2>Legacy Formats</h2>
+<h2>doc / HWPF (~20%)</h2>
+<table>
+<thead><tr><th>Category</th><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Reading</td><td>OLE2 <code>.doc</code> open, FIB/table stream parsing</td><td>✅</td><td><code>WordDocument</code> + <code>0Table</code>/<code>1Table</code> selection and fallback covered</td></tr>
+<tr><td>Text</td><td>main body text extraction</td><td>✅</td><td>CLX/piece table based extraction with compressed and Unicode text pieces</td></tr>
+<tr><td>UserModel</td><td>Range, Paragraph, CharacterRun</td><td>⚠️</td><td>Paragraph/run splitting and text composition covered for representative fixtures</td></tr>
+<tr><td>Formatting</td><td>character and paragraph properties</td><td>⚠️</td><td>CHPX-derived font name/size/bold/italic/underline/strike plus minimal PAPX fields</td></tr>
+<tr><td>Editing</td><td>no-op write, append paragraph, simple text replacement</td><td>⚠️</td><td>Limited main-body edit path, not a full Word binary editing engine</td></tr>
+<tr><td>Preservation</td><td>OLE streams/storages, embedded OLE</td><td>✅</td><td>Unedited stream/storage content is preserved in representative fixtures</td></tr>
+<tr><td>Interop</td><td>Java POI reads dotnet-poi no-op saved <code>.doc</code></td><td>⚠️</td><td>Direction B smoke coverage</td></tr>
+<tr><td>Not modeled</td><td>tables/images/header-footer/footnotes/comments/fields API</td><td>❌</td><td>Existing streams may be preserved, but these are not usermodel creation/edit features</td></tr>
+</tbody>
+</table>
+<h2>ppt / HSLF (~5%)</h2>
 <table>
 <thead><tr><th>Format</th><th>Status</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>doc (HWPF)</td><td>~5%</td><td>Read stub only</td></tr>
-<tr><td>ppt (HSLF)</td><td>~5%</td><td>Read stub only</td></tr>
+<tr><td>ppt (HSLF)</td><td>~5%</td><td>Minimal reader can open OLE2 <code>.ppt</code> and scan <code>PowerPoint Document</code> for TextChars/TextBytes atoms. No no-op write or interop coverage yet.</td></tr>
 </tbody>
 </table>
 

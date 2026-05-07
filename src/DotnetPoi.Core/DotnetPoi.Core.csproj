@@ -40,6 +40,13 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="../DotnetPoi.Common/DotnetPoi.Common.csproj" />
+        <ProjectReference Include="../DotnetPoi.Legacy/DotnetPoi.Legacy.csproj" />
+        <ProjectReference Include="../DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj" />
+        <ProjectReference Include="../DotnetPoi.POIFS/DotnetPoi.POIFS.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="System.Memory" Version="4.5.5" />
         <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
     </ItemGroup>

@@ -19,6 +19,7 @@ namespace DotnetPoi.Interop.Tests;
 /// These tests do NOT verify correctness of the unsupported feature — they only
 /// verify the feature's binary parts survive the round-trip.
 /// </summary>
+[Trait("Format", "OOXML")]
 public sealed class PoiPreservationTests
 {
     // ──────────────── Helpers ────────────────

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>doc (HWPF) Overview | dotnet-poi Documentation</title>
+  <meta name="description" content="Apache POI-compatible un-official .NET library for Office files, focused on faithful round-trip and Java POI interop.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../xlsx/layout.html">Layout</a></li>
+<li><a href="../xlsx/images.html">Images</a></li>
+<li><a href="../xlsx/formulas.html">Formulas</a></li>
+<li><a href="../xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../xlsx/protection.html">Protection</a></li>
+<li><a href="../xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/styles.html">Styles</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../pptx/slides.html">Slides</a></li>
+<li><a href="../pptx/text.html">Text Boxes</a></li>
+<li><a href="../pptx/images.html">Images</a></li>
+<li><a href="../pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">doc (HWPF)</div>
+<ul>
+<li><a class="active" href="overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">ppt (HSLF)</div>
+<ul>
+<li><a href="../ppt/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>doc (HWPF) Overview</h1>
+<p>HWPF provides early support for the legacy Word 97-2003 <code>.doc</code> format. Coverage is ~20%.</p>
+<h2>Status</h2>
+<p>HWPF is useful today for body-text extraction, simple indexing/migration workflows, and limited main-body edits. It can open OLE2 <code>.doc</code> files, parse the File Information Block and selected table stream, extract main document text from the CLX/piece table, expose a minimal Range/Paragraph/CharacterRun model, and preserve unedited OLE streams/storages during no-op or limited body edits.</p>
+<p>It is not a complete Word binary editing engine. Tables, images, header/footer stories, footnotes, comments, fields, and tracked changes are not modeled through public APIs.</p>
+<h2>Basic Text Extraction</h2>
+<pre><code class="language-csharp">using DotnetPoi.HWPF.UserModel;
+
+using var stream = File.OpenRead(&quot;input.doc&quot;);
+using var doc = new HWPFDocument(stream);
+
+Console.WriteLine(doc.getText());</code></pre>
+<h2>Limited Body Editing</h2>
+<pre><code class="language-csharp">using DotnetPoi.HWPF.UserModel;
+
+using var stream = File.OpenRead(&quot;input.doc&quot;);
+using var doc = new HWPFDocument(stream);
+
+doc.appendParagraph(&quot;Added by dotnet-poi&quot;);
+doc.replaceText(&quot;{{name}}&quot;, &quot;Example Corp&quot;);
+
+using var output = File.Create(&quot;output.doc&quot;);
+doc.write(output);</code></pre>
+<h2>Supported Today</h2>
+<ul>
+<li>OLE2 <code>.doc</code> open and stream inventory</li>
+<li>FIB / <code>0Table</code> / <code>1Table</code> parsing</li>
+<li>Main body text extraction from CLX/piece table</li>
+<li>Compressed and Unicode text pieces</li>
+<li>Minimal Range / Paragraph / CharacterRun API</li>
+<li>Selected CHPX character formatting: font name, size, bold, italic, underline, strike</li>
+<li>Minimal paragraph property reading</li>
+<li>No-op write preservation</li>
+<li>Limited append paragraph and simple text replacement</li>
+<li>OLE stream/storage and embedded OLE preservation</li>
+<li>Java POI Direction B smoke for dotnet-poi no-op saved <code>.doc</code></li>
+</ul>
+<h2>Limitations</h2>
+<ul>
+<li>No table model or table editing API</li>
+<li>No image extraction or editing API</li>
+<li>No header/footer story extraction API</li>
+<li>No footnote/endnote/comment model</li>
+<li>No field/bookmark model</li>
+<li>No full Word style inheritance or complete PAPX/CHPX expansion</li>
+<li>Limited body edits rebuild the main body as a single Unicode piece; use cautiously for complex documents</li>
+</ul>
+<p>For new documents, prefer <code>docx</code> / XWPF.</p>
+
+    </main>
+  </div>
+</body>
+</html>

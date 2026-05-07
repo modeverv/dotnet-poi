@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ppt (HSLF) Overview | dotnet-poi Documentation</title>
+  <meta name="description" content="Apache POI-compatible un-official .NET library for Office files, focused on faithful round-trip and Java POI interop.">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../../index.html">dotnet-poi Documentation</a>
+      <nav>
+<div class="nav-section">
+<div class="nav-title">Getting Started</div>
+<ul>
+<li><a href="../../getting-started/installation.html">Installation</a></li>
+<li><a href="../../getting-started/first-workbook.html">Your First Spreadsheet</a></li>
+<li><a href="../../getting-started/first-document.html">Your First Word Document</a></li>
+<li><a href="../../getting-started/first-presentation.html">Your First Presentation</a></li>
+<li><a href="../../getting-started/usage-samples.html">Usage Samples</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Compatibility</div>
+<ul>
+<li><a href="../../compatibility/format-coverage.html">Format Coverage</a></li>
+<li><a href="../../compatibility/limitations.html">Limitations</a></li>
+<li><a href="../../compatibility/package-split.html">Package Split</a></li>
+<li><a href="../../compatibility/interop.html">Java POI Interop</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xlsx Guides</div>
+<ul>
+<li><a href="../xlsx/cell-types.html">Cell Types &amp; Values</a></li>
+<li><a href="../xlsx/styles.html">Styles &amp; Formatting</a></li>
+<li><a href="../xlsx/layout.html">Layout</a></li>
+<li><a href="../xlsx/images.html">Images</a></li>
+<li><a href="../xlsx/formulas.html">Formulas</a></li>
+<li><a href="../xlsx/data-validation.html">Data Validation</a></li>
+<li><a href="../xlsx/conditional-formatting.html">Conditional Formatting</a></li>
+<li><a href="../xlsx/auto-filter.html">Auto Filter</a></li>
+<li><a href="../xlsx/pivot-tables.html">Pivot Tables</a></li>
+<li><a href="../xlsx/protection.html">Protection</a></li>
+<li><a href="../xlsx/rich-text.html">Rich Text</a></li>
+<li><a href="../xlsx/macros.html">Macros (xlsm)</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">docx Guides</div>
+<ul>
+<li><a href="../docx/paragraphs.html">Paragraphs &amp; Runs</a></li>
+<li><a href="../docx/styles.html">Styles</a></li>
+<li><a href="../docx/tables.html">Tables</a></li>
+<li><a href="../docx/images.html">Images</a></li>
+<li><a href="../docx/headers-footers.html">Headers &amp; Footers</a></li>
+<li><a href="../docx/hyperlinks.html">Hyperlinks</a></li>
+<li><a href="../docx/fields.html">Fields</a></li>
+<li><a href="../docx/sections.html">Page Setup</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">pptx Guides</div>
+<ul>
+<li><a href="../pptx/slides.html">Slides</a></li>
+<li><a href="../pptx/text.html">Text Boxes</a></li>
+<li><a href="../pptx/images.html">Images</a></li>
+<li><a href="../pptx/tables.html">Tables</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">xls (HSSF)</div>
+<ul>
+<li><a href="../xls/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">doc (HWPF)</div>
+<ul>
+<li><a href="../doc/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">ppt (HSLF)</div>
+<ul>
+<li><a class="active" href="overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">Reference</div>
+<ul>
+<li><a href="../../reference/examples-index.html">Examples Index</a></li>
+</ul>
+</div>
+      </nav>
+    </aside>
+    <main class="content">
+<h1>ppt (HSLF) Overview</h1>
+<p>HSLF is the legacy PowerPoint 97-2003 <code>.ppt</code> implementation. Coverage is ~5%.</p>
+<h2>Status</h2>
+<p>HSLF is currently a minimal reader. It can open OLE2 <code>.ppt</code> files, read the <code>PowerPoint Document</code> stream, and extract early text content from <code>TextCharsAtom</code> and <code>TextBytesAtom</code> records. This can be useful for very basic text discovery experiments, but it is not yet ready for reliable migration, preservation, or editing workflows.</p>
+<p>The next planned work is to add fixture coverage, OLE2 stream inventory, record tree preservation, no-op write round-trip, and Java POI interop.</p>
+<h2>Basic Text Probe</h2>
+<pre><code class="language-csharp">using DotnetPoi.HSLF.UserModel;
+
+using var stream = File.OpenRead(&quot;input.ppt&quot;);
+using var ppt = new HSLFSlideShow(stream);
+
+foreach (var slide in ppt.getSlides())
+{
+    foreach (var text in slide.getTextParagraphs())
+        Console.WriteLine(text);
+}</code></pre>
+<h2>Supported Today</h2>
+<ul>
+<li>OLE2 <code>.ppt</code> open</li>
+<li><code>PowerPoint Document</code> stream scan</li>
+<li>Minimal slide container detection</li>
+<li>Text extraction from <code>TextCharsAtom</code> and <code>TextBytesAtom</code></li>
+</ul>
+<h2>Limitations</h2>
+<ul>
+<li>No no-op write preservation yet</li>
+<li>No Java POI interop track yet</li>
+<li>Slide order is not yet rebuilt from <code>Current User</code> / <code>UserEditAtom</code> / persist pointers</li>
+<li>No shapes, images, comments, notes, animations, transitions, OLE, or master/layout model</li>
+<li>No public editing API</li>
+</ul>
+<p>For new presentations, prefer <code>pptx</code> / XSLF.</p>
+
+    </main>
+  </div>
+</body>
+</html>

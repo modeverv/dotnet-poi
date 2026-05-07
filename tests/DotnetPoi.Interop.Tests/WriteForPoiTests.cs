@@ -14,6 +14,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_HssfWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase6-basic.xls");
@@ -36,6 +37,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_Phase12HssfStyles_CreatesFixtureForPoi()
     {
         // Phase 12 item 4: Direction B — dotnet-poi writes .xls with styles → Java POI reads
@@ -83,6 +85,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_Phase12HssfLayout_CreatesFixtureForPoi()
     {
         // Phase 12 item 4: Direction B — dotnet-poi writes .xls with layout → Java POI reads
@@ -123,6 +126,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_Phase13NoOpDoc_CreatesFixtureForPoi()
     {
         // Phase 13 item 4: Direction B — dotnet-poi no-op saves SampleDoc.doc → Java POI reads
@@ -159,6 +163,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_Phase14EditedDoc_CreatesFixtureForPoi()
     {
         // Phase 14: Direction B — dotnet-poi edits SampleDoc.doc → Java POI reads
@@ -198,6 +203,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_Phase12HssfUnicode_CreatesFixtureForPoi()
     {
         // Phase 12 item 3: Direction B — Unicode/Japanese sheet names and strings
@@ -225,6 +231,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_Phase12HssfComprehensive_CreatesFixtureForPoi()
     {
         // Phase 12 item 3: Direction B — dotnet-poi writes .xls → Java POI reads
@@ -260,6 +267,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_StringAndNumberWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase0-basic.xlsx");
@@ -281,6 +289,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_StyledWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase2-styles.xlsx");
@@ -315,6 +324,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_PictureWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase2_5-images.xlsx");
@@ -341,6 +351,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_RotatedPictureWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_1-rotation.xlsx");
@@ -368,6 +379,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_DocxWithText_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_2-basic.docx");
@@ -393,6 +405,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_DocxWithImageAndRotation_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_2_1-image-rotation.docx");
@@ -414,6 +427,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_ComprehensiveDocx_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-docx-comprehensive.docx");
@@ -522,6 +536,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_PptxWithPictureAndRotation_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_3-pptx.pptx");
@@ -543,6 +558,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_PptxWithTextBoxesAndTables_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-pptx-comprehensive.pptx");
@@ -588,6 +604,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_AgileEncryptedWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_4-agile-encrypted.xlsx");
@@ -608,6 +625,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_BooleanAndNumericCells_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase7-cell-types.xlsx");
@@ -630,6 +648,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_FormulaCells_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase5-step1-formulas.xlsx");
@@ -657,6 +676,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_ForceFormulaRecalculation_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase5-step2-recalc.xlsx");
@@ -676,6 +696,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_EvaluatedFormulaFunctions_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase5-step3-evaluated-functions.xlsx");
@@ -706,6 +727,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_DocmWithParagraphsAndVba_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-docm-interop.docm");
@@ -735,6 +757,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_PptmWithSlideAndVba_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-pptm-interop.pptm");
@@ -758,6 +781,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_XlsmWithCellsAndVba_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-xlsm-interop.xlsm");
@@ -792,6 +816,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_AutoFilterWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-autofilter.xlsx");
@@ -816,6 +841,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_ProtectedWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-protection.xlsx");
@@ -836,6 +862,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_ActiveSheetWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-active-sheet.xlsx");
@@ -856,6 +883,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_DocxWithFields_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-docx-fields.docx");

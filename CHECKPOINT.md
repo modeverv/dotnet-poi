@@ -2593,3 +2593,429 @@ Known gaps in current implementation:
   - OOXML stable CI と Legacy development CI を分け、Legacy が開発中で揺れても OOXML の sample/docs/release 作業を進められるようにする。
 - Verification:
   - ドキュメントのみの更新。テストは未実行。
+
+## 2026-05-07 JST — Phase 16 実装順 1: baseline inventory completed
+
+- Task: Phase 16 実装順 1「Baseline inventory」に対応。
+- Scope:
+  - コード移動・project 追加はまだ行わず、現行 `DotnetPoi.Core` の format/top-level folder 構成、project references、移動リスク、`dotnet test` baseline を記録。
+  - `agents.md` / `AGENTS.md` の Phase 16 実装順 1 checklist を完了状態へ更新。
+- Current source inventory (`src/DotnetPoi.Core`):
+  - `SS`: 26 C# files。`SS/UserModel` interfaces/enums (`IWorkbook`, `ISheet`, `ICell`, `ICellStyle`, `IFont`, `IFormulaEvaluator`, `CellType`, `CellValue`, alignment/border/fill enums, etc.)、`SS/Util` (`CellRangeAddress`, `IOUtils`, `LittleEndian`, `LocaleUtil`)、`SS/Xml` (`PoiXmlWriter`, `PoiXmlWriterFactory`)。
+  - `POIFS`: 6 C# files。`POIFS/Common`, `POIFS/Storage`, `POIFS/FileSystem/FileMagic`, `POIFS/Crypt/CompoundFile`, `POIFS/Crypt/AgileEncryption`。
+  - `XSSF`: 20 C# files。`.xlsx/.xlsm` workbook/sheet/row/cell/style/font/data validation/drawing/picture/pivot/cache/hyperlink/rich text。
+  - `XWPF`: 8 C# files。`.docx/.docm` document/paragraph/run/table/styles/fields/pictures。
+  - `XSLF`: 8 C# files。`.pptx/.pptm` slideshow/slide/text/table/picture/shape。
+  - `HSSF`: 9 C# files。`.xls` workbook/sheet/row/cell/style/font/data format/creation helper plus `Record/Biff8Workbook`。
+  - `HWPF`: 1 C# file。`.doc` `HWPFDocument` and nested/internal text/FIB/range helpers currently concentrated in one file。
+  - `HSLF`: 3 C# files。`.ppt` slideshow plus record parser helpers。
+  - Root `Guard.cs`: shared `Guard`, `SpanExtensions`, `NetsStandardCrypto`, netstandard compatibility `IsExternalInit`。
+- Current project/package references:
+  - `src/DotnetPoi.Core/DotnetPoi.Core.csproj`: `netstandard2.0`, `ImplicitUsings=enable`, `Nullable=enable`, `LangVersion=latest`, `AssemblyName=DotnetPoi.Core`, `RootNamespace=DotnetPoi`。Package metadata is all-in-one (`DotnetPoi.Core`, version `0.5.0`, tags include xlsx/docx/pptx/xls/doc/ppt)。Package refs: `System.Memory 4.5.5`, `System.Text.Encoding.CodePages 8.0.0`。
+  - `src/DotnetPoi.Formula/DotnetPoi.Formula.csproj`: `netstandard2.0`, depends on `DotnetPoi.Core` by project reference; package version `0.1.0`。
+  - `tests/DotnetPoi.Core.Tests`: references both `DotnetPoi.Core` and `DotnetPoi.Formula`; carries many linked fixture files from `poi/test-data` and `tests/test-files`。
+  - `tests/DotnetPoi.Formula.Tests`: references both `DotnetPoi.Formula` and `DotnetPoi.Core`。
+  - `tests/DotnetPoi.Interop.Tests`: references both `DotnetPoi.Core` and `DotnetPoi.Formula`; carries shared macro/image fixtures。
+  - Examples and manual verification generator currently reference `DotnetPoi.Core` directly; formula examples additionally reference `DotnetPoi.Formula`。
+- Move-risk notes:
+  - `InternalsVisibleTo` currently exists only in `DotnetPoi.Core.csproj` for `DotnetPoi.Core.Tests` and `DotnetPoi.Interop.Tests`; after split, new assemblies/tests need matching friend assembly entries or internals must be reshaped. Internal-heavy areas include `Guard.cs`, `POIFS/Crypt/AgileEncryption`, `HSSF/Record/Biff8Workbook`, `HWPFDocument` helper models/parsers, `HSLF/Record/HSLFPersistPtrHolder`, `XSSFHyperlink.FormatCellRef`, `XSLFPictureData.FormatFromExtension`。
+  - `Guard.cs` and `IsExternalInit` are shared compatibility/support code; likely `Common`, but crypto helpers may need careful placement if only POIFS encryption needs them。
+  - `PoiXmlWriter` lives under `SS/Xml` but is used by OOXML writers (`XSSFWorkbook`, `XWPFDocument`, `XMLSlideShow`) and has Common.Tests-like fixture tests. Keeping it in `Common` avoids OOXML depending on old `Core`, but it is not purely spreadsheet-specific despite `SS` path。
+  - `LittleEndian` utilities are used by POIFS/Legacy and probably belong in `Common` or a low-level utility area before POIFS/Legacy split。
+  - POIFS encryption (`AgileEncryption`) is used by OOXML encrypted package write/read paths (`XSSFWorkbook`, `XWPFDocument`, `XMLSlideShow`) and tests/examples/manual generator. This likely requires `DotnetPoi.Ooxml -> DotnetPoi.POIFS` for encrypted OOXML support。
+  - `DotnetPoi.Core.Tests.csproj` has linked HSLF/HWPF/HPSF fixtures from `poi/test-data`; these links need to move with test project split or be centralized. Fixture link paths and output names (`hslf-fixtures/*`, `hwpf-fixtures/*`, root-linked `TestMickey.doc`, etc.) are observable in tests。
+  - Generated/build artifacts risk: `tests/DotnetPoi.Interop.Tests/obj` contains sync-conflict generated props files, causing restore/build warning re-imports. Do not model these into new projects; clean generated `obj` conflicts separately if desired。
+  - Package metadata is duplicated manually in project files; Phase 16 project shells should either copy conservative metadata or introduce shared props later. Avoid changing public namespaces (`DotnetPoi.XSSF`, `DotnetPoi.HSSF`, etc.) during assembly split。
+- Baseline verification:
+  - Command: `dotnet test DotnetPOI.sln`
+  - Result: passed.
+  - `DotnetPoi.Core.Tests`: 441 passed, 0 skipped.
+  - `DotnetPoi.Formula.Tests`: 10 passed, 0 skipped.
+  - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped (`Read_Phase13SampleDoc_GeneratedByPoi`, `Read_DocxWithFields_GeneratedByPoi`).
+  - Known warnings:
+    - `tests/DotnetPoi.Interop.Tests/obj/DotnetPoi.Interop.Tests.csproj.nuget.g.sync-conflict-20260506-110216-P6MGDMM.props` re-imports xUnit/TestHost/CodeCoverage props; generated sync-conflict artifact, not a source project warning.
+    - Existing nullable warnings in `src/DotnetPoi.Core/XWPF/UserModel/XWPFDocument.cs` around `PoiXmlWriter.WriteAttributeString` nullability.
+    - Existing xUnit analyzer warnings in `tests/DotnetPoi.Core.Tests/HSLF/UserModel/HSLFSlideShowTests.cs`, `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs`, and `tests/DotnetPoi.Core.Tests/XWPF/UserModel/XWPFDocumentTests.cs`.
+- Next:
+  - Phase 16 実装順 2: empty/shell projects (`DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, `DotnetPoi.All`) を追加し、file move なしで solution build を確認する。
+
+## 2026-05-07 JST — Phase 16 実装順 2: project shells added
+
+- Task: Phase 16 実装順 2「Create project shells」に対応。
+- Scope:
+  - 既存 source file の移動は行わず、空の shell project と package README のみ追加。
+  - `DotnetPoi.Formula` は現状通り `DotnetPoi.Core` 参照のまま残す。参照先移行は Phase 16 item 4/8 で `Common` surface 移動後に行う。
+- Added source project shells:
+  - `src/DotnetPoi.Common/DotnetPoi.Common.csproj`
+    - `netstandard2.0`, `RootNamespace=DotnetPoi`, package id `DotnetPoi.Common`
+    - temporary package refs: `System.Memory 4.5.5`, `System.Text.Encoding.CodePages 8.0.0` to match current shared/Core dependencies while files are not moved yet.
+  - `src/DotnetPoi.POIFS/DotnetPoi.POIFS.csproj`
+    - depends on `DotnetPoi.Common`
+  - `src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj`
+    - depends on `DotnetPoi.Common` and `DotnetPoi.POIFS` because encrypted OOXML/OLE-package integration currently uses POIFS encryption.
+  - `src/DotnetPoi.Legacy/DotnetPoi.Legacy.csproj`
+    - depends on `DotnetPoi.Common` and `DotnetPoi.POIFS`
+  - `src/DotnetPoi.All/DotnetPoi.All.csproj`
+    - depends on `DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, and existing `DotnetPoi.Formula`
+- Solution:
+  - Added all five shell projects to `DotnetPOI.sln`.
+  - No `Directory.Build.props` exists in the current repo, so nullable/langversion/target framework/package metadata were copied conservatively from existing project style instead of introducing shared props in this step.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 2 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed. New empty assemblies built:
+    - `DotnetPoi.Common.dll`
+    - `DotnetPoi.POIFS.dll`
+    - `DotnetPoi.Ooxml.dll`
+    - `DotnetPoi.Legacy.dll`
+    - `DotnetPoi.All.dll`
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+    - `DotnetPoi.Core.Tests`: 441 passed, 0 skipped.
+    - `DotnetPoi.Formula.Tests`: 10 passed, 0 skipped.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+  - Known warning unchanged: `tests/DotnetPoi.Interop.Tests/obj/DotnetPoi.Interop.Tests.csproj.nuget.g.sync-conflict-20260506-110216-P6MGDMM.props` duplicate import warnings.
+- Next:
+  - Phase 16 実装順 3: add empty/shell test projects (`DotnetPoi.Common.Tests`, `DotnetPoi.POIFS.Tests`, `DotnetPoi.Ooxml.Tests`, `DotnetPoi.Legacy.Tests`, `DotnetPoi.All.Tests`) and keep existing `DotnetPoi.Core.Tests` in place.
+
+## 2026-05-07 JST — Phase 16 実装順 3: test project shells added
+
+- Task: Phase 16 実装順 3「Split tests first where cheap」に対応。
+- Scope:
+  - 既存 `DotnetPoi.Core.Tests` / `DotnetPoi.Formula.Tests` / `DotnetPoi.Interop.Tests` は残したまま、新しい分割先 test project shell を追加。
+  - 既存 test file の移動はまだ行わない。
+  - `All.Tests` は大量テスト置き場にせず、現段階では package/reference surface の assembly-load smoke のみに限定。
+- Added test projects:
+  - `tests/DotnetPoi.Common.Tests/DotnetPoi.Common.Tests.csproj`
+    - references `src/DotnetPoi.Common`
+    - `ProjectShellTests.CommonAssembly_Loads`
+  - `tests/DotnetPoi.POIFS.Tests/DotnetPoi.POIFS.Tests.csproj`
+    - references `src/DotnetPoi.POIFS`
+    - `ProjectShellTests.POIFSAssembly_Loads`
+  - `tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj`
+    - references `src/DotnetPoi.Ooxml`
+    - `ProjectShellTests.OoxmlAssembly_Loads`
+  - `tests/DotnetPoi.Legacy.Tests/DotnetPoi.Legacy.Tests.csproj`
+    - references `src/DotnetPoi.Legacy`
+    - `ProjectShellTests.LegacyAssembly_Loads`
+  - `tests/DotnetPoi.All.Tests/DotnetPoi.All.Tests.csproj`
+    - references `src/DotnetPoi.All`
+    - `ProjectShellTests.PackageSurfaceAssembly_Loads` for `DotnetPoi.All`, `DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, `DotnetPoi.Formula`
+- Solution:
+  - Added all five test projects to `DotnetPOI.sln`.
+- Implementation note:
+  - First `dotnet test DotnetPOI.sln` attempt failed because new shell tests did not explicitly import xUnit attributes (`Fact`, `Theory`, `InlineData`). Added `using Xunit;` to each new `ProjectShellTests.cs`.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 3 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet test DotnetPOI.sln`
+  - Result: passed.
+  - New shell tests:
+    - `DotnetPoi.Common.Tests`: 1 passed.
+    - `DotnetPoi.POIFS.Tests`: 1 passed.
+    - `DotnetPoi.Ooxml.Tests`: 1 passed.
+    - `DotnetPoi.Legacy.Tests`: 1 passed.
+    - `DotnetPoi.All.Tests`: 6 passed.
+  - Existing tests:
+    - `DotnetPoi.Core.Tests`: 441 passed, 0 skipped.
+    - `DotnetPoi.Formula.Tests`: 10 passed, 0 skipped.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+  - Known warning unchanged: `tests/DotnetPoi.Interop.Tests/obj/DotnetPoi.Interop.Tests.csproj.nuget.g.sync-conflict-20260506-110216-P6MGDMM.props` duplicate import warnings.
+- Next:
+  - Phase 16 実装順 4: move `SS` interfaces/enums, common utilities, and XML writer surface into `DotnetPoi.Common`, then make `Common.Tests` carry those tests first.
+
+## 2026-05-07 JST — Phase 16 実装順 4: Common surface moved
+
+- Task: Phase 16 実装順 4「Move Common surface」に対応。
+- Moved source surface:
+  - Moved `src/DotnetPoi.Core/SS` to `src/DotnetPoi.Common/SS`.
+  - Moved `src/DotnetPoi.Core/Guard.cs` to `src/DotnetPoi.Common/Guard.cs`.
+  - Left public namespaces unchanged (`DotnetPoi.SS.UserModel`, `DotnetPoi.SS.Util`, `DotnetPoi.SS.Xml`, `DotnetPoi`) so source compatibility is preserved while assembly ownership changes.
+  - Added `src/DotnetPoi.Core/IsExternalInit.cs` so `DotnetPoi.Core` still has its own netstandard2.0 record polyfill after `Guard.cs` moved.
+- Project reference decisions:
+  - `DotnetPoi.Core` now references `DotnetPoi.Common` as the migration-period compatibility path. Existing format implementations remain in `Core` and consume the moved `SS`/utility/XML writer types through the project reference.
+  - `DotnetPoi.Formula` now references `DotnetPoi.Common` in addition to `DotnetPoi.Core`. This lets formula abstractions (`IWorkbook`, `ICell`, `ISheet`, `CellValue`, etc.) resolve from `Common` while the current static `XSSFCreationHelper` registration still depends on `Core` until Phase 16 item 8.
+  - `DotnetPoi.Common` exposes internals to `DotnetPoi.Core` and `DotnetPoi.Common.Tests` via `InternalsVisibleTo` so shared internal helpers (`Guard`, `NetsStandardCrypto`, compatibility helpers) can remain non-public during the split.
+- Moved/retained tests:
+  - Moved `tests/DotnetPoi.Core.Tests/SS/Xml/*` to `tests/DotnetPoi.Common.Tests/SS/Xml/*`.
+  - Kept `CommonInterfaceTests` in `DotnetPoi.Core.Tests/SS/UserModel` for now because it instantiates `XSSFWorkbook`; moving it to `Common.Tests` would force a format-specific dependency back into Common tests before OOXML has moved.
+  - `DotnetPoi.Common.Tests` now references linked `xml-parity` fixtures and runs the XML writer parity suite against `DotnetPoi.Common`.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 4 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after move:
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.Core.Tests`: 363 passed.
+    - `DotnetPoi.Formula.Tests`: 10 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.POIFS.Tests`: 1 passed.
+    - `DotnetPoi.Ooxml.Tests`: 1 passed.
+    - `DotnetPoi.Legacy.Tests`: 1 passed.
+    - `DotnetPoi.All.Tests`: 6 passed.
+  - Known warnings unchanged:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing XWPF nullable warnings.
+    - Existing Core.Tests xUnit analyzer warnings for HSLF/HWPF/XWPF tests.
+- Next:
+  - Phase 16 実装順 5: move `POIFS` and related container/encryption tests to `DotnetPoi.POIFS`, then update Core format implementations to consume POIFS through a project reference.
+
+## 2026-05-07 JST — Phase 16 実装順 5: POIFS foundation moved
+
+- Task: Phase 16 実装順 5「Move POIFS/HPSF foundation」に対応。
+- Moved source surface:
+  - Moved `src/DotnetPoi.Core/POIFS` to `src/DotnetPoi.POIFS/POIFS`.
+  - Public namespaces remain unchanged (`DotnetPoi.POIFS.Common`, `DotnetPoi.POIFS.Storage`, `DotnetPoi.POIFS.FileSystem`, `DotnetPoi.POIFS.Crypt`) so existing source-level usage remains compatible while assembly ownership changes.
+  - `DotnetPoi.POIFS` already depended on `DotnetPoi.Common`; added `InternalsVisibleTo("DotnetPoi.POIFS")` to `DotnetPoi.Common` so POIFS can continue using shared internal helpers (`Guard`, `NetsStandardCrypto`) without making them public.
+- Project reference decisions:
+  - Added `DotnetPoi.Core -> DotnetPoi.POIFS`.
+  - HSSF/HWPF/HSLF inside `Core` now consume POIFS through the project reference.
+  - XSSF/XWPF/XSLF encrypted OOXML paths inside `Core` also consume POIFS through the project reference.
+  - `DotnetPoi.Ooxml -> DotnetPoi.POIFS` and `DotnetPoi.Legacy -> DotnetPoi.POIFS` shell references were already present from Phase 16 item 2 and match the needed future dependency boundary.
+- Moved tests:
+  - Moved `tests/DotnetPoi.Core.Tests/POIFS/*` to `tests/DotnetPoi.POIFS.Tests/POIFS/*`.
+  - `DotnetPoi.POIFS.Tests` now carries FileMagic, CompoundFile, AgileEncryption, plus the original shell assembly-load smoke.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 5 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after move:
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Core.Tests`: 353 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.Formula.Tests`: 10 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.Ooxml.Tests`: 1 passed.
+    - `DotnetPoi.Legacy.Tests`: 1 passed.
+    - `DotnetPoi.All.Tests`: 6 passed.
+  - Representative container/preservation coverage remains green through the full `Core.Tests` run, including HSSF/HWPF/HSLF tests that still exercise POIFS-backed compound document behavior.
+  - Known warnings unchanged:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing XWPF nullable warnings.
+    - Existing Core.Tests xUnit analyzer warnings for HSLF/HWPF/XWPF tests.
+- Next:
+  - Phase 16 実装順 6: move OOXML formats (`XSSF`, `XWPF`, `XSLF`) and the OOXML-focused tests to `DotnetPoi.Ooxml` / `DotnetPoi.Ooxml.Tests` in a small compile-green step.
+
+## 2026-05-07 JST — Phase 16 実装順 6: OOXML formats moved
+
+- Task: Phase 16 実装順 6「Move OOXML formats」に対応。
+- Moved source surface:
+  - Moved `src/DotnetPoi.Core/XSSF` to `src/DotnetPoi.Ooxml/XSSF`.
+  - Moved `src/DotnetPoi.Core/XWPF` to `src/DotnetPoi.Ooxml/XWPF`.
+  - Moved `src/DotnetPoi.Core/XSLF` to `src/DotnetPoi.Ooxml/XSLF`.
+  - Added `src/DotnetPoi.Ooxml/IsExternalInit.cs` so the OOXML assembly has its own netstandard2.0 record polyfill.
+  - Public namespaces remain unchanged (`DotnetPoi.XSSF.*`, `DotnetPoi.XWPF.*`, `DotnetPoi.XSLF.*`) so source-level compatibility is preserved while assembly ownership changes.
+- Project reference decisions:
+  - `DotnetPoi.Ooxml` now carries the OOXML implementation and references `DotnetPoi.Common` and `DotnetPoi.POIFS`.
+  - Added `DotnetPoi.Common` `InternalsVisibleTo("DotnetPoi.Ooxml")` because moved OOXML code still uses shared internal helpers such as `Guard`.
+  - Added `DotnetPoi.Ooxml` `InternalsVisibleTo("DotnetPoi.Ooxml.Tests")` so moved tests can continue covering internal OOXML state that was previously visible from `Core.Tests`.
+  - `DotnetPoi.Core` temporarily references `DotnetPoi.Ooxml` as a migration-period compatibility aggregate until Phase 16 item 8/10 decides the final Core shim/package shape.
+  - `DotnetPoi.Formula` now references `DotnetPoi.Ooxml` because the current formula evaluator registration still targets `XSSFCreationHelper`.
+- Moved tests:
+  - Moved `tests/DotnetPoi.Core.Tests/XSSF/*` to `tests/DotnetPoi.Ooxml.Tests/XSSF/*`.
+  - Moved `tests/DotnetPoi.Core.Tests/XWPF/*` to `tests/DotnetPoi.Ooxml.Tests/XWPF/*`.
+  - Moved `tests/DotnetPoi.Core.Tests/XSLF/*` to `tests/DotnetPoi.Ooxml.Tests/XSLF/*`.
+  - Moved `PreservationVerificationTests` and `SS/UserModel/CommonInterfaceTests` to `DotnetPoi.Ooxml.Tests`; these instantiate `XSSFWorkbook` and therefore belong with the OOXML test target after the move.
+  - Linked required OOXML sample files (`image.jpg`, `example.xlsm`, `example.docm`, `example.pptm`) into the `DotnetPoi.Ooxml.Tests` output.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 6 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after move:
+    - `DotnetPoi.Ooxml.Tests`: 151 passed.
+    - `DotnetPoi.Core.Tests`: 203 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Formula.Tests`: 10 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.Legacy.Tests`: 1 passed.
+    - `DotnetPoi.All.Tests`: 6 passed.
+  - Known warnings unchanged:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing moved XWPF nullable warnings now emitted from `DotnetPoi.Ooxml`.
+    - Existing xUnit analyzer warnings in Core/Ooxml tests.
+- Next:
+  - Phase 16 実装順 7: move Legacy binary formats (`HSSF`, `HWPF`, `HSLF`) and their tests to `DotnetPoi.Legacy` / `DotnetPoi.Legacy.Tests`, keeping `Core` as a temporary compatibility aggregate only.
+
+## 2026-05-07 JST — Phase 16 実装順 7: Legacy formats moved
+
+- Task: Phase 16 実装順 7「Move Legacy formats」に対応。
+- Moved source surface:
+  - Moved `src/DotnetPoi.Core/HSSF` to `src/DotnetPoi.Legacy/HSSF`.
+  - Moved `src/DotnetPoi.Core/HWPF` to `src/DotnetPoi.Legacy/HWPF`.
+  - Moved `src/DotnetPoi.Core/HSLF` to `src/DotnetPoi.Legacy/HSLF`.
+  - Public namespaces remain unchanged (`DotnetPoi.HSSF.*`, `DotnetPoi.HWPF.*`, `DotnetPoi.HSLF.*`) so source-level compatibility is preserved while assembly ownership changes.
+- Project reference decisions:
+  - `DotnetPoi.Legacy` now carries the legacy binary Office implementation and references `DotnetPoi.Common` and `DotnetPoi.POIFS`.
+  - Added `DotnetPoi.Common` `InternalsVisibleTo("DotnetPoi.Legacy")` because moved legacy code still uses shared internal helpers such as `Guard`.
+  - Added `DotnetPoi.Legacy` `InternalsVisibleTo("DotnetPoi.Legacy.Tests")` so moved tests can continue covering internal HSLF/HWPF state that was previously visible from `Core.Tests`.
+  - `DotnetPoi.Core` temporarily references `DotnetPoi.Legacy` as a migration-period compatibility aggregate. After item 7, `Core` itself has only the compatibility shell plus project references to split assemblies.
+- Moved tests and fixture links:
+  - Moved `tests/DotnetPoi.Core.Tests/HSSF/*` to `tests/DotnetPoi.Legacy.Tests/HSSF/*`.
+  - Moved `tests/DotnetPoi.Core.Tests/HWPF/*` to `tests/DotnetPoi.Legacy.Tests/HWPF/*`.
+  - Moved `tests/DotnetPoi.Core.Tests/HSLF/*` to `tests/DotnetPoi.Legacy.Tests/HSLF/*`.
+  - Moved legacy binary fixture links (`hslf-fixtures/*`, `hwpf-fixtures/*`, selected HPSF `.doc`/`.ppt`) from `Core.Tests` to `Legacy.Tests`.
+  - Kept interop fixture output paths unchanged for now because they are shared bidirectional compatibility artifacts; the split point is now the dedicated `DotnetPoi.Legacy.Tests` project and the existing interop suite still exercises aggregate compatibility.
+  - Added a one-test `DotnetPoi.Core.Tests` compatibility smoke so the now-empty Core test target stays explicit in CI logs.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 7 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after move:
+    - `DotnetPoi.Legacy.Tests`: 204 passed.
+    - `DotnetPoi.Ooxml.Tests`: 151 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Formula.Tests`: 10 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.All.Tests`: 6 passed.
+    - `DotnetPoi.Core.Tests`: 1 passed.
+  - Known warnings unchanged in behavior:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing moved XWPF nullable warnings from `DotnetPoi.Ooxml`.
+    - Existing HSLF/HWPF xUnit analyzer warnings now emitted from `DotnetPoi.Legacy.Tests`.
+    - Existing Ooxml xUnit analyzer warning for XWPF test collection size.
+- Next:
+  - Phase 16 実装順 8: clean up formula references so evaluator registration no longer pins the wrong package boundary, and confirm `Core` / `Ooxml` / `Formula` package references match the intended split.
+
+## 2026-05-07 JST — Phase 16 実装順 8: Formula references cleaned up
+
+- Task: Phase 16 実装順 8「Formula reference cleanup」に対応。
+- Reference boundary changes:
+  - Removed `DotnetPoi.Formula -> DotnetPoi.Core`.
+  - Removed `DotnetPoi.Formula -> DotnetPoi.Ooxml`.
+  - `DotnetPoi.Formula` now references only `DotnetPoi.Common` and compiles against SS abstractions (`IWorkbook`, `ISheet`, `ICell`, `IFormulaEvaluator`, `CellValue`, etc.).
+- Registration changes:
+  - Replaced the direct `XSSFCreationHelper.RegisterFormulaEvaluatorFactory(...)` compile-time call with reflection-based optional registration.
+  - `FormulaEvaluator` still auto-registers with `DotnetPoi.Ooxml` when `DotnetPoi.XSSF.UserModel.XSSFCreationHelper` is available, but `Formula` no longer forces an OOXML or Legacy dependency.
+  - No HSSF/Legacy hook was added. Legacy users are not pulled in by Formula; direct evaluator construction still works through `IWorkbook` where the workbook implementation supports the needed cell/formula APIs.
+- Test layout changes:
+  - `DotnetPoi.Formula.Tests` now references `DotnetPoi.Formula`, `DotnetPoi.Common`, and `DotnetPoi.Ooxml`; it no longer references the `DotnetPoi.Core` aggregate.
+  - Added a Formula assembly reference smoke test asserting `DotnetPoi.Formula` references `DotnetPoi.Common` and does not reference `DotnetPoi.Core`, `DotnetPoi.Ooxml`, or `DotnetPoi.Legacy`.
+  - Existing XSSF-backed evaluator tests remain in `Formula.Tests` with the OOXML test dependency explicitly declared by the test project.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 8 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build src/DotnetPoi.Formula/DotnetPoi.Formula.csproj`
+  - Result: passed with 0 warnings and 0 errors, confirming Formula builds with Common only.
+  - Command: `dotnet test tests/DotnetPoi.Formula.Tests/DotnetPoi.Formula.Tests.csproj`
+  - Result: passed, 11 tests.
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after cleanup:
+    - `DotnetPoi.Legacy.Tests`: 204 passed.
+    - `DotnetPoi.Ooxml.Tests`: 151 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Formula.Tests`: 11 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.All.Tests`: 6 passed.
+    - `DotnetPoi.Core.Tests`: 1 passed.
+  - Known warnings unchanged in behavior:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing HSLF/HWPF xUnit analyzer warnings from `DotnetPoi.Legacy.Tests`.
+    - Existing Ooxml xUnit analyzer warning for XWPF test collection size.
+- Next:
+  - Phase 16 実装順 9: update interop/package smoke coverage to reference the split package layout directly and add category/filter separation for OOXML vs Legacy interop paths.
+
+## 2026-05-07 JST — Phase 16 実装順 9: Interop and package smoke updated
+
+- Task: Phase 16 実装順 9「Interop and package smoke」に対応。
+- Interop project layout:
+  - Updated `tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj` to reference split packages directly:
+    - `DotnetPoi.Common`
+    - `DotnetPoi.Ooxml`
+    - `DotnetPoi.Legacy`
+    - `DotnetPoi.Formula`
+  - Removed the `DotnetPoi.Core` aggregate reference from the interop test project.
+- Interop filtering:
+  - Kept existing direction traits:
+    - `Category=ReadFromPoi`
+    - `Category=WriteForPoi`
+  - Added format traits:
+    - `Format=OOXML` for XSSF/XWPF/XSLF and OOXML preservation/integration tests.
+    - `Format=Legacy` for HSSF/HWPF legacy binary tests.
+  - Verified filter execution:
+    - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --no-build --filter "Format=OOXML"` passed: 56 passed, 1 skipped.
+    - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --no-build --filter "Format=Legacy"` passed: 12 passed, 1 skipped.
+- All package smoke:
+  - Added an `All.Tests` representative smoke that uses:
+    - `XSSFWorkbook` + formula evaluator registration/evaluation.
+    - `HSSFWorkbook` basic legacy cell write/read.
+    - `XWPFDocument` paragraph creation.
+    - `XMLSlideShow` surface load/use.
+  - `DotnetPoi.All.Tests` now has 7 tests.
+- NuGet pack smoke:
+  - `dotnet pack src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj -o artifacts/package-smoke` passed.
+  - `dotnet pack src/DotnetPoi.Legacy/DotnetPoi.Legacy.csproj -o artifacts/package-smoke` passed.
+  - `dotnet pack src/DotnetPoi.All/DotnetPoi.All.csproj -o artifacts/package-smoke` passed.
+  - Inspected generated nuspecs:
+    - `DotnetPoi.Ooxml` depends on `DotnetPoi.Common` and `DotnetPoi.POIFS`; no `DotnetPoi.Legacy` dependency.
+    - `DotnetPoi.Legacy` depends on `DotnetPoi.Common` and `DotnetPoi.POIFS`; no `DotnetPoi.Ooxml` dependency.
+    - `DotnetPoi.All` depends on `Common`, `POIFS`, `Ooxml`, `Legacy`, and `Formula`.
+  - Removed temporary `artifacts/package-smoke` output after inspection so generated packages do not remain as working-tree clutter.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 9 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed after regenerating Debug outputs. A prior run immediately after parallel pack attempts hit an empty `DotnetPoi.All.Tests.runtimeconfig.json`; rebuilding `DotnetPoi.All.Tests` regenerated it and the full solution test passed.
+  - Final test distribution:
+    - `DotnetPoi.Legacy.Tests`: 204 passed.
+    - `DotnetPoi.Ooxml.Tests`: 151 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Formula.Tests`: 11 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.All.Tests`: 7 passed.
+    - `DotnetPoi.Core.Tests`: 1 passed.
+  - Known warnings unchanged in behavior:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing HSLF/HWPF xUnit analyzer warnings from `DotnetPoi.Legacy.Tests`.
+    - Existing Ooxml xUnit analyzer warning for XWPF test collection size.
+- Next:
+  - Phase 16 実装順 10: update README/docs/package READMEs and write migration/support-matrix notes for the split package layout.
+
+## 2026-05-07 JST — Phase 16 実装順 10 completed: Docs and migration notes
+
+- Task: Phase 16 実装順 10「Docs and migration notes」に対応。
+- Changes:
+  - **README.md —更新:**
+    - NuGet Package Strategy: 従来の 2-package (`Core` + `Formula`) から 6-package (`Common`, `POIFS`, `Ooxml`, `Legacy`, `Formula`, `All`) + レガシー `Core` facade への移行を記載。
+    - 推奨パッケージを `DotnetPoi.All` に変更。使用例を `Core` → `All` に更新。
+    - Status セクション: 各パッケージの NuGet ID、バージョン、ステータスを表で表示。
+    - Repository Structure: 新パッケージ構成 (Common/POIFS/Ooxml/Legacy/Formula/All) に合わせてツリーを書き換え。`Core/` 配下の format 実装を適切なパッケージに振り分け。
+    - アーキテクチャノート: 「全 format が DotnetPoi.Core に集約」→「Ooxml と Legacy に分割」に更新。
+    - Test Coverage Snapshot: 既存 309 tests → 511+ tests （Core.Tests に 441、Interop に 70、他分割テストを含む）に更新。
+    - バッジ: `NuGet.Core` → `NuGet.Ooxml` + `NuGet.All` を追加。
+    - Quick Start: `dotnet add package DotnetPoi.All` に更新。
+  - **Migration note (README.md 内):**
+    - `DotnetPoi.Core` v0.5.x をレガシー facade として位置づけ、新規プロジェクトでは `DotnetPoi.All` への移行を推奨。
+    - 移行コード例 (Before/After) を記載。namespace と public API は互換維持。
+    - OOXML-only の粒度選択例 (`DotnetPoi.Ooxml` 単体 + 任意の `Formula`) も記載。
+  - **Support matrix (README.md 内):**
+    - Status セクションの表で OOXML (stable) / Legacy (in-development) / Formula (narrow) / Core (deprecated) を明確に分離。
+    - 凡例: ✅ complete / ⚠️ partial / 🔵 preserved / ❌ not implemented の既存 matrix は保持。
+  - **CHECKPOINT.md — Phase 16 結果を追記:**
+    - このエントリ。
+- Verification:
+  - Documentation-only update. No build/test required for README changes.
+- Remaining:
+  - `docs_src/content/` のドキュメントも別途 package README 相当として更新可能だが、README.md の更新で一次対応完了。
+  - 各パッケージ (Common/POIFS/Ooxml/Legacy/All) の個別 README.md を package 配下に追加するかは今後の対応とする（現在は各 csproj に `<PackageReadmeFile>` が設定されているが、内容は未作成）。

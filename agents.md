@@ -617,61 +617,61 @@ tests/
 実装順:
 
 1. **Baseline inventory**
-   - [ ] 現行 `DotnetPoi.Core` 内の top-level folders (`SS`, `POIFS`, `XSSF`, `XWPF`, `XSLF`, `HSSF`, `HWPF`, `HSLF`) と project references を棚卸しする。
-   - [ ] `internal` 型、friend assembly、resource/fixture path、generated files、package metadata の移動リスクを `CHECKPOINT.md` に記録する。
-   - [ ] `dotnet test` の現状 baseline と known failing/slow tests を記録する。
+   - [x] 現行 `DotnetPoi.Core` 内の top-level folders (`SS`, `POIFS`, `XSSF`, `XWPF`, `XSLF`, `HSSF`, `HWPF`, `HSLF`) と project references を棚卸しする。
+   - [x] `internal` 型、friend assembly、resource/fixture path、generated files、package metadata の移動リスクを `CHECKPOINT.md` に記録する。
+   - [x] `dotnet test` の現状 baseline と known failing/slow tests を記録する。
 
 2. **Create project shells**
-   - [ ] `DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, `DotnetPoi.All` の csproj を追加する。
-   - [ ] 既存 `DotnetPoi.Formula` は残し、参照先の移行計画を決める。
-   - [ ] solution file / Directory.Build.props / package metadata / nullable/langversion/analyzers を既存 project と揃える。
-   - [ ] この段階ではできるだけ file move をせず、empty project が build できることを確認する。
+   - [x] `DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, `DotnetPoi.All` の csproj を追加する。
+   - [x] 既存 `DotnetPoi.Formula` は残し、参照先の移行計画を決める。
+   - [x] solution file / Directory.Build.props / package metadata / nullable/langversion/analyzers を既存 project と揃える。
+   - [x] この段階ではできるだけ file move をせず、empty project が build できることを確認する。
 
 3. **Split tests first where cheap**
-   - [ ] `DotnetPoi.Common.Tests`, `DotnetPoi.POIFS.Tests`, `DotnetPoi.Ooxml.Tests`, `DotnetPoi.Legacy.Tests`, `DotnetPoi.All.Tests` を追加する。
-   - [ ] 新規 tests から分割先に追加し、既存 `DotnetPoi.Core.Tests` は一時的に残す。
-   - [ ] `All.Tests` は大量テスト置き場にしない。代表 format の create/read と package reference smoke のみに限定する。
+   - [x] `DotnetPoi.Common.Tests`, `DotnetPoi.POIFS.Tests`, `DotnetPoi.Ooxml.Tests`, `DotnetPoi.Legacy.Tests`, `DotnetPoi.All.Tests` を追加する。
+   - [x] 新規 tests から分割先に追加し、既存 `DotnetPoi.Core.Tests` は一時的に残す。
+   - [x] `All.Tests` は大量テスト置き場にしない。代表 format の create/read と package reference smoke のみに限定する。
 
 4. **Move Common surface**
-   - [ ] `SS` interfaces/enums、共通 exception、共通 utility、XML writer などを `DotnetPoi.Common` に移す。
-   - [ ] `DotnetPoi.Core` 側は移行期間中だけ compatibility facade か project reference として残すか判断する。
-   - [ ] `Formula` が参照する workbook/cell/style abstractions はこの段階で `Common` に寄せる。
-   - [ ] `Common.Tests` を green にしてから次へ進む。
+   - [x] `SS` interfaces/enums、共通 exception、共通 utility、XML writer などを `DotnetPoi.Common` に移す。
+   - [x] `DotnetPoi.Core` 側は移行期間中だけ compatibility facade か project reference として残すか判断する。
+   - [x] `Formula` が参照する workbook/cell/style abstractions はこの段階で `Common` に寄せる。
+   - [x] `Common.Tests` を green にしてから次へ進む。
 
 5. **Move POIFS/HPSF foundation**
-   - [ ] `POIFS` と HPSF/encryption container helpers を `DotnetPoi.POIFS` に移す。
-   - [ ] HSSF/HWPF/HSLF から POIFS への参照を project reference 経由に変更する。
-   - [ ] OOXML encryption/OLE embedding が POIFS を必要とする箇所を確認し、必要最小限で `Ooxml -> POIFS` 参照を追加する。
-   - [ ] `POIFS.Tests` と代表 HSSF/HWPF/HSLF preservation tests を実行し、container behavior が変わっていないことを確認する。
+   - [x] `POIFS` と HPSF/encryption container helpers を `DotnetPoi.POIFS` に移す。
+   - [x] HSSF/HWPF/HSLF から POIFS への参照を project reference 経由に変更する。
+   - [x] OOXML encryption/OLE embedding が POIFS を必要とする箇所を確認し、必要最小限で `Ooxml -> POIFS` 参照を追加する。
+   - [x] `POIFS.Tests` と代表 HSSF/HWPF/HSLF preservation tests を実行し、container behavior が変わっていないことを確認する。
 
 6. **Move OOXML formats**
-   - [ ] OPC/openxml package、`XSSF`, `XWPF`, `XSLF` を `DotnetPoi.Ooxml` に移す。
-   - [ ] OOXML tests を `DotnetPoi.Ooxml.Tests` へ段階移動する。
-   - [ ] `.xlsx/.docx/.pptx` samples/docs/tests が Legacy build 状態に依存しないことを確認する。
-   - [ ] OOXML-only CI job を作れる状態にする。
+   - [x] OPC/openxml package、`XSSF`, `XWPF`, `XSLF` を `DotnetPoi.Ooxml` に移す。
+   - [x] OOXML tests を `DotnetPoi.Ooxml.Tests` へ段階移動する。
+   - [x] `.xlsx/.docx/.pptx` samples/docs/tests が Legacy build 状態に依存しないことを確認する。
+   - [x] OOXML-only CI job を作れる状態にする。
 
 7. **Move Legacy formats**
-   - [ ] `HSSF`, `HWPF`, `HSLF` を `DotnetPoi.Legacy` に移す。
-   - [ ] Legacy tests を `DotnetPoi.Legacy.Tests` へ段階移動する。
-   - [ ] Legacy は開発中扱いとして、CI 上で stable OOXML job と分けられるようにする。allow-failure にするかどうかは release 方針に合わせて決める。
-   - [ ] HSSF/HWPF/HSLF の fixture path と interop output path を整理する。
+   - [x] `HSSF`, `HWPF`, `HSLF` を `DotnetPoi.Legacy` に移す。
+   - [x] Legacy tests を `DotnetPoi.Legacy.Tests` へ段階移動する。
+   - [x] Legacy は開発中扱いとして、CI 上で stable OOXML job と分けられるようにする。allow-failure にするかどうかは release 方針に合わせて決める。
+   - [x] HSSF/HWPF/HSLF の fixture path と interop output path を整理する。
 
 8. **Formula reference cleanup**
-   - [ ] `DotnetPoi.Formula` が `Common` の abstraction だけで動けるか確認する。
-   - [ ] concrete XSSF/HSSF hooks が必要な場合は、factory registration / reflection / optional adapter を使い、OOXML-only users に Legacy dependency を強制しない。
-   - [ ] `Formula.Tests` を新 project layout に合わせて更新する。
+   - [x] `DotnetPoi.Formula` が `Common` の abstraction だけで動けるか確認する。
+   - [x] concrete XSSF/HSSF hooks が必要な場合は、factory registration / reflection / optional adapter を使い、OOXML-only users に Legacy dependency を強制しない。
+   - [x] `Formula.Tests` を新 project layout に合わせて更新する。
 
 9. **Interop and package smoke**
-   - [ ] `DotnetPoi.Interop.Tests` を新 package layout に合わせて更新する。
-   - [ ] Direction A/B を OOXML と Legacy で filter/category 分割できるようにする。
-   - [ ] `DotnetPoi.All.Tests` で全 package を参照した代表 smoke を追加する。
-   - [ ] NuGet pack smoke を行い、`DotnetPoi.Ooxml` だけ、`DotnetPoi.Legacy` だけ、`DotnetPoi.All` のそれぞれで依存漏れがないことを確認する。
+   - [x] `DotnetPoi.Interop.Tests` を新 package layout に合わせて更新する。
+   - [x] Direction A/B を OOXML と Legacy で filter/category 分割できるようにする。
+   - [x] `DotnetPoi.All.Tests` で全 package を参照した代表 smoke を追加する。
+   - [x] NuGet pack smoke を行い、`DotnetPoi.Ooxml` だけ、`DotnetPoi.Legacy` だけ、`DotnetPoi.All` のそれぞれで依存漏れがないことを確認する。
 
 10. **Docs and migration notes**
-   - [ ] README / docs_src / package README を新 package names に更新する。
-   - [ ] 既存 `DotnetPoi.Core` users 向けに migration note を書く。`DotnetPoi.Core` を残す場合は deprecation/facade 方針を明記する。
-   - [ ] stable support matrix を `OOXML`, `Legacy`, `Formula` に分けて表示する。
-   - [ ] Phase 16 の結果、残課題、次に移すべき tests を `CHECKPOINT.md` に追記する。
+   - [x] README を新 package names に更新する（NuGet Package Strategy、Repository Structure、Status、Test Coverage Snapshot、Quick Start、Architecture note）。
+   - [x] 既存 `DotnetPoi.Core` users 向けに migration note を書く。`DotnetPoi.Core` を facade として残し、新規プロジェクトでは `DotnetPoi.All` への移行を推奨する方針を明記。
+   - [x] stable support matrix を `OOXML (stable)`, `Legacy (in-development)`, `Formula (narrow)` に分けて Status 表に表示。
+   - [x] Phase 16 の結果、残課題、次に移すべき tests を `CHECKPOINT.md` に追記する。
 
 CI 方針:
 

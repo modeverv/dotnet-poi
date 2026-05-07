@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <IsTestProject>true</IsTestProject>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="[17.9.0,)" />
+        <PackageReference Include="xunit" Version="2.6.6" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.5.4">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../../src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj" />
+        <ProjectReference Include="../../src/DotnetPoi.Formula/DotnetPoi.Formula.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="../../tests/test-files/image.jpg" CopyToOutputDirectory="PreserveNewest" Link="image.jpg" />
+        <Content Include="../../tests/test-files/example.xlsm" CopyToOutputDirectory="PreserveNewest" Link="example.xlsm" />
+        <Content Include="../../tests/test-files/example.docm" CopyToOutputDirectory="PreserveNewest" Link="example.docm" />
+        <Content Include="../../tests/test-files/example.pptm" CopyToOutputDirectory="PreserveNewest" Link="example.pptm" />
+    </ItemGroup>
+
+</Project>

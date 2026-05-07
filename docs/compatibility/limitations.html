@@ -77,6 +77,18 @@
 </ul>
 </div>
 <div class="nav-section">
+<div class="nav-title">doc (HWPF)</div>
+<ul>
+<li><a href="../guides/doc/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">ppt (HSLF)</div>
+<ul>
+<li><a href="../guides/ppt/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
 <div class="nav-title">Reference</div>
 <ul>
 <li><a href="../reference/examples-index.html">Examples Index</a></li>
@@ -114,6 +126,8 @@
 <tr><td>Notes slides</td><td>pptx</td><td>Existing notes slides are preserved but cannot be created or read through a public API</td></tr>
 <tr><td>Sparklines</td><td>xlsx</td><td>In-cell sparkline charts not supported</td></tr>
 <tr><td>External data connections</td><td>xlsx</td><td>Existing connection parts are preserved but cannot be edited through a public API</td></tr>
+<tr><td>HSSF advanced object model</td><td>xls</td><td>Basic workbook values, styles/layout slices, interop, and preservation exist, but images, charts, comment editing, filters, pivots, and new formula writing are not modeled</td></tr>
+<tr><td>HWPF advanced object model</td><td>doc</td><td>Body text extraction and limited body edits work, but tables, images, header/footer stories, footnotes, comments, and fields are not modeled through public APIs</td></tr>
 </tbody>
 </table>
 <h2>Minor Gaps</h2>
@@ -125,7 +139,7 @@
 <tr><td>Animations/transitions editing</td><td>pptx</td><td>Preserved as unknown parts</td></tr>
 <tr><td>Theme editing</td><td>pptx</td><td>Layout/master/theme preserved but not editable</td></tr>
 <tr><td>Password hashing</td><td>xlsx</td><td>Protection on/off works; password hash not implemented</td></tr>
-<tr><td>xls (HSSF)</td><td>xls</td><td>Legacy format; minimal support</td></tr>
+<tr><td>ppt (HSLF)</td><td>ppt</td><td>Minimal reader only; no no-op write/interoperability track completed yet</td></tr>
 </tbody>
 </table>
 <h2>When to Use Java POI Instead</h2>
@@ -134,8 +148,9 @@
 <li>Programmatic formula evaluation (Excel calculation engine)</li>
 <li>Chart creation from data</li>
 <li>Editing character/table styles or resolving complex Word style inheritance</li>
-<li>Full xls (BIFF) support</li>
-<li>Legacy doc (HWPF) or ppt (HSLF) formats</li>
+<li>Full xls (BIFF) support beyond the current basic values/styles/layout/preservation slices</li>
+<li>Legacy doc (HWPF) features beyond body text extraction and limited body edits</li>
+<li>Legacy ppt (HSLF) workflows beyond the minimal reader</li>
 </ul>
 
     </main>

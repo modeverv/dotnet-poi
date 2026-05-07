@@ -14,7 +14,7 @@
         <VersionPrefix>0.1.0</VersionPrefix>
         <PackageVersion>$(VersionPrefix)</PackageVersion>
         <Authors>modeverv</Authors>
-        <Description>Formula evaluator for DotnetPoi.Core — evaluate spreadsheet formulas in xlsx workbooks. Requires DotnetPoi.Core.</Description>
+        <Description>Formula evaluator for DotnetPoi workbooks. Depends on shared SS abstractions and registers with OOXML workbooks when DotnetPoi.Ooxml is present.</Description>
         <Copyright>Copyright (c) 2025 modeverv</Copyright>
         <PackageProjectUrl>https://github.com/modeverv/dotnet-poi</PackageProjectUrl>
         <RepositoryUrl>https://github.com/modeverv/dotnet-poi</RepositoryUrl>
@@ -29,7 +29,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="../DotnetPoi.Core/DotnetPoi.Core.csproj" />
+        <ProjectReference Include="../DotnetPoi.Common/DotnetPoi.Common.csproj" />
     </ItemGroup>
 
     <ItemGroup>

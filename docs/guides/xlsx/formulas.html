@@ -77,6 +77,18 @@
 </ul>
 </div>
 <div class="nav-section">
+<div class="nav-title">doc (HWPF)</div>
+<ul>
+<li><a href="../doc/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">ppt (HSLF)</div>
+<ul>
+<li><a href="../ppt/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
 <div class="nav-title">Reference</div>
 <ul>
 <li><a href="../../reference/examples-index.html">Examples Index</a></li>
@@ -100,7 +112,7 @@ var cachedValue = cell.getNumericCellValue();           // 55.0</code></pre>
 <pre><code class="language-csharp">workbook.getCTWorkbook().calcPr.fullCalcOnLoad = true;</code></pre>
 <p>This sets the <code>fullCalcOnLoad</code> flag in the workbook. When the file is opened in Excel, all formulas are recalculated regardless of cached values.</p>
 <h2>Formula Evaluation</h2>
-<p>Full formula evaluation is <strong>permanently deferred</strong>. The <code>DotnetPoi.Formula</code> package contains a partial evaluator (SU, AVERAGE, CONCATENATE, basic arithmetic) that will not be expanded.</p>
+<p>Full formula evaluation is <strong>permanently deferred</strong>. The <code>DotnetPoi.Formula</code> package contains a limited evaluator for simple arithmetic and a small function subset such as SUM, AVERAGE, COUNT, MIN, MAX, and CONCATENATE. It is not an Excel-compatible calculation engine.</p>
 <p>Without <code>DotnetPoi.Formula</code>, calling <code>createFormulaEvaluator()</code> throws <code>NotSupportedException</code>.</p>
 <p>See <a href="../../compatibility/package-split.md">Package Split</a> for details.</p>
 <h2>Full Runnable Example</h2>
