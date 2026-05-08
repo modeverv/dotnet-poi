@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <AssemblyName>DotnetPoi.Legacy</AssemblyName>
+        <RootNamespace>DotnetPoi</RootNamespace>
+    </PropertyGroup>
+
+    <!-- ── NuGet package metadata ─────────────────────────────────────── -->
+    <PropertyGroup>
+        <PackageId>DotnetPoi.Legacy</PackageId>
+        <VersionPrefix>0.5.0</VersionPrefix>
+        <PackageVersion>$(VersionPrefix)</PackageVersion>
+        <Authors>modeverv</Authors>
+        <Description>Legacy Office 97-2003 binary format implementations for xls, doc, and ppt.</Description>
+        <Copyright>Copyright (c) 2025 modeverv</Copyright>
+        <PackageProjectUrl>https://github.com/modeverv/dotnet-poi</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/modeverv/dotnet-poi</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageTags>excel;word;powerpoint;xls;doc;ppt;binary-office;apache-poi;poi</PackageTags>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../DotnetPoi.Common/DotnetPoi.Common.csproj" />
+        <ProjectReference Include="../DotnetPoi.POIFS/DotnetPoi.POIFS.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>DotnetPoi.Legacy.Tests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" Visible="false" />
+    </ItemGroup>
+
+</Project>

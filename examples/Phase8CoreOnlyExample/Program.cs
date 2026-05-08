@@ -2,10 +2,9 @@ using DotnetPoi.SS.UserModel;
 using DotnetPoi.XSSF.UserModel;
 
 // ============================================================
-// Phase 8: Core-only example — reads and writes xlsx without
-//          the DotnetPoi.Formula package.
+// Phase 8: All-in-one example — reads and writes xlsx.
 //
-// This demonstrates that DotnetPoi.Core alone is sufficient
+// This demonstrates that DotnetPoi.All is sufficient
 // for all spreadsheet read/write/format operations.
 //
 // Formula evaluation is NOT available (the call to
@@ -13,7 +12,7 @@ using DotnetPoi.XSSF.UserModel;
 // ============================================================
 #pragma warning disable CS8602
 
-Console.WriteLine("=== Phase 8: DotnetPoi.Core only (no Formula) ===\n");
+Console.WriteLine("=== Phase 8: DotnetPoi.All (no Formula separately) ===\n");
 
 // ---- Write ----
 using (var wb = new XSSFWorkbook())

@@ -17,6 +17,10 @@ dotnet-poi can write formula text and preserve cached values, but **full formula
 
 Charts in xlsx and pptx are **preserved on round-trip but cannot be created or edited programmatically**. If your workflow requires generating chart visuals from data, this is not yet supported.
 
+### docx Comments
+
+Existing docx comments are preserved on round-trip, and dotnet-poi exposes a minimal XWPF comment API for comment metadata/text, paragraph/run marker reference ids, metadata/text editing, and paragraph range comment creation. Rich comment body content, arbitrary range editing, and cleanup-heavy marker deletion remain limited. xlsx cell comments are different: common read/create/edit/remove workflows are modeled through `XSSFComment`, cell/sheet lookup, and VML/comment part write/read, with rich formatting and VML shape styling still minimal.
+
 ### docx Style Editing
 
 Paragraph style references are supported with `setStyle()` / `getStyleID()`, and `word/styles.xml` is read or generated for new documents. Character styles, table styles, and full Word style inheritance are not yet editable or evaluated by dotnet-poi.
@@ -25,18 +29,23 @@ Paragraph style references are supported with `setStyle()` / `getStyleID()`, and
 
 docx tables support basic creation, width, grid columns, row height, header rows, cell width, horizontal grid span, vertical merge, and vertical alignment. Detailed border and shading creation is not yet exposed as an API, but existing `tblPr` / `trPr` / `tcPr` children are preserved as raw XML during round-trip.
 
+### docx Tracked Changes
+
+Tracked-change XML such as `w:ins`, `w:del`, and move ranges is preserved as raw XML in body/paragraph child order during read/write round-trip. This is preservation-only: dotnet-poi does not expose accept/reject, create/edit, author/date editing, or semantic merge behavior for revisions.
+
 ## Moderate Gaps
 
 | Feature | Format | Impact |
 |---|---|---|
-| Comments (read/create) | xlsx, docx | Existing comments preserved on round-trip but cannot be read or created |
+| Comments API | docx | Existing comments are preserved on round-trip and can be read through minimal XWPF APIs, but cannot be created or edited through public XWPF APIs |
 | Content controls (SDT) | docx | Block-level and inline SDT are preserved on round-trip but cannot be edited through a public API |
-| Word text boxes (w:txbxContent) | docx | Text inside Word text boxes is not readable |
-| Track changes | docx | Revision marks not supported |
+| Track changes API | docx | Revision markup is preserved on round-trip, but accept/reject/create/edit APIs are not supported |
 | Grouped shapes | pptx | Preserved as raw `spTree` XML but cannot be edited through a public API |
 | Notes slides | pptx | Existing notes slides are preserved but cannot be created or read through a public API |
 | Sparklines | xlsx | In-cell sparkline charts not supported |
 | External data connections | xlsx | Existing connection parts are preserved but cannot be edited through a public API |
+| HSSF advanced object model | xls | Basic workbook values, styles/layout slices, interop, and preservation exist, but images, charts, comment editing, filters, pivots, and new formula writing are not modeled |
+| HWPF advanced object model | doc | Body/header/footer/table text extraction and limited body edits work, but images, footnotes, comments, and fields are not modeled through public APIs |
 
 ## Minor Gaps
 
@@ -47,7 +56,7 @@ docx tables support basic creation, width, grid columns, row height, header rows
 | Animations/transitions editing | pptx | Preserved as unknown parts |
 | Theme editing | pptx | Layout/master/theme preserved but not editable |
 | Password hashing | xlsx | Protection on/off works; password hash not implemented |
-| xls (HSSF) | xls | Legacy format; minimal support |
+| ppt (HSLF) | ppt | Text extraction and no-op preservation exist; new slide creation and shape/image editing are not modeled |
 
 ## When to Use Java POI Instead
 
@@ -56,5 +65,7 @@ If your project depends on any of the following, consider using Apache POI (Java
 - Programmatic formula evaluation (Excel calculation engine)
 - Chart creation from data
 - Editing character/table styles or resolving complex Word style inheritance
-- Full xls (BIFF) support
-- Legacy doc (HWPF) or ppt (HSLF) formats
+- Accepting/rejecting or programmatically authoring Word tracked changes
+- Full xls (BIFF) support beyond the current basic values/styles/layout/preservation slices
+- Legacy doc (HWPF) features beyond body text extraction and limited body edits
+- Legacy ppt (HSLF) workflows beyond text extraction and no-op preservation

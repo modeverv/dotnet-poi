@@ -169,6 +169,24 @@
       ]
     },
     {
+      "title": "doc (HWPF)",
+      "items": [
+        {
+          "title": "Overview",
+          "path": "guides/doc/overview.md"
+        }
+      ]
+    },
+    {
+      "title": "ppt (HSLF)",
+      "items": [
+        {
+          "title": "Overview",
+          "path": "guides/ppt/overview.md"
+        }
+      ]
+    },
+    {
       "title": "Reference",
       "items": [
         {

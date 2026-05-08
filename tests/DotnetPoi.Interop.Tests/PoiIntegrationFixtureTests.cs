@@ -20,6 +20,7 @@ namespace DotnetPoi.Interop.Tests;
 /// Item 12 reminder: do not resurrect fixture-specific XSSFWorkbook XML payloads;
 /// keep writers model-driven and POI-source-backed.
 /// </summary>
+[Trait("Format", "OOXML")]
 public class PoiIntegrationFixtureTests
 {
     // ── shared-strings-basic ──────────────────────────────────────────────

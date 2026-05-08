@@ -20,7 +20,7 @@ set "REPO_ROOT=%SCRIPT_DIR%..\..\.."
 :: Read project version from csproj
 set "DOTNETPOI_VERSION="
 for /f "tokens=2 delims=<>" %%v in (
-    'findstr /i "VersionPrefix" "%REPO_ROOT%\src\DotnetPoi.Core\DotnetPoi.Core.csproj" 2^>nul'
+    'findstr /i "VersionPrefix" "%REPO_ROOT%\src\DotnetPoi.All\DotnetPoi.All.csproj" 2^>nul'
 ) do (
     if not defined DOTNETPOI_VERSION set "DOTNETPOI_VERSION=%%v"
 )

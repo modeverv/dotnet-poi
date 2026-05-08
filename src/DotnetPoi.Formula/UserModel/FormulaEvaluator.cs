@@ -1,6 +1,5 @@
 using System.Globalization;
 using DotnetPoi.SS.UserModel;
-using DotnetPoi.XSSF.UserModel;
 
 namespace DotnetPoi.Formula;
 
@@ -18,7 +17,7 @@ public sealed class FormulaEvaluator : IFormulaEvaluator
 
     static FormulaEvaluator()
     {
-        XSSFCreationHelper.RegisterFormulaEvaluatorFactory(wb => new FormulaEvaluator(wb));
+        TryRegisterXssfFactory();
     }
 
     public FormulaEvaluator(IWorkbook workbook)
@@ -167,6 +166,24 @@ public sealed class FormulaEvaluator : IFormulaEvaluator
             "#N/A" => 42,
             _ => ValueError
         };
+
+    private static void TryRegisterXssfFactory()
+    {
+        try
+        {
+            var creationHelperType = Type.GetType(
+                "DotnetPoi.XSSF.UserModel.XSSFCreationHelper, DotnetPoi.Ooxml",
+                throwOnError: false);
+            var registerMethod = creationHelperType?.GetMethod(
+                "RegisterFormulaEvaluatorFactory",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            registerMethod?.Invoke(null, new object[] { new Func<IWorkbook, IFormulaEvaluator>(wb => new FormulaEvaluator(wb)) });
+        }
+        catch
+        {
+            // OOXML is optional for the evaluator core; direct construction still works with any IWorkbook.
+        }
+    }
 
     private sealed class Parser
     {

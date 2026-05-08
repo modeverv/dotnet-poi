@@ -3,6 +3,7 @@ package org.dotnetpoi.interop;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -11,9 +12,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.extractor.WordExtractor;
+import org.apache.poi.hslf.usermodel.HSLFSlideShow;
+import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Comment;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.FormulaError;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.PictureData;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -32,6 +41,7 @@ import org.apache.poi.xslf.usermodel.XSLFTextParagraph;
 import org.apache.poi.xslf.usermodel.XSLFTextRun;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFComment;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFFooter;
@@ -63,6 +73,194 @@ public class ReadFromDotnetTest {
             assertEquals("from dotnet-poi hssf", row.getCell(0).getStringCellValue());
             assertEquals(66.25, row.getCell(1).getNumericCellValue());
             assertTrue(row.getCell(2).getBooleanCellValue());
+        }
+    }
+
+    @Test
+    void readPhase12HssfStyles() throws IOException {
+        // Phase 12 item 4: Direction B — Java POI reads dotnet-poi .xls with styles
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase12-hssf-styles.xls");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase12HssfStyles_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSSFWorkbook workbook = new HSSFWorkbook(input)) {
+
+            Sheet sheet = workbook.getSheet("Styles");
+            assertNotNull(sheet);
+            Row row = sheet.getRow(0);
+            assertNotNull(row);
+
+            Cell cell0 = row.getCell(0);
+            assertEquals(CellType.NUMERIC, cell0.getCellType());
+            assertEquals(42.5, cell0.getNumericCellValue(), 0.001);
+            CellStyle style0 = cell0.getCellStyle();
+            assertEquals(HorizontalAlignment.CENTER, style0.getAlignment());
+            assertTrue(style0.getWrapText());
+            assertEquals(BorderStyle.THIN, style0.getBorderBottom());
+            Font font0 = workbook.getFontAt(style0.getFontIndex());
+            assertTrue(font0.getBold());
+            assertTrue(font0.getItalic());
+            assertEquals("Calibri", font0.getFontName());
+            assertEquals(14, font0.getFontHeightInPoints());
+
+            Cell cell1 = row.getCell(1);
+            assertEquals(CellType.STRING, cell1.getCellType());
+            assertEquals("right", cell1.getStringCellValue());
+            CellStyle style1 = cell1.getCellStyle();
+            assertEquals(HorizontalAlignment.RIGHT, style1.getAlignment());
+            assertEquals(BorderStyle.MEDIUM, style1.getBorderLeft());
+        }
+    }
+
+    @Test
+    void readPhase12HssfLayout() throws IOException {
+        // Phase 12 item 4: Direction B — Java POI reads dotnet-poi .xls with layout
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase12-hssf-layout.xls");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase12HssfLayout_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSSFWorkbook workbook = new HSSFWorkbook(input)) {
+
+            Sheet sheet = workbook.getSheet("Layout");
+            assertNotNull(sheet);
+
+            // Column widths
+            assertTrue(sheet.getColumnWidth(0) > 0, "Column 0 width should be set.");
+            assertTrue(sheet.getColumnWidth(1) > sheet.getColumnWidth(0), "Column 1 should be wider than column 0.");
+            assertTrue(sheet.isColumnHidden(2), "Column 2 should be hidden.");
+
+            // Row height
+            Row row0 = sheet.getRow(0);
+            assertNotNull(row0);
+            assertTrue(row0.getHeightInPoints() > 15.0f, "Row 0 height should be > 15pt.");
+
+            // Merged region
+            assertEquals(1, sheet.getNumMergedRegions());
+            org.apache.poi.ss.util.CellRangeAddress merged = sheet.getMergedRegion(0);
+            assertEquals(3, merged.getFirstRow());
+            assertEquals(3, merged.getLastRow());
+            assertEquals(0, merged.getFirstColumn());
+            assertEquals(2, merged.getLastColumn());
+        }
+    }
+
+    @Test
+    void readPhase13NoOpDoc() throws IOException {
+        // Phase 13 item 4: Direction B — Java POI reads dotnet-poi no-op saved .doc
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase13-noop-sample.doc");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase13NoOpDoc_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HWPFDocument doc = new HWPFDocument(input)) {
+            WordExtractor extractor = new WordExtractor(doc);
+            String text = extractor.getText();
+            assertNotNull(text);
+            assertTrue(text.length() > 0, "Document text should be non-empty.");
+            assertTrue(text.contains("I am a test document") || text.contains("test document"),
+                "Document text should contain expected content.");
+        }
+    }
+
+    @Test
+    void readPhase14EditedDoc() throws IOException {
+        // Phase 14: Direction B — Java POI reads dotnet-poi edited .doc
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase14-edited-sample.doc");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase14EditedDoc_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HWPFDocument doc = new HWPFDocument(input)) {
+            WordExtractor extractor = new WordExtractor(doc);
+            String text = extractor.getText();
+            assertNotNull(text);
+            assertTrue(text.length() > 0, "Document text should be non-empty.");
+
+            // Appended text must be present
+            assertTrue(text.contains("Phase14 edited paragraph"),
+                "Edited doc should contain appended text.");
+            assertTrue(text.contains("Second appended"),
+                "Edited doc should contain second appended paragraph.");
+
+            // Original text must still be present
+            assertTrue(text.contains("I am a test document") || text.contains("test document"),
+                "Original document content should survive edits.");
+        }
+    }
+
+    @Test
+    void readPhase12HssfUnicode() throws IOException {
+        // Phase 12 item 3: Direction B — Java POI reads dotnet-poi .xls with Japanese/Unicode
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase12-hssf-unicode.xls");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase12HssfUnicode_CreatesFixtureForPoi test before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSSFWorkbook workbook = new HSSFWorkbook(input)) {
+
+            assertEquals(2, workbook.getNumberOfSheets());
+
+            Sheet sheet1 = workbook.getSheet("日本語");
+            assertNotNull(sheet1);
+            Row row0 = sheet1.getRow(0);
+            assertNotNull(row0);
+            assertEquals("テスト文字列", row0.getCell(0).getStringCellValue());
+            assertEquals("hello 世界", row0.getCell(1).getStringCellValue());
+            assertEquals("こんにちは", row0.getCell(2).getStringCellValue());
+
+            Sheet sheet2 = workbook.getSheet("中文测试");
+            assertNotNull(sheet2);
+            assertEquals("汉字测试", sheet2.getRow(0).getCell(0).getStringCellValue());
+        }
+    }
+
+    @Test
+    void readPhase12HssfComprehensive() throws IOException {
+        // Phase 12 item 3: Direction B — Java POI reads dotnet-poi generated .xls
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase12-hssf-comprehensive.xls");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase12HssfComprehensive_CreatesFixtureForPoi test before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSSFWorkbook workbook = new HSSFWorkbook(input)) {
+
+            assertEquals(2, workbook.getNumberOfSheets());
+
+            // Sheet 1: all cell types
+            Sheet sheet1 = workbook.getSheet("CellTypes");
+            assertNotNull(sheet1);
+            Row row0 = sheet1.getRow(0);
+            assertNotNull(row0);
+
+            Cell c0 = row0.getCell(0);
+            assertEquals(CellType.STRING, c0.getCellType());
+            assertEquals("string value", c0.getStringCellValue());
+
+            Cell c1 = row0.getCell(1);
+            assertEquals(CellType.NUMERIC, c1.getCellType());
+            assertEquals(42.5, c1.getNumericCellValue(), 0.001);
+
+            Cell c2 = row0.getCell(2);
+            assertEquals(CellType.BOOLEAN, c2.getCellType());
+            assertTrue(c2.getBooleanCellValue());
+
+            Cell c3 = row0.getCell(3);
+            assertEquals(CellType.BOOLEAN, c3.getCellType());
+            assertFalse(c3.getBooleanCellValue());
+
+            Cell c4 = row0.getCell(4);
+            assertEquals(CellType.ERROR, c4.getCellType());
+            assertEquals(FormulaError.DIV0.getCode(), c4.getErrorCellValue());
+
+            Cell c5 = row0.getCell(5);
+            assertEquals(CellType.ERROR, c5.getCellType());
+            assertEquals(FormulaError.NA.getCode(), c5.getErrorCellValue());
+
+            Cell c6 = row0.getCell(6);
+            assertEquals(CellType.BLANK, c6.getCellType());
+
+            // Sheet 2: sparse layout
+            Sheet sheet2 = workbook.getSheet("Sparse");
+            assertNotNull(sheet2);
+            assertEquals("row0col0", sheet2.getRow(0).getCell(0).getStringCellValue());
+            assertEquals(99.9, sheet2.getRow(5).getCell(3).getNumericCellValue(), 0.001);
+            assertEquals("row10", sheet2.getRow(10).getCell(0).getStringCellValue());
         }
     }
 
@@ -642,6 +840,65 @@ public class ReadFromDotnetTest {
     }
 
     @Test
+    void readPhase18XssfCommentsWorkbook() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase18-xssf-comments.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XSSFWorkbook workbook = new XSSFWorkbook(input)) {
+            XSSFSheet first = workbook.getSheet("Comments A");
+            XSSFSheet second = workbook.getSheet("Comments B");
+            assertNotNull(first);
+            assertNotNull(second);
+
+            assertEquals(2, first.getCellComments().size());
+            assertEquals(1, second.getCellComments().size());
+
+            Comment visible = first.getRow(0).getCell(0).getCellComment();
+            assertNotNull(visible);
+            assertEquals("DotnetPoi", visible.getAuthor());
+            assertEquals("Visible from dotnet-poi", visible.getString().getString());
+            assertTrue(visible.isVisible());
+
+            assertNull(first.getCellComment(new org.apache.poi.ss.util.CellAddress("B2")));
+            Comment moved = first.getRow(2).getCell(2).getCellComment();
+            assertNotNull(moved);
+            assertEquals("DotnetPoi", moved.getAuthor());
+            assertEquals("Moved to C3", moved.getString().getString());
+            assertFalse(moved.isVisible());
+
+            Comment other = second.getRow(1).getCell(1).getCellComment();
+            assertNotNull(other);
+            assertEquals("Interop", other.getAuthor());
+            assertEquals("Second sheet comment", other.getString().getString());
+        }
+    }
+
+    @Test
+    void readPhase18XwpfCommentsDocument() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase18-xwpf-comments.docx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XWPFDocument document = new XWPFDocument(input)) {
+            assertEquals(1, document.getComments().length);
+            XWPFComment comment = document.getCommentByID("0");
+            assertNotNull(comment);
+            assertEquals("DotnetPoi", comment.getAuthor());
+            assertEquals("DP", comment.getInitials());
+            assertEquals("Docx comment from dotnet-poi", comment.getText());
+
+            XWPFParagraph paragraph = document.getParagraphs().get(0);
+            assertEquals("DotnetPoi commented text", paragraph.getText());
+            assertEquals(1, paragraph.getCTP().getCommentRangeStartList().size());
+            assertEquals(1, paragraph.getCTP().getCommentRangeEndList().size());
+            assertEquals("0", paragraph.getCTP().getCommentRangeStartList().get(0).getId().toString());
+            assertEquals("0", paragraph.getCTP().getCommentRangeEndList().get(0).getId().toString());
+            assertEquals("0", paragraph.getRuns().get(1).getCTR().getCommentReferenceList().get(0).getId().toString());
+        }
+    }
+
+    @Test
     void readPhaseDocxFields() throws IOException {
         Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase-docx-fields.docx");
         assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
@@ -656,6 +913,50 @@ public class ReadFromDotnetTest {
 
             // Paragraph 2: "Hello " + MERGEFIELD
             assertTrue(paragraphs.get(2).getText().contains("Hello"));
+        }
+    }
+
+    @Test
+    void readPhase15HslfNoOp() throws IOException {
+        // Phase 15 Item 7: Direction B — Java POI reads dotnet-poi no-op saved .ppt
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase15-hslf-noop.ppt");
+        assertTrue(Files.exists(fixture), "Run the C# Write_Phase15HslfNoOp_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             HSLFSlideShow ppt = new HSLFSlideShow(input)) {
+
+            var slides = ppt.getSlides();
+            assertNotNull(slides);
+            assertTrue(slides.size() > 0, "No-op preserved .ppt should have slides.");
+        }
+    }
+
+    @Test
+    void readPhase17HwpfDocExtraction() throws Exception {
+        // Phase 17: Direction B — Java POI reads dotnet-poi no-op saved docs with headers/tables
+        Path headerFixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase17-headerfooter.doc");
+        Path tableFixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase17-innertable.doc");
+        
+        assertTrue(Files.exists(headerFixture), "Run the C# Write_Phase17HwpfDocExtraction_CreatesFixtureForPoi test first.");
+        assertTrue(Files.exists(tableFixture), "Run the C# Write_Phase17HwpfDocExtraction_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(headerFixture);
+             org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument(input)) {
+            String headerText = doc.getHeaderStoryRange().text();
+            assertTrue(headerText.contains("Molière"));
+        }
+
+        try (InputStream input = Files.newInputStream(tableFixture);
+             org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument(input)) {
+            org.apache.poi.hwpf.usermodel.Range range = doc.getRange();
+            boolean foundTable = false;
+            for (int i = 0; i < range.numParagraphs(); i++) {
+                if (range.getParagraph(i).isInTable()) {
+                    foundTable = true;
+                    break;
+                }
+            }
+            assertTrue(foundTable, "Table should be correctly preserved in innertable.doc");
         }
     }
 

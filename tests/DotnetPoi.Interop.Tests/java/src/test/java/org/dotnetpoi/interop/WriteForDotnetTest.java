@@ -3,16 +3,24 @@ package org.dotnetpoi.interop;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.FormulaError;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.hslf.usermodel.HSLFSlideShow;
+import org.apache.poi.hslf.usermodel.HSLFTextParagraph;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -41,6 +49,171 @@ public class WriteForDotnetTest {
             row.createCell(0).setCellValue("from apache poi hssf");
             row.createCell(1).setCellValue(123.75);
             row.createCell(2).setCellValue(false);
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhase13SampleDoc() throws IOException {
+        // Phase 13: Direction A — Java POI writes SampleDoc.doc → dotnet-poi reads
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase13-sample-doc.doc");
+        Files.createDirectories(fixture.getParent());
+
+        // Read SampleDoc.doc as a template (HWPFDocument has no zero-arg constructor in POI 5.5.1)
+        Path template = findRepoRoot().resolve("poi/test-data/document/SampleDoc.doc");
+        try (InputStream templateInput = Files.newInputStream(template);
+             org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument(templateInput)) {
+            org.apache.poi.hwpf.usermodel.Range range = doc.getRange();
+            range.insertBefore("I am a Java POI generated test document.\r");
+            range.insertAfter("Second paragraph from Java POI.\r");
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                doc.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhase12HssfStyles() throws IOException {
+        // Phase 12 item 4: Direction A — Java POI writes .xls with styles
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase12-hssf-styles.xls");
+        Files.createDirectories(fixture.getParent());
+
+        try (HSSFWorkbook workbook = new HSSFWorkbook()) {
+            Font boldFont = workbook.createFont();
+            boldFont.setBold(true);
+            boldFont.setFontName("Calibri");
+            boldFont.setFontHeightInPoints((short) 14);
+            boldFont.setItalic(true);
+
+            CellStyle style1 = workbook.createCellStyle();
+            style1.setFont(boldFont);
+            style1.setAlignment(HorizontalAlignment.CENTER);
+            style1.setWrapText(true);
+            style1.setBorderBottom(BorderStyle.THIN);
+            style1.setDataFormat(workbook.createDataFormat().getFormat("0.00"));
+
+            CellStyle style2 = workbook.createCellStyle();
+            style2.setAlignment(HorizontalAlignment.RIGHT);
+            style2.setBorderLeft(BorderStyle.MEDIUM);
+
+            Sheet sheet = workbook.createSheet("Styles");
+            Row row = sheet.createRow(0);
+            Cell cell0 = row.createCell(0);
+            cell0.setCellValue(42.5);
+            cell0.setCellStyle(style1);
+
+            Cell cell1 = row.createCell(1);
+            cell1.setCellValue("right");
+            cell1.setCellStyle(style2);
+
+            Cell cell2 = row.createCell(2);
+            cell2.setCellValue("no style");
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhase12HssfLayout() throws IOException {
+        // Phase 12 item 4: Direction A — Java POI writes .xls with layout
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase12-hssf-layout.xls");
+        Files.createDirectories(fixture.getParent());
+
+        try (HSSFWorkbook workbook = new HSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Layout");
+            // Column widths (in 1/256 of character width)
+            sheet.setColumnWidth(0, 5000);
+            sheet.setColumnWidth(1, 8000);
+            // Hidden column
+            sheet.setColumnHidden(2, true);
+            // Row heights
+            Row row0 = sheet.createRow(0);
+            row0.setHeightInPoints(30);
+            row0.createCell(0).setCellValue("wide col");
+            Row row1 = sheet.createRow(1);
+            row1.setZeroHeight(true);
+            row1.createCell(0).setCellValue("hidden row");
+            Row row2 = sheet.createRow(2);
+            row2.setHeightInPoints(20);
+            row2.createCell(0).setCellValue("normal");
+            // Merged regions
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(3, 3, 0, 2));
+            Row row3 = sheet.createRow(3);
+            row3.createCell(0).setCellValue("merged");
+            // Freeze pane
+            sheet.createFreezePane(1, 2);
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhase12HssfUnicode() throws IOException {
+        // Phase 12 item 3: Unicode/Japanese sheet names and string cells
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase12-hssf-unicode.xls");
+        Files.createDirectories(fixture.getParent());
+
+        try (HSSFWorkbook workbook = new HSSFWorkbook()) {
+            Sheet sheet1 = workbook.createSheet("日本語");
+            Row row0 = sheet1.createRow(0);
+            row0.createCell(0).setCellValue("テスト文字列");
+            row0.createCell(1).setCellValue("hello 世界");
+            row0.createCell(2).setCellValue("こんにちは");
+
+            Sheet sheet2 = workbook.createSheet("中文测试");
+            sheet2.createRow(0).createCell(0).setCellValue("汉字测试");
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                workbook.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhase12HssfComprehensive() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase12-hssf-comprehensive.xls");
+        Files.createDirectories(fixture.getParent());
+
+        try (HSSFWorkbook workbook = new HSSFWorkbook()) {
+            // Sheet 1: all cell types in one row
+            Sheet sheet1 = workbook.createSheet("CellTypes");
+            Row row0 = sheet1.createRow(0);
+            row0.createCell(0).setCellValue("string value");
+            row0.createCell(1).setCellValue(42.5);
+            row0.createCell(2).setCellValue(true);
+            row0.createCell(3).setCellValue(false);
+            row0.createCell(4).setCellErrorValue(FormulaError.DIV0.getCode());
+            row0.createCell(5).setCellErrorValue(FormulaError.NA.getCode());
+            row0.createCell(6); // blank cell
+
+            // Sheet 2: sparse layout
+            Sheet sheet2 = workbook.createSheet("Sparse");
+            sheet2.createRow(0).createCell(0).setCellValue("row0col0");
+            sheet2.createRow(5).createCell(3).setCellValue(99.9);
+            sheet2.createRow(10).createCell(0).setCellValue("row10");
 
             try (OutputStream output = Files.newOutputStream(fixture)) {
                 workbook.write(output);
@@ -318,6 +491,34 @@ public class WriteForDotnetTest {
 
             try (OutputStream output = Files.newOutputStream(fixture)) {
                 doc.write(output);
+            }
+        }
+
+        assertTrue(Files.exists(fixture));
+        assertTrue(Files.size(fixture) > 0);
+    }
+
+    @Test
+    void writePhase15HslfSampleShow() throws IOException {
+        // Phase 15: Direction A — Java POI writes .ppt → dotnet-poi reads
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-poi/phase15-hslf-sample.ppt");
+        Files.createDirectories(fixture.getParent());
+
+        Path template = findRepoRoot().resolve("poi/test-data/slideshow/basic_test_ppt_file.ppt");
+        try (InputStream templateInput = Files.newInputStream(template);
+             HSLFSlideShow ppt = new HSLFSlideShow(templateInput)) {
+
+            // Modify the first slide's title text via SLWT-linked paragraphs
+            var slides = ppt.getSlides();
+            if (!slides.isEmpty()) {
+                var textParas = slides.get(0).getTextParagraphs();
+                if (!textParas.isEmpty() && !textParas.get(0).isEmpty()) {
+                    HSLFTextParagraph.setText(textParas.get(0), "Modified by Java POI");
+                }
+            }
+
+            try (OutputStream output = Files.newOutputStream(fixture)) {
+                ppt.write(output);
             }
         }
 

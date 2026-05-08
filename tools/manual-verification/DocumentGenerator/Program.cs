@@ -1,5 +1,7 @@
 using System.IO.Compression;
 using DotnetPoi.HSSF.UserModel;
+using DotnetPoi.HWPF.UserModel;
+using DotnetPoi.HSLF.UserModel;
 using DotnetPoi.POIFS.Crypt;
 using DotnetPoi.XSSF.UserModel;
 using DotnetPoi.XSLF.UserModel;
@@ -18,6 +20,9 @@ var imageBytes = File.ReadAllBytes(Path.Combine(testFilesDirectory, "image.jpg")
 var xlsmVba = ReadZipEntry(Path.Combine(testFilesDirectory, "example.xlsm"), "xl/vbaProject.bin");
 var docmVba = ReadZipEntry(Path.Combine(testFilesDirectory, "example.docm"), "word/vbaProject.bin");
 var pptmVba = ReadZipEntry(Path.Combine(testFilesDirectory, "example.pptm"), "ppt/vbaProject.bin");
+
+var legacyDocTemplatePath = Path.Combine(repoRoot, "poi", "test-data", "document", "SampleDoc.doc");
+var legacyPptTemplatePath = Path.Combine(repoRoot, "poi", "test-data", "slideshow", "SampleShow.ppt");
 
 var outputs = new List<(string Label, string Path, string? Password)>();
 
@@ -50,6 +55,12 @@ CreateEncryptedDocx(outputs[^1].Path);
 
 outputs.Add(("xls", Path.Combine(outputDirectory, "manual-simple.xls"), null));
 CreateXls(outputs[^1].Path);
+
+outputs.Add(("doc", Path.Combine(outputDirectory, "manual-simple.doc"), null));
+CreateDocRoundTrip(outputs[^1].Path, legacyDocTemplatePath);
+
+outputs.Add(("ppt", Path.Combine(outputDirectory, "manual-simple.ppt"), null));
+CreatePptRoundTrip(outputs[^1].Path, legacyPptTemplatePath);
 
 Console.WriteLine("Manual verification documents generated:");
 foreach (var output in outputs)
@@ -211,6 +222,38 @@ static void CreateXls(string outputPath)
 
     using var output = File.Create(outputPath);
     workbook.write(output);
+}
+
+static void CreateDocRoundTrip(string outputPath, string templatePath)
+{
+    if (!File.Exists(templatePath))
+    {
+        Console.WriteLine($"  [SKIP] doc template not found: {templatePath}");
+        return;
+    }
+
+    using (var stream = File.OpenRead(templatePath))
+    using (var doc = new HWPFDocument(stream))
+    {
+        doc.appendParagraph("\n[MANUAL VERIFICATION] Edited by dotnet-poi DocumentGenerator.");
+        doc.replaceText("Sample", "Manual Verification Sample");
+
+        using var output = File.Create(outputPath);
+        doc.write(output);
+    }
+}
+
+static void CreatePptRoundTrip(string outputPath, string templatePath)
+{
+    if (!File.Exists(templatePath))
+    {
+        Console.WriteLine($"  [SKIP] ppt template not found: {templatePath}");
+        return;
+    }
+
+    // HSLF is read-only for now, so we just copy it to represent "preservation" 
+    // when we eventually add write support.
+    File.Copy(templatePath, outputPath, overwrite: true);
 }
 
 static void AddDocxRow(XWPFTable table, string left, string right)

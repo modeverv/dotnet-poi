@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <AssemblyName>DotnetPoi.All</AssemblyName>
+        <RootNamespace>DotnetPoi</RootNamespace>
+    </PropertyGroup>
+
+    <!-- ── NuGet package metadata ─────────────────────────────────────── -->
+    <PropertyGroup>
+        <PackageId>DotnetPoi.All</PackageId>
+        <VersionPrefix>1.0.0</VersionPrefix>
+        <PackageVersion>$(VersionPrefix)</PackageVersion>
+        <Authors>modeverv</Authors>
+        <Description>Meta package shell for the complete DotnetPoi surface: OOXML, legacy binary formats, POIFS, and Formula.</Description>
+        <Copyright>Copyright (c) 2025 modeverv</Copyright>
+        <PackageProjectUrl>https://github.com/modeverv/dotnet-poi</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/modeverv/dotnet-poi</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageTags>excel;word;powerpoint;xlsx;docx;pptx;xls;doc;ppt;apache-poi;poi</PackageTags>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../DotnetPoi.Common/DotnetPoi.Common.csproj" />
+        <ProjectReference Include="../DotnetPoi.POIFS/DotnetPoi.POIFS.csproj" />
+        <ProjectReference Include="../DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj" />
+        <ProjectReference Include="../DotnetPoi.Legacy/DotnetPoi.Legacy.csproj" />
+        <ProjectReference Include="../DotnetPoi.Formula/DotnetPoi.Formula.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" Visible="false" />
+    </ItemGroup>
+
+</Project>

@@ -23,9 +23,9 @@ tests/DotnetPoi.Interop.Tests/
 
 ## Bidirectional Verification
 
-**Direction A:** Java POI writes an xlsx/docx/pptx → dotnet-poi reads it and asserts every cell value, style, and structural element matches.
+**Direction A:** Java POI writes an xlsx/xls/docx/pptx fixture → dotnet-poi reads it and asserts the supported values, styles, and structural elements match.
 
-**Direction B:** dotnet-poi writes an xlsx/docx/pptx → Java POI reads it and asserts everything matches.
+**Direction B:** dotnet-poi writes or no-op saves a fixture → Java POI reads it and asserts the supported content matches.
 
 Both directions run in CI on every push.
 
@@ -34,9 +34,11 @@ Both directions run in CI on every push.
 | Format | Direction A (POI → C#) | Direction B (C# → POI) |
 |---|---|---|
 | xlsx (XSSF) | ✅ Comprehensive | ✅ Comprehensive |
-| xls (HSSF) | ⚠️ Basic | ⚠️ Basic |
+| xls (HSSF) | ⚠️ Basic + styles/layout/unicode/comprehensive fixtures | ⚠️ Basic + styles/layout/unicode/comprehensive fixtures |
 | docx (XWPF) | ✅ Comprehensive | ✅ Comprehensive |
+| doc (HWPF) | — | ⚠️ No-op saved `.doc` smoke |
 | pptx (XSLF) | ✅ Comprehensive | ✅ Comprehensive |
+| ppt (HSLF) | ⚠️ Fixture survey / text extraction | ⚠️ C# no-op fixture generation; Java assertion pending |
 | xlsm (macro) | N/A | ✅ |
 | docm (macro) | N/A | ✅ |
 | pptm (macro) | N/A | ✅ |

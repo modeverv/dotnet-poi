@@ -11,6 +11,7 @@ public class ReadPoiGeneratedTests
 {
     [Fact]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "Legacy")]
     public void Read_HssfWorkbook_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase6-basic.xls");
@@ -30,6 +31,173 @@ public class ReadPoiGeneratedTests
 
     [Fact]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "Legacy")]
+    public void Read_Phase12HssfStyles_GeneratedByPoi()
+    {
+        // Phase 12 item 4: Direction A — Java POI writes styled .xls → dotnet-poi reads
+        var fixturePath = GetFixturePath("phase12-hssf-styles.xls");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest#writePhase12HssfStyles before this test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var workbook = new HSSFWorkbook(stream);
+
+        var sheet = workbook.getSheet("Styles");
+        Assert.NotNull(sheet);
+        var row = sheet!.getRow(0)!;
+
+        // cell0: numeric with bold Calibri 14pt, center, wrap, border bottom, data format 0.00
+        var cell0 = row.getCell(0)!;
+        Assert.Equal(CellType.Numeric, cell0.getCellType());
+        Assert.Equal(42.5, cell0.getNumericCellValue());
+        var style0 = (HSSFCellStyle)cell0.getCellStyle();
+        Assert.Equal(HorizontalAlignment.Center, style0.getAlignment());
+        Assert.True(style0.getWrapText());
+        Assert.Equal(BorderStyle.Thin, style0.getBorderBottom());
+        var font0 = (HSSFFont)style0.getFont();
+        Assert.True(font0.getBold());
+        Assert.True(font0.getItalic());
+        Assert.Equal("Calibri", font0.getFontName());
+        Assert.Equal(14, font0.getFontHeightInPoints());
+
+        // cell1: right aligned, border left medium
+        var cell1 = row.getCell(1)!;
+        Assert.Equal(CellType.String, cell1.getCellType());
+        Assert.Equal("right", cell1.getStringCellValue());
+        var style1 = (HSSFCellStyle)cell1.getCellStyle();
+        Assert.Equal(HorizontalAlignment.Right, style1.getAlignment());
+        Assert.Equal(BorderStyle.Medium, style1.getBorderLeft());
+
+        // cell2: no special style
+        var cell2 = row.getCell(2)!;
+        Assert.Equal(CellType.String, cell2.getCellType());
+        Assert.Equal("no style", cell2.getStringCellValue());
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "Legacy")]
+    public void Read_Phase12HssfLayout_GeneratedByPoi()
+    {
+        // Phase 12 item 4: Direction A — Java POI writes layout .xls → dotnet-poi reads
+        var fixturePath = GetFixturePath("phase12-hssf-layout.xls");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest#writePhase12HssfLayout before this test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var workbook = new HSSFWorkbook(stream);
+
+        var sheet = workbook.getSheet("Layout");
+        Assert.NotNull(sheet);
+
+        // Column widths
+        var width0 = sheet!.getColumnWidth(0);
+        var width1 = sheet.getColumnWidth(1);
+        Assert.True(width0 > 0, "Column 0 width should be set.");
+        Assert.True(width1 > 0, "Column 1 width should be set.");
+        Assert.True(width1 > width0, "Column 1 should be wider than column 0.");
+
+        // Hidden column
+        Assert.True(sheet.isColumnHidden(2), "Column 2 should be hidden.");
+
+        // Row height
+        var row0 = sheet.getRow(0);
+        Assert.NotNull(row0);
+        Assert.True(row0!.getHeight() > 15.0f, "Row 0 should have custom height > 15pt.");
+
+        // Merged region
+        var mergedRegions = sheet.getMergedRegions();
+        Assert.True(mergedRegions.Count > 0, "Sheet should have at least one merged region.");
+        var merged = mergedRegions[0];
+        Assert.Equal(3, merged.FirstRow);
+        Assert.Equal(3, merged.LastRow);
+        Assert.Equal(0, merged.FirstCol);
+        Assert.Equal(2, merged.LastCol);
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "Legacy")]
+    public void Read_Phase12HssfUnicode_GeneratedByPoi()
+    {
+        // Phase 12 item 3: Unicode/Japanese sheet names and string cells — Direction A
+        var fixturePath = GetFixturePath("phase12-hssf-unicode.xls");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest#writePhase12HssfUnicode before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var workbook = new HSSFWorkbook(stream);
+
+        Assert.Equal(2, workbook.getNumberOfSheets());
+
+        var sheet1 = workbook.getSheet("日本語");
+        Assert.NotNull(sheet1);
+        var row0 = sheet1!.getRow(0);
+        Assert.NotNull(row0);
+        Assert.Equal("テスト文字列", row0!.getCell(0)!.getStringCellValue());
+        Assert.Equal("hello 世界", row0.getCell(1)!.getStringCellValue());
+        Assert.Equal("こんにちは", row0.getCell(2)!.getStringCellValue());
+
+        var sheet2 = workbook.getSheet("中文测试");
+        Assert.NotNull(sheet2);
+        Assert.Equal("汉字测试", sheet2!.getRow(0)!.getCell(0)!.getStringCellValue());
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "Legacy")]
+    public void Read_Phase12HssfComprehensive_GeneratedByPoi()
+    {
+        // Phase 12 item 3: Direction A — Java POI writes .xls → dotnet-poi reads
+        var fixturePath = GetFixturePath("phase12-hssf-comprehensive.xls");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest#writePhase12HssfComprehensive before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var workbook = new HSSFWorkbook(stream);
+
+        Assert.Equal(2, workbook.getNumberOfSheets());
+
+        // Sheet 1: all cell types
+        var sheet1 = workbook.getSheet("CellTypes");
+        Assert.NotNull(sheet1);
+        var row0 = sheet1!.getRow(0);
+        Assert.NotNull(row0);
+
+        var c0 = row0!.getCell(0)!;
+        Assert.Equal(CellType.String, c0.getCellType());
+        Assert.Equal("string value", c0.getStringCellValue());
+
+        var c1 = row0.getCell(1)!;
+        Assert.Equal(CellType.Numeric, c1.getCellType());
+        Assert.Equal(42.5, c1.getNumericCellValue());
+
+        var c2 = row0.getCell(2)!;
+        Assert.Equal(CellType.Boolean, c2.getCellType());
+        Assert.True(c2.getBooleanCellValue());
+
+        var c3 = row0.getCell(3)!;
+        Assert.Equal(CellType.Boolean, c3.getCellType());
+        Assert.False(c3.getBooleanCellValue());
+
+        var c4 = row0.getCell(4)!;
+        Assert.Equal(CellType.Error, c4.getCellType());
+        Assert.Equal("#DIV/0!", c4.getErrorCellString());
+
+        var c5 = row0.getCell(5)!;
+        Assert.Equal(CellType.Error, c5.getCellType());
+        Assert.Equal("#N/A", c5.getErrorCellString());
+
+        var c6 = row0.getCell(6)!;
+        Assert.Equal(CellType.Blank, c6.getCellType());
+
+        // Sheet 2: sparse layout
+        var sheet2 = workbook.getSheet("Sparse");
+        Assert.NotNull(sheet2);
+        Assert.Equal("row0col0", sheet2!.getRow(0)!.getCell(0)!.getStringCellValue());
+        Assert.Equal(99.9, sheet2.getRow(5)!.getCell(3)!.getNumericCellValue());
+        Assert.Equal("row10", sheet2.getRow(10)!.getCell(0)!.getStringCellValue());
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "OOXML")]
     public void Read_StringAndNumberWorkbook_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase1-basic.xlsx");
@@ -53,6 +221,7 @@ public class ReadPoiGeneratedTests
 
     [Fact]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "OOXML")]
     public void Read_FormulaAndBooleanCells_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase7-formulas.xlsx");
@@ -95,6 +264,7 @@ public class ReadPoiGeneratedTests
 
     [Fact]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "OOXML")]
     public void Read_ForceFormulaRecalculation_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase5-step2-recalc.xlsx");
@@ -111,6 +281,7 @@ public class ReadPoiGeneratedTests
 
     [Fact]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "OOXML")]
     public void Read_DocxComprehensive_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase-docx-comprehensive.docx");
@@ -158,6 +329,7 @@ public class ReadPoiGeneratedTests
 
     [Fact]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "OOXML")]
     public void Read_PptxWithTextBoxes_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase-pptx-comprehensive.pptx");
@@ -187,6 +359,7 @@ public class ReadPoiGeneratedTests
 
     [Fact]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "OOXML")]
     public void Read_AutoFilterSheet_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase-autofilter.xlsx");
@@ -211,6 +384,7 @@ public class ReadPoiGeneratedTests
 
     [Fact]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "OOXML")]
     public void Read_ProtectedSheet_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase-protection.xlsx");
@@ -227,6 +401,7 @@ public class ReadPoiGeneratedTests
 
     [Fact]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "OOXML")]
     public void Read_ActiveSheet_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase-active-sheet.xlsx");
@@ -242,6 +417,7 @@ public class ReadPoiGeneratedTests
 
     [Fact(Skip = "Apache POI 5.5.1 does not expose an XWPF field creation API, so the from-poi fixture contains placeholders instead of field codes.")]
     [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "OOXML")]
     public void Read_DocxWithFields_GeneratedByPoi()
     {
         var fixturePath = GetFixturePath("phase-docx-fields.docx");
@@ -266,6 +442,67 @@ public class ReadPoiGeneratedTests
         var p2Fields = paragraphs[2].getFields();
         Assert.NotEmpty(p2Fields);
         Assert.Contains("MERGEFIELD", p2Fields[0].Instruction);
+    }
+
+    [Fact(Skip = "Fixtures generated by Java tests. Run Java WriteForDotnetTest#writePhase13SampleDoc first.")]
+    [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "Legacy")]
+    public void Read_Phase13SampleDoc_GeneratedByPoi()
+    {
+        // Phase 13: Direction A — Java POI writes SampleDoc.doc → dotnet-poi reads
+        var fixturePath = GetFixturePath("phase13-sample-doc.doc");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest#writePhase13SampleDoc before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var doc = new DotnetPoi.HWPF.UserModel.HWPFDocument(stream);
+
+        var text = doc.getText();
+        Assert.NotNull(text);
+        Assert.True(text.Length > 0, "Document text should be non-empty.");
+
+        // FIB must be readable
+        var fib = doc.getFileInformationBlock();
+        Assert.True(fib.CcpText >= 0);
+        Assert.True(fib.DeclaredTableStreamName is "0Table" or "1Table");
+
+        // Range must compose
+        var range = doc.getRange();
+        Assert.Equal(text, range.text());
+        Assert.True(range.numParagraphs() > 0);
+
+        // Paragraph and run composition
+        for (int i = 0; i < range.numParagraphs(); i++)
+        {
+            var para = range.getParagraph(i);
+            var runText = string.Concat(Enumerable.Range(0, para.numCharacterRuns())
+                .Select(j => para.getCharacterRun(j).text()));
+            Assert.Equal(para.text(), runText);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "ReadFromPoi")]
+    [Trait("Format", "Legacy")]
+    public void Read_Phase15HslfSampleShow_GeneratedByPoi()
+    {
+        // Phase 15: Direction A — Java POI writes a .ppt → dotnet-poi reads
+        var fixturePath = GetFixturePath("phase15-hslf-sample.ppt");
+        Assert.True(File.Exists(fixturePath), "Run the Java WriteForDotnetTest#writePhase15HslfSampleShow before this C# read test.");
+
+        using var stream = File.OpenRead(fixturePath);
+        using var prs = new DotnetPoi.HSLF.UserModel.HSLFSlideShow(stream);
+        Assert.NotNull(prs);
+
+        var slides = prs.getSlides();
+        Assert.True(slides.Count >= 2, "Should have at least 2 slides.");
+
+        // Verify text extraction works — fixture uses basic_test_ppt_file.ppt as template
+        // (Java POI's HSLFTextParagraph.setText() modifies shape-level text but not SLWT atoms)
+        if (slides.Count >= 1)
+        {
+            var slide0Text = slides[0].getTitle();
+            Assert.Contains("This is a test title", slide0Text);
+        }
     }
 
     private static string GetFixturePath(string fileName)

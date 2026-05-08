@@ -1,34 +1,65 @@
 # Installation
 
-dotnet-poi ships as **two separate NuGet packages**. Most projects only need `DotnetPoi.Core`.
+dotnet-poi ships as **multiple NuGet packages** — pick the combination that fits your project.
+
+## Quick Pick
+
+| If you need… | Install this |
+|---|---|
+| xlsx / docx / pptx read/write only | `DotnetPoi.Ooxml` |
+| OOXML + formula evaluator | `DotnetPoi.Ooxml` + `DotnetPoi.Formula` |
+| xls / doc / ppt (legacy binary) only | `DotnetPoi.Legacy` |
+| All formats + formula (everything) | `DotnetPoi.All` |
 
 ## Package Reference
 
-Add the package to your `.csproj`:
+**OOXML-only project (xlsx, docx, pptx):**
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="DotnetPoi.Core" Version="..." />
+  <PackageReference Include="DotnetPoi.Ooxml" Version="..." />
 </ItemGroup>
 ```
 
-If you need spreadsheet formula evaluation, add the Formula package as well:
+**Add formula evaluation when needed:**
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="DotnetPoi.Core" Version="..." />
+  <PackageReference Include="DotnetPoi.Ooxml" Version="..." />
   <PackageReference Include="DotnetPoi.Formula" Version="..." />
 </ItemGroup>
 ```
 
-## Why Two Packages?
+**Legacy binary formats (xls, doc, ppt):**
 
-| Package | Contents | When to use |
+```xml
+<ItemGroup>
+  <PackageReference Include="DotnetPoi.Legacy" Version="..." />
+</ItemGroup>
+```
+
+**Everything in one dependency:**
+
+```xml
+<ItemGroup>
+  <PackageReference Include="DotnetPoi.All" Version="..." />
+</ItemGroup>
+```
+
+Transitive dependencies (`DotnetPoi.Common`, `DotnetPoi.POIFS`) are resolved automatically by NuGet.
+
+## Why Multiple Packages?
+
+| Package | Contents | Best for |
 |---|---|---|
-| `DotnetPoi.Core` | All format implementations (xlsx, xls, docx, pptx, doc, ppt) + common interfaces + XML writer | Always required |
-| `DotnetPoi.Formula` | Formula evaluator (`IFormulaEvaluator`, `FormulaEvaluator`, `CellValue`) | Only when you need programmatic formula evaluation |
+| `DotnetPoi.Ooxml` | XSSF (xlsx/xlsm), XWPF (docx/docm), XSLF (pptx/pptm) | Modern Office 2007+ formats |
+| `DotnetPoi.Legacy` | HSSF (xls), HWPF (doc), HSLF (ppt) | Legacy binary formats |
+| `DotnetPoi.Formula` | Formula evaluator (`IFormulaEvaluator`, `FormulaEvaluator`, `CellValue`) | Programmatic formula calculation |
+| `DotnetPoi.Common` | SS interfaces, shared enums, XML writer | Included transitively |
+| `DotnetPoi.POIFS` | OLE2/CFB container, encryption helpers | Included transitively |
+| `DotnetPoi.All` | All of the above in one meta-package | Convenience |
 
-**Design principle:** `Core` has zero knowledge of `Formula`. Adding `DotnetPoi.Formula` to your project automatically enables `createFormulaEvaluator()` via lazy assembly discovery at runtime. Without it, the call throws a clear `NotSupportedException`.
+**Design principle:** Format packages have zero knowledge of `Formula`. Adding `DotnetPoi.Formula` to your project automatically enables `createFormulaEvaluator()` via lazy assembly discovery at runtime. Without it, the call throws a clear `NotSupportedException`.
 
 ## Verify Installation
 
@@ -41,7 +72,7 @@ Create a file `TestInstall.csproj`:
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="DotnetPoi.Core" Version="..." />
+    <PackageReference Include="DotnetPoi.Ooxml" Version="..." />
   </ItemGroup>
 </Project>
 ```

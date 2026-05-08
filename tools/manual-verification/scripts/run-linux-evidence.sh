@@ -8,7 +8,7 @@ COMPOSE_FILE="${PHASE11_DIR}/docker-compose.yml"
 
 version="$(
   sed -n 's:.*<VersionPrefix>\(.*\)</VersionPrefix>.*:\1:p' \
-    "${REPO_ROOT}/src/DotnetPoi.Core/DotnetPoi.Core.csproj" | head -n 1
+    "${REPO_ROOT}/src/DotnetPoi.All/DotnetPoi.All.csproj" | head -n 1
 )"
 if [ -z "${version}" ]; then
   version="unknown"

@@ -1,5 +1,436 @@
 # CHECKPOINT
 
+## 2026-05-07 JST — Phase 14 item 12 completed: FIB full rebuild after edit
+
+- Task: Phase 14 item 12「HWPF: write() — FIB の完全な再構築なし」を解消。
+- Fixed: `RebuildFibAfterEdit(main)` メソッドを追加し、`SetMainBodyText` の最後に呼ぶようにした。
+  - `fcMac` (fibBase offset 28) = `main.Length` — POI の `fcMac = wordDocumentStream.size()` 相当
+  - `ccpFtn` / `ccpHdd` / `ccpAtn` / `ccpEdn` / `ccpTxbx` / `ccpHdrTxbx` = 0 — 単一 Unicode ピース書き換え後は二次ストーリーなし
+- FIB オフセット定数 7 個追加: `FibOffsetFcMac`/`FibOffsetCcpFtn`/`FibOffsetCcpHdd`/`FibOffsetCcpAtn`/`FibOffsetCcpEdn`/`FibOffsetCcpTxbx`/`FibOffsetCcpHdrTxbx`
+- Test: `Phase14Item12_AfterEdit_FibRebuildSetsFcMacAndZerosSecondaryStoryCounts` — 59 passed, 0 failed。
+
+## 2026-05-07 JST — Phase 14 item 11 completed: CHPBinTable/PAPBinTable update after edit
+
+- Task: Phase 14 item 11「HWPF: appendParagraph / replaceText — piece table の不完全な更新」を解消。
+- Fixed: `SetMainBodyText` で CLX 更新後、最小限の CHPBinTable (PlcBteChpx) と PAPBinTable (PlcBtePapx) をテーブルストリーム末尾に書き込むようにした。最小エントリ構造: lcb=8 (2×int32 FC センチネル、FKP ページなし)。これにより編集後の文書で古い FKP 参照が残らず、外部リーダーが stale な FC 範囲の CHPX/PAPX を参照することがなくなる。
+- FIB 更新フィールド: `fcPlcfBteChpx`/`lcbPlcfBteChpx`/`fcPlcfBtePapx`/`lcbPlcfBtePapx` を新しいテーブルエントリ位置・長さ (8) に更新。
+- Test: `Phase14Item11_AfterEdit_ChpBinTableAndPapBinTablePointToNewTextRange` — lcbChpx=8 / lcbPapx=8 の検証、FC 範囲の正値確認、段落・ランのテキスト合成検証。58 passed, 0 failed。
+
+## 2026-05-07 JST — Phase 12/13 remaining items + Phase 14 structure debt
+
+- Task: Phase 12/13 の未完了・部分完了アイテムを全て対応し、Phase 14 として構造的負債をリストアップ。
+- Completed:
+  - **Phase 12 item 4 FormatRecord**: `Biff8Workbook` に FormatRecord (0x041E) read/write を実装。`HSSFDataFormat.AddBiffFormat` / `GetUserDefinedFormats` を追加。user-defined formats が write → read で round-trip することをテスト固定。
+  - **Phase 13 item 3 CHPX formatting**: `HWPFDocument` に CHPBinTable → CHPFKP → CHPX sprm 解析を実装。`ReadChpSegments()` が FC→CP 変換を行い、全 CP 範囲に CHPX プロパティをマップ。`HWPFChpProperties.ParseChpx()` で sprmCFBold/sprmCFItalic/sprmCFStrike/sprmCKul/sprmCHps/sprmCRgFtc0 を解析。`ReadFontTable()` の STTBFFFN 名前オフセットを 26→40 (POI Ffn.java に合わせた正確な値) に修正。CharacterRun.isBold/isItalic/getFontSize/getFontName が実際の CHPX 値を返すようになった。SampleDoc.doc の Arial Black 16pt が size=32, font="Arial Black" として読み取れることを確認・テスト固定。
+  - **Phase 13 item 3 Unicode string assertions**: `Phase13Chpx_SampleDoc_ReturnsFormattingFromChpfkp` / `Phase13Chpx_SampleDoc_DefaultRunHasNoExplicitFormatting` テストを追加し、formatting 値と default run 挙動を固定。
+  - **Phase 13 item 4 Java POI Direction B smoke**: `Write_Phase13NoOpDoc_CreatesFixtureForPoi` (C# side) と `readPhase13NoOpDoc` (Java side) を追加。pom.xml に poi-scratchpad 依存を追加。Java POI の WordExtractor で dotnet-poi no-op 保存 .doc を読み取り確認済み。
+  - **Phase 13 item 5 round-trip tests**: HSSF compile error 解消後に全テスト通過確認。append paragraph / replace text の round-trip tests が 57 passed で安定。
+  - **Phase 14 構造的負債リスト**: agents.md に Phase 14 を追加し、Phase 12/13 での POI 乖離 12 点 (HSSF 7点 + HWPF 5点) を TODO としてリストアップ。
+- Test counts after this session:
+  - HWPFDocumentTests: 57 passed (+2 CHPX tests added)
+  - HSSFWorkbookTests: 35 passed (+1 FormatRecord test added)
+  - Interop tests: Phase 13 Direction B 1 test added
+- Key limitation (Phase 14 target):
+  - CharacterRun のスタイルシート default values (font/size が CHPX に明示されない run は size=0/font="" を返す)
+  - HSSF: POI と同じ 21 built-in XF records を書いていない (15 のみ)
+  - HSSF: FormatRecord で built-in 8 formats を書いていない
+  - HSSF: StyleRecord を書いていない
+  - HWPF: PAPX (paragraph properties) 未実装
+
+## 2026-05-07 JST — Phase 12 item 4 completed: style/layout BIFF records
+
+- Task: Phase 12 実装順 4「style / layout の順に、帳票で効く機能から追加する」の主要サブタスクを完了。
+- Completed:
+  - `HSSFCellStyle`: alignment/wrapText/border/fill 等の実際のフィールドを追加し get/set が機能するようにした。
+  - `HSSFFont`: BoldWeight/Attributes/AutoColor internal helper を追加。
+  - `HSSFRow`: `_heightTwips`/`_hidden` を追加し setHeight/getHeight/setHidden/isHidden が動作するようにした。
+  - `HSSFSheet`: freeze pane / hidden columns の state を追加し createFreezePane/setColumnHidden/isColumnHidden が動作するようにした。
+  - `HSSFWorkbook`: BeginBiffLoad/AddFontFromBiff/AddStyleFromBiff 等の internal method を追加。
+  - `Biff8Workbook`: FontRecord (0x0031), XfRecord (0x00E0) の read/write を実装。RowRecord (0x0208), ColInfo (0x007D), MergeCells (0x00E5), Pane (0x0041) の read/write を実装。WriteSheet を ROW record + cells interleaved 構造に変更 (POI 互換)。
+  - Cell prefix record で実際の XF index を使うよう修正。cell 読み取り時に XF index から style を参照するよう修正。
+- Tests added:
+  - `Write_CellStyles_RoundTrip`, `Write_SheetLayout_RoundTrip` (C# round-trip)
+  - `Read_Phase12HssfStyles_GeneratedByPoi`, `Read_Phase12HssfLayout_GeneratedByPoi` (Direction A)
+  - `Write_Phase12HssfStyles_CreatesFixtureForPoi`, `Write_Phase12HssfLayout_CreatesFixtureForPoi` (Direction B + Java verification)
+- Test counts: HSSFWorkbookTests 34 passed; Interop Phase12 8 passed.
+- Remaining: FormatRecord (custom number formats) 未実装。loaded workbook への新規スタイル追加は未対応。
+
+## 2026-05-07 JST — Phase 13 item 5: HWPF limited body edits
+
+- Task: Phase 13 実装順 5「append paragraph / simple replacement のような限定編集を追加する」に対応。
+- Conflict note:
+  - Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れず、HWPF/`.doc` の限定本文編集に限定する。
+- POI reference checked:
+  - `poi/poi-scratchpad/src/main/java/org/apache/poi/hwpf/usermodel/Range.java` の `insertAfter(String)`, `replaceText(String, String)`, `delete()`, FIB text count adjustment 周辺を確認。
+  - POI は character/paragraph/section tables と bookmarks を編集に合わせて調整するが、dotnet-poi Phase 13 item 5 は本文中心 fixture の限定編集に絞り、PAPX/CHPX/FKP/bookmarks/fields の完全調整は Phase 13 item 6 以降に残す。
+- Changes:
+  - `agents.md` の Phase 13 item 5 に、POI 調査、append paragraph、simple replacement、FIB/CLX/piece table 最小更新、C# round-trip、preservation 境界、Phase 13 item 6/7 への引き継ぎ TODO を追加。
+  - `HWPFDocument.appendParagraph(string)` を追加。本文末尾に段落終端 `\r` 付きテキストを追加する。
+  - `HWPFDocument.replaceText(string placeholder, string value)` を追加。本文内の plain-text placeholder を ordinal replacement する。
+  - 編集時は既存 `WordDocument` 末尾に新しい単一 Unicode text piece を追加し、選択 table stream 末尾に新しい CLX/Pcdt を追加。FIB の `ccpText`, `fcClx`, `lcbClx` を更新する。
+  - `Data`, `ObjectPool`, summary streams など未編集 stream/storage は保持する。
+  - `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs` に append paragraph / simple replacement / unedited OLE stream preservation tests を追加。
+- Verification:
+  - Attempted: `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore`
+  - Blocked by unrelated concurrent Phase 12 item 4 compile error in `src/DotnetPoi.Core/HSSF/UserModel/HSSFSheet.cs`: `CS0246: IReadOnlySet<>` not found.
+  - Existing NuGet sync-conflict import warnings were also emitted as before.
+- Residual TODO / Phase 13 item 6 handoff:
+  - Current edit path rebuilds main body text as one new Unicode piece and does not adjust PAPX/CHPX/FKP, bookmarks, fields, headers/footers, tables, or image/OLE references semantically.
+  - Java POI interop and Office/LibreOffice manual verification stay in Phase 13 item 7 after the repository builds cleanly again.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 4 completed: HWPF no-op write preservation
+
+- Task: Phase 13 実装順 4「no-op write round-trip を追加し、未対応 stream と binary table を壊さないことを確認する」に対応。
+- Conflict note:
+  - Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れず、HWPF/`.doc` の no-op preservation のみに限定した。
+- POI reference checked:
+  - `poi/poi-scratchpad/src/main/java/org/apache/poi/hwpf/HWPFDocument.java#write(OutputStream)` と private write path、`HWPFDocumentCore`, `FileInformationBlock.writeTo`, `ComplexFileTable.writeTo` 周辺を確認。
+  - POI は編集時に FIB/table stream を再構築するが、dotnet-poi Phase 13 item 4 は no-op preservation に限定し、本文編集・FIB/table rebuild は item 5 以降に残す。
+- Changes:
+  - `HWPFDocument.write(Stream)` を追加。読み込み時に保持した `CompoundFileDocument` を `CompoundFile.Write()` で書き戻す no-op preservation path。
+  - `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs` に `Phase13NoOpWriteFixtures()` を追加し、代表 fixture + `word_with_embeded.doc` を対象化。
+  - `Phase13NoOpWrite_PreservesOleStreamsAndStorages`: no-op write 後も全 OLE2 stream name と stream bytes が一致し、storage/root entries が保持されることを固定。
+  - `Phase13NoOpWrite_RoundTrippedDocumentKeepsFibClxAndTextModel`: no-op write 後に dotnet-poi で再読込し、FIB table stream 選択、CLX offset/length、`Range.text()` と paragraph composition が一致することを固定。
+  - `agents.md` の Phase 13 item 4 checklist を実績ベースに更新。Java POI Direction B smoke は Phase 13 item 7 に残した。
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore` ✅
+  - Result: 52 passed, 0 failed, 0 skipped.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings, existing XWPF nullable warnings, and existing xUnit analyzer warning; no new failures.
+- Residual TODO / Phase 13 item 5 handoff:
+  - Current write path intentionally does not edit text, rebuild FIB, rebuild piece table, or update binary tables.
+  - append paragraph / simple replacement should start by cloning existing streams and then performing the smallest POI-compatible WordDocument/table stream update needed, with Java POI interop left for Phase 13 item 7.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 4: add HWPF no-op write task list
+
+- Task: Phase 13 実装順 4「no-op write round-trip を追加し、未対応 stream と binary table を壊さないことを確認する」の作業サブリストを `agents.md` に追加する。
+- Conflict note:
+  - Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、Phase 13 item 4 は HWPF/`.doc` no-op preservation に限定し、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れない方針を明記した。
+- Changes:
+  - `agents.md` の Phase 13 item 4 に、POI 調査、HWPF no-op write API、代表 fixture round-trip、stream/storage/FIB/CLX/text composition preservation、Java POI smoke、item 5 への引き継ぎ TODO を追加。
+- Verification:
+  - Documentation-only change so far. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 3 completed: value round-trip and Java POI interop A/B
+
+- Task: Phase 12 実装順 3「値の round-trip と Java POI interop A/B を、文字列・数値・bool/error・blank・複数シートで固める」を完了。
+- Completed:
+  - `ICell.setCellErrorValue(byte)` を追加し、`HSSFCell` と `XSSFCell` に実装。
+  - `HSSFCell.GetErrorByte()` を追加し、`Biff8Workbook.WriteSheetCells` で error cell を `BoolErr` record (fError=1) として書き込むよう実装。
+  - C# round-trip テスト: `Write_AllCellTypes_RoundTrip`（string/numeric/boolean/error/blank 全型）。
+  - C# round-trip テスト: `Write_MultipleSheets_RoundTrip`（複数シート・空行・疎行列・col 255）。
+  - Interop Direction A (Java→C#): `phase12-hssf-comprehensive.xls` fixture を Java POI が生成、dotnet-poi が読み取り検証。
+  - Interop Direction B (C#→Java): `phase12-hssf-comprehensive.xls` fixture を dotnet-poi が生成、Java POI が読み取り検証。
+  - Unicode Direction A (Java→C#): `phase12-hssf-unicode.xls` で日本語/中国語 sheet name・string cell を検証。
+  - Unicode Direction B (C#→Java): 同 fixture を dotnet-poi が生成、Java POI が検証。
+  - Record-level integrity テスト: SST/LabelSST/Number/BoolErr/Blank/Dimensions/BoundSheet offset の一貫性を BIFF byte 解析で固定。
+  - Light-edit テスト: `SimpleMultiCell.xls` を読み込み・軽編集・再読み込みで cell 更新を検証。
+- Test counts after this phase:
+  - `HSSFWorkbookTests`: 32 passed (was 28 before Phase 12 item 3).
+  - Interop tests: 新規 4 テスト追加 (Phase12 Comprehensive x2 方向, Unicode x2 方向).
+- Remaining / notes:
+  - Error cell: C# 側の `setCellErrorValue` で error code を byte で渡す（0x07=#DIV/0!, 0x2A=#N/A 等）。XSSF 実装も追加済み。
+  - `getErrorCellString()` は HSSFCell の error code → string mapping でカバー: #NULL!/#DIV/0!/#VALUE!/#REF!/#NAME?/#NUM!/#N/A。
+  - Blank cell: `row.createCell(index)` で値未設定のまま書き込むと Blank record が出力され、読み戻し時 `CellType.Blank` として復元される。
+  - Unknown BIFF preservation: Phase 12 item 2 で実装済みの template-based writing が引き続き動作する。
+  - 次のステップは Phase 12 item 4: style / layout の実装。
+
+## 2026-05-07 JST — Phase 13 item 3: add HWPF text extraction task list
+
+- Task: Phase 13 実装順 3「text extraction を `Range` / paragraph / run の順に実装する」の作業サブリストを `agents.md` に追加する。
+- Conflict note:
+  - Claude Code が Phase 12 item 3 を作業中のため、Phase 13 item 3 の予定は HWPF reader / HWPF tests / `.doc` fixture 参照に限定し、HSSF/POIFS 共通実装や `.xls` fixture には触れない方針を明記した。
+- Changes:
+  - `agents.md` の Phase 13 item 3 に、POI 調査、`Range` API、piece table CP/FC mapping、paragraph/run boundary、PAPX/CHPX/FKP formatting、代表 fixture tests、CHECKPOINT 引き継ぎの TODO を追加。
+- Verification:
+  - Documentation-only change. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 3: HWPF Range / paragraph / run baseline
+
+- Task: Phase 13 実装順 3「text extraction を `Range` / paragraph / run の順に実装する」に対応。
+- Conflict note:
+  - Claude Code が Phase 12 item 3 を作業中のため、HSSF/POIFS 共通実装、`.xls` fixture、HSSF tests には触れず、HWPF reader と HWPF tests のみに限定した。
+- POI reference checked:
+  - `HWPFDocument.getRange()`, `Range.text()`, `Range.numParagraphs()`, `Paragraph.numCharacterRuns()`, `CharacterRun.text()`, `ComplexFileTable`, `TextPieceTable`, `TextPiece` 周辺。
+- Changes:
+  - `HWPFDocument` が CLX/piece table 抽出結果を `HWPFTextModel` として保持するように変更し、既存 `getText()` は同じ文字列を返し続ける。
+  - `HWPFDocument.getRange()` を追加。
+  - 最小 read-only usermodel として `Range`, `Paragraph`, `CharacterRun` を追加。
+  - `Range.text()`, `getStartOffset()`, `getEndOffset()`, `numParagraphs()`, `getParagraph(i)`, `numCharacterRuns()`, `getCharacterRun(i)` を追加。
+  - paragraph boundary は `\r`, `\f`, `\a` を終端として検出。
+  - run boundary は CLX piece table の text piece 境界を使い、compressed/Unicode piece を `CharacterRun.isCompressed()` から確認できるようにした。
+  - `CharacterRun` / `Paragraph` formatting 系 method は POI-compatible API の足場のみ。PAPX/CHPX/FKP sprm 展開は未実装で後続 TODO。
+- Tests:
+  - `Phase13Range_TextMatchesDocumentText`
+  - `Phase13Range_ParagraphsAndRunsComposeOriginalText`
+  - 対象 fixture: `SampleDoc.doc`, `HeaderFooterUnicode.doc`, `innertable.doc`, `two_images.doc`, `pageref.doc`, `test-fields.doc`
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore` ✅
+  - Result: 38 passed, 0 failed, 0 skipped.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings, existing XWPF nullable warnings, and existing xUnit analyzer warning; no new failures.
+- Residual TODO:
+  - Add exact string expectations for Japanese/Unicode and field marker fixtures instead of only composition/offset invariants.
+  - Parse PAPX/CHPX/FKP and map representative formatting: bold, italic, underline, font size/name, alignment, indent.
+  - Consider exposing a dedicated text piece table model if later POI parity tests need CP/FC-level assertions.
+- Phase 13 item 4 handoff:
+  - `Range` is read-only and does not mutate piece table / FIB state. No-op write round-trip can build on the existing stream inventory from item 2 without relying on editing APIs from item 3.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 2: HWPF stream inventory and FIB/table stream model
+
+- Task: Phase 13 実装順 2「POIFS stream preservation と FIB / table stream 読み取りを固める」に対応。
+- Conflict note:
+  - Claude Code が Phase 12 item 3（HSSF `.xls` value round-trip / Java POI interop）を作業中のため、共有 POIFS/HSSF 実装には触れず、HWPF read-side の状態保持と検証だけに限定した。
+- Changes:
+  - `agents.md` の Phase 13 実装順 2 にサブタスクを追加し、完了状態へ更新。
+  - `HWPFDocument` が `CompoundFile.ReadDocument()` を使って OLE2 stream と storage metadata を保持するように変更。
+  - `HWPFDocument` に `getStreamNames()`, `hasStream()`, `hasStorage()`, `hasEntry()`, `getFileInformationBlock()` を追加。
+  - `HWPFFileInformationBlock` を追加し、`fWhichTblStm`, `ccpText`, `fcClx`, `lcbClx`, declared/selected table stream, fallback flag, selected table stream length, CLX validity を公開。
+  - 代表 `.doc` fixture で `WordDocument` と選択 `0Table` / `1Table` が見えること、CLX 範囲が table stream 内に収まることをテストで固定。
+  - `two_images.doc` で `Data` stream、`word_with_embeded.doc` で `ObjectPool` storage と配下 stream を検出するテストを追加。
+  - 合成 OLE2 fixture（declared table stream を削除し、反対側 table stream に同じ bytes を置く）で table stream fallback 検出を固定。
+- Tests:
+  - Added/extended HWPF tests in `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs`.
+  - Added `word_with_embeded.doc` as a linked HWPF fixture in `tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj`.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore` succeeded: 26 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and an existing xUnit analyzer warning; no new failures.
+- Phase 13 item 3 handoff:
+  - Build `Range` / paragraph / run extraction on top of `HWPFFileInformationBlock` and selected table stream state.
+  - Current API intentionally does not write `.doc`; no-op write/preservation belongs to Phase 13 item 4.
+  - Fallback behavior is modeled and covered by a synthetic/mutated in-memory OLE2 document; representative POI fixtures all have their selected table stream present.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 13 item 1: HWPF fixture survey
+
+- Task: Phase 13 実装順 1「POI HWPF tests / `poi/test-data/document/*.doc` から、単純本文、日本語、表、画像、ヘッダー/フッター、field を含む fixture を選ぶ」に対応。
+- Changes:
+  - `agents.md` の Phase 13 実装順 1 にサブタスクを追加し、完了状態へ更新。
+  - 代表 fixture を `tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj` に `hwpf-fixtures/` link として追加。
+  - `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs` に Phase 13 representative fixture smoke test を追加。
+- Selected fixtures:
+  - `SampleDoc.doc`: simple body / write baseline. POI refs: `TestHWPFWrite`, `TestProblems`.
+  - `HeaderFooterUnicode.doc`: Unicode header/footer and text piece coverage. POI refs: `TestHeaderStories`, `TestWordExtractor`, `TestTextPieceTable`.
+  - `innertable.doc`: nested table structure. POI refs: `TestTableRow`, `TestWordToFoConverter`, `TestSprms`.
+  - `two_images.doc`: picture table with jpg/png. POI refs: `TestPictures`, `TestHWPFPictures`.
+  - `pageref.doc`: bookmarks/page-reference fields. POI refs: `TestBookmarksTables`, `TestWordToFoConverter`.
+  - `test-fields.doc`: fields PLCF coverage. POI ref: `TestFieldsTables`.
+- Current dotnet-poi status:
+  - Existing `HWPFDocument` can open all selected representative fixtures and `getText()` / `getCcpText()` do not throw.
+  - Added tests intentionally assert only the current safe baseline: open + plain text extraction API stability.
+  - Missing for later Phase 13 items: POI-compatible `Range`, paragraph/run model, header/footer stories, table model, pictures table, fields tables, and write/no-op preservation API.
+- Phase 13 item 2 handoff:
+  - Start by exposing/validating FIB and selected table stream details, then add preservation-aware stream bookkeeping before any write path.
+  - Keep Phase 12 item 3 isolated: do not touch HSSF/POIFS `.xls` value interop work unless a shared POIFS bug is explicitly confirmed.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HWPFDocumentTests --no-restore` succeeded: 11 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and an existing xUnit analyzer warning; no new failures.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — agents.md: add Phase 12 item 3 task sublist
+
+- Task: `agents.md` の Phase 12 実装順 3 に、対応予定のサブリストを追加する。
+- Changes:
+  - C# round-trip、Java POI → dotnet-poi、dotnet-poi → Java POI、Unicode、BIFF record-level 検証、軽編集 preservation、CHECKPOINT 記録の項目に分解。
+- Verification:
+  - Documentation-only change. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 2 completed: BIFF unknown record preservation
+
+- Task: Complete Phase 12 item 2 item「Workbook stream 内の unknown BIFF record / unmodeled record ranges を軽編集 round-trip で保持する」。
+- Fixed:
+  - `HSSFWorkbook` now keeps the original Workbook stream bytes when loading an existing `.xls`.
+  - `Biff8Workbook.WriteWorkbook()` accepts the original Workbook stream as a template.
+  - Template-based writing preserves global Workbook records except regenerated `BoundSheet8` offsets and `SST`.
+  - Template-based sheet writing preserves unmodeled sheet records and regenerates only `Dimensions` plus currently-modeled basic cell records (`LabelSST`, `Label`, `Number`, `RK`, `BoolErr`, `Blank`).
+  - Existing SST strings are seeded into the regenerated SST before modeled strings are appended, reducing breakage for preserved unmodeled records that still reference original shared-string indexes.
+- Tests:
+  - Added `Write_LoadedWorkbook_PreservesUnknownBiffRecordsDuringLightEdit`.
+  - The test injects synthetic unknown BIFF records into both the global Workbook section and the first sheet section, edits A1 through HSSF, writes the workbook, and verifies both unknown records survive while the edited cell round-trips.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 28 passed, 0 failed.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter "FullyQualifiedName~CompoundFileTests|FullyQualifiedName~HSSFWorkbookTests|FullyQualifiedName~AgileEncryptionTests" --no-restore` succeeded: 37 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining:
+  - Exact original directory sibling tree shape remains open but is now marked as "必要に応じて"; not required for current semantic preservation.
+  - Further BIFF work should happen in Phase 12 item 3 (value round-trip + Java POI interop A/B), then style/layout.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 2 continued: POIFS DIFAT extension sectors
+
+- Task: Continue Phase 12 item 2 by supporting OLE2 DIFAT extension sectors when FAT sector count exceeds the 109 header DIFAT entries.
+- Fixed:
+  - Added `DifSect` support in `CompoundFile.Write()`.
+  - Updated FAT/DIFAT sector count calculation to include DIFAT extension sectors in the FAT coverage.
+  - Updated header writing to emit first DIFAT sector location and DIFAT sector count.
+  - Added DIFAT sector writing for FAT sector indexes beyond the first 109 header entries.
+  - Updated `ReadFat()` to traverse DIFAT extension sectors and read all FAT sectors.
+- Tests:
+  - Added `tests/DotnetPoi.Core.Tests/POIFS/Crypt/CompoundFileTests.cs`.
+  - Added a large-stream test that writes an 8MB+ stream, asserts the header uses DIFAT extension sectors, and reads the stream back byte-for-byte.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter "FullyQualifiedName~CompoundFileTests|FullyQualifiedName~HSSFWorkbookTests|FullyQualifiedName~AgileEncryptionTests" --no-restore` succeeded: 36 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining:
+  - Workbook stream unknown BIFF preservation remains the main Phase 12 item 2 blocker.
+  - Exact original directory sibling tree shape is still regenerated unless a concrete interop failure requires preserving it.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 2 continued: POIFS directory metadata preservation
+
+- Task: Continue Phase 12 item 2 by preserving OLE2 directory entry metadata through HSSF load/write.
+- Fixed:
+  - Added `CompoundFileDocument`, a metadata-aware POIFS container model with path-qualified streams and per-entry metadata.
+  - Added `CompoundFileEntryMetadata` for entry type, red/black color, CLSID, state bits, creation time, and modified time.
+  - Added `CompoundFile.ReadDocument(Stream)` and `CompoundFile.Write(Stream, CompoundFileDocument)`.
+  - Updated `HSSFWorkbook` to keep the loaded `CompoundFileDocument` and replace only the Workbook stream on write, preserving stream/storage metadata for untouched entries.
+  - Fixed path-aware metadata traversal so metadata from left-sibling directory entries is not lost.
+- Tests:
+  - Added `Write_LoadedWorkbook_PreservesOleDirectoryEntryMetadata`, which creates a workbook compound document with synthetic root/storage/stream metadata and verifies HSSF load/write preserves it.
+- Verification:
+  - `dotnet build src/DotnetPoi.Core/DotnetPoi.Core.csproj --no-restore` succeeded.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 27 passed, 0 failed.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~AgileEncryptionTests --no-restore` succeeded: 8 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining:
+  - The exact original sibling tree shape is still regenerated by the POI-like comparer. Metadata is preserved, but directory node ordering/tree shape is not byte-for-byte stable.
+  - DIFAT extension-sector support and Workbook stream unknown BIFF preservation remain open.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — agents.md: add Phase 12 item 2 progress sublist
+
+- Task: `agents.md` の Phase 12 実装順 2 に進行状況のサブリストを追加する。
+- Changes:
+  - 完了済みとして、HSSFWorkbook の OLE2 stream 保持、root 直下 stream preservation、uppercase `BOOK` alias、POIFS storage path preservation をチェック済みにした。
+  - 未完として、directory entry metadata、DIFAT extension sectors、Workbook stream 内 unknown BIFF record preservation を追加。
+- Verification:
+  - Documentation-only change. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 2: first POIFS/HSSF container fixes
+
+- Task: Phase 12 実装順 2「POIFS の不足を洗い出し、HSSF を壊している container 問題を先に直す」に対応。
+- Fixed:
+  - `HSSFWorkbook` now keeps the original OLE2 streams returned by `CompoundFile.ReadStreams()` when loading an existing `.xls`.
+  - `HSSFWorkbook.write()` now starts from those preserved streams and replaces only the workbook stream instead of writing a compound file containing only `Workbook`.
+  - Non-workbook streams such as `SummaryInformation`, `DocumentSummaryInformation`, and `CompObj` are preserved byte-for-byte through the current flat stream model.
+  - Added `BOOK` as an accepted workbook stream alias. `BOOK_in_capitals.xls` now opens and writes back using `BOOK` rather than being normalized to `Workbook`.
+- Tests:
+  - Added coverage that `BOOK_in_capitals.xls` loads.
+  - Added coverage that writing loaded `empty.xls` preserves non-workbook OLE2 streams byte-for-byte.
+  - Added coverage that writing loaded `BOOK_in_capitals.xls` preserves the uppercase `BOOK` workbook stream name.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 25 passed, 0 failed.
+  - Build emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining POIFS/HSSF container gaps:
+  - `CompoundFile.ReadStreams()` is still a flat stream API. It reads stream bytes but does not preserve storage hierarchy, directory entry metadata, CLSIDs, timestamps, or sibling tree shape.
+  - `CompoundFile.Write()` rebuilds a fresh root-level directory from a flat dictionary. This is enough for simple workbook/document summary streams, but not sufficient for robust macro/VBA, embedded OLE, drawing package, or arbitrary storage preservation.
+  - Unknown BIFF records inside the Workbook stream are still not preserved; the current writer regenerates a minimal workbook stream from the modeled cells.
+  - DIFAT beyond the first 109 FAT sectors has not been validated in this slice.
+- Next:
+  - For Phase 12 item 3, value round-trip can proceed on top of this safer stream preservation.
+  - Before macro/OLE/drawing preservation is claimed, introduce a structured POIFS document model that round-trips storages and directory metadata instead of flattening names.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 2 continued: POIFS storage path preservation
+
+- Task: Continue Phase 12 item 2 by fixing the next container-level blocker: OLE2 storage hierarchy flattening.
+- Fixed:
+  - Added `CompoundFile.ReadStreamsWithPaths(Stream)` for path-aware stream reads. It traverses the OLE2 directory sibling/child tree and returns storage-qualified names such as `_VBA_PROJECT_CUR/VBA/dir`.
+  - Updated `CompoundFile.Write()` directory construction to understand `/`-separated storage paths, create storage entries, and wire child/sibling trees per storage instead of placing every stream at root.
+  - Kept existing `CompoundFile.ReadStreams(Stream)` behavior for current callers that expect flat leaf names.
+  - Updated `HSSFWorkbook.Load()` to use path-aware stream reads so loading/writing macro-bearing `.xls` fixtures preserves nested storage streams rather than flattening them.
+- Tests:
+  - Added `Write_LoadedMacroPoiFixture_PreservesNestedOleStorageStreams`, using `poi/test-data/spreadsheet/SimpleMacro.xls`.
+  - The test verifies nested VBA streams like `_VBA_PROJECT_CUR/VBA/dir` and `_VBA_PROJECT_CUR/VBA/Module1` survive HSSF load/write/read byte-for-byte.
+- Verification:
+  - `dotnet build src/DotnetPoi.Core/DotnetPoi.Core.csproj --no-restore` succeeded.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 26 passed, 0 failed.
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~AgileEncryptionTests --no-restore` succeeded: 8 passed, 0 failed.
+  - Build/test emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Remaining:
+  - Directory metadata such as CLSIDs, timestamps, and original red/black colors are still regenerated rather than preserved.
+  - Unknown BIFF records inside the Workbook stream are still regenerated away by `Biff8Workbook.WriteWorkbook()`.
+  - DIFAT extension-sector support beyond the header DIFAT remains unimplemented/untested.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — Phase 12 item 1: POI HSSF fixture survey
+
+- Task: Phase 12 実装順 1「POI HSSF tests / `poi/test-data/spreadsheet/*.xls` から代表 fixture を選び、現状の read/write 失敗を `CHECKPOINT.md` に記録する」に対応。
+- Selected representative fixtures from `poi/test-data/spreadsheet/`:
+  - Foundation / workbook stream variants: `empty.xls`, `Simple.xls`, `SimpleMultiCell.xls`, `SampleSS.xls`, `WORKBOOK_in_capitals.xls`, `BOOK_in_capitals.xls`.
+  - Unicode / dates / basic values: `chinese-provinces.xls`, `DateFormats.xls`.
+  - Styles / formatting: `SimpleWithStyling.xls`, `WithExtendedStyles.xls`, `55341_CellStyleBorder.xls`.
+  - Layout / print metadata: `SimpleWithPrintArea.xls`, `RepeatingRowsCols.xls`.
+  - Formulas: `SimpleWithFormula.xls`, `ex47747-sharedFormula.xls`.
+  - Later preservation areas: `WithHyperlink.xls`, `comments.xls`, `drawings.xls`, `SimpleWithImages.xls`, `SimpleMacro.xls`.
+- Current read findings:
+  - 19 selected fixtures open through `HSSFWorkbook` and report expected sheet counts. This confirms the current POIFS reader can handle common FAT/MiniFAT cases for these files and that the thin BIFF scanner can reach the Workbook stream.
+  - `BOOK_in_capitals.xls` fails with `InvalidDataException: The OLE2 document does not contain a Workbook stream.` The current loader accepts `Workbook`, `Book`, and `WORKBOOK`, but not uppercase `BOOK`.
+  - Several fixtures open but expose zero or low cell counts because current BIFF support only consumes `LabelSST`, `Label`, `Number`, `RK`, `BoolErr`, and `Blank`; formula, drawing, comment, image, style, layout, name, hyperlink, and many preservation records are not modeled.
+- Current write/preservation finding:
+  - `HSSFWorkbook.write()` currently writes a new compound file containing only `Workbook`. It drops `SummaryInformation`, `DocumentSummaryInformation`, `CompObj`, VBA streams, drawing/package streams, and all unmodeled BIFF records. This is the main blocker before Phase 12 light-edit round-trip can be considered safe.
+- Changes:
+  - Added Phase 12 representative fixture coverage to `tests/DotnetPoi.Core.Tests/HSSF/UserModel/HSSFWorkbookTests.cs`.
+  - Added a characterization test documenting the current `BOOK_in_capitals.xls` failure.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Core.Tests/DotnetPoi.Core.Tests.csproj --filter FullyQualifiedName~HSSFWorkbookTests --no-restore` succeeded: 22 passed, 0 failed.
+  - Build emitted pre-existing NuGet sync-conflict import warnings and existing nullable/analyzer warnings; no new failures.
+- Next:
+  - Phase 12 item 2 should start with POIFS/HSSF preservation: retain original OLE2 streams and unknown BIFF record ranges when opening an existing workbook for light edit.
+  - Small immediate fix candidate: accept uppercase `BOOK` as a workbook stream alias.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
+## 2026-05-07 JST — agents.md: add Phase 12 xls and Phase 13 doc roadmap
+
+- Task: ユーザー方針「xlsx/docx/pptx は十分進んだので、Phase 12 を xls、Phase 13 を doc 対応にしたい」に合わせて `agents.md` を更新。
+- Changes:
+  - `Phase 12 — xls/HSSF Practical Completion` を追加。
+  - HSSF の実装範囲を POIFS foundation、minimal workbook、styles/formats、sheet layout、formula preservation、hyperlinks/comments/names/data validation、drawings/images、manual verification の順に整理。
+  - `.xls` は XML ではなく BIFF record stream なので、record-level semantic parity と unknown record preservation を重視する方針を明記。
+  - `Phase 13 — doc/HWPF Practical Completion` を追加。
+  - HWPF の実装範囲を container/stream preservation、FIB/table stream、text extraction、paragraph/run、safe light editing、tables/headers/fields、images/OLE preservation の順に整理。
+  - Phase 13 は Phase 12 後、HSSF で POIFS の実用性を固めてから進める前提を明記。
+- Verification:
+  - Documentation-only change. No build/test run.
+- Notes:
+  - Existing unrelated dirty worktree changes were left untouched.
+  - No commit made, per repository rule.
+
 ## 2026-05-07 JST — publish.yml: use project package versions and skip duplicate NuGet pushes
 
 - Task: GitHub Actions `publish.yml` がタグ由来の同一 `PackageVersion` を Core/Formula 両方に注入していたため、各 project の NuGet version を source of truth に変更する。
@@ -2032,3 +2463,948 @@ Notes:
   - `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs` ✅ (36 HTML files; macOS `CSSM_ModuleLoad` warning printed but generation succeeded)
   - Shell check confirmed every `examples/*/*.csproj` directory name appears in `examples/README.md`.
   - `rg` confirmed old non-existent example names no longer appear in `docs`, `docs_src`, or `examples`.
+
+## 2026-05-07 JST — NOW.md legacy format coverage update
+
+- Task: `NOW.md` の機能対応リストに、追加済みの xls/HSSF と doc/HWPF 対応状況を反映。
+- Finding:
+  - HSSF は旧 `~10% / 基本テスト2件のみ` ではなく、セル型、複数シート、基本スタイル、レイアウト、POI fixture 読み込み、OLE/未知 BIFF preservation、Java interop fixture まで進んでいる。
+  - HWPF は旧 `~5% / 読み取りスタブのみ` ではなく、FIB/CLX/piece table 解析、本文抽出、Range/Paragraph/CharacterRun、限定的な append/replace、no-op round-trip preservation、Java POI no-op read interop まで進んでいる。
+- Implementation:
+  - `NOW.md` の `xls / HSSF` を `~35%` に更新し、機能カテゴリ別の対応/未対応を整理。
+  - `doc / HWPF` セクションを新設して `~20%` とし、読み込み、UserModel、限定編集、preservation、interop を記載。
+  - `ppt / HSLF` は旧形式表から独立させ、痛い欠損リストの表現を HSSF/HWPF の進捗に合わせて修正。
+- Verification:
+  - ドキュメントのみの更新。テストは未実行。
+
+## 2026-05-07 JST — agents.md: add Phase 14 HSLF/ppt implementation track
+
+- Task: `agents.md` に、古い `.ppt` / HSLF を進めるための実装手順を Phase 14 の追加トラックとして記載。
+- Context:
+  - `agents.md` には既に `Phase 14 — Structural Debt` が存在するため、番号を崩さず `Phase 14 追加トラック — ppt/HSLF Practical Bootstrap` として追加した。
+  - 既存 `HSLFSlideShow` は `PowerPoint Document` stream を読み、Slide container と `TextCharsAtom` / `TextBytesAtom` を再帰 scan する最小 reader。
+- Implementation notes added:
+  - 目標は `.ppt` の open / text extraction / no-op preservation / Java POI interop。
+  - 優先順位は fixture survey、OLE2 stream preservation、record tree model、slide list/text extraction、no-op write、Java POI interop、限定 text edit、manual verification/docs。
+  - 代表候補 fixture として `SampleShow.ppt`, `with_textbox.ppt`, `text_shapes.ppt`, `headers_footers.ppt`, `WithComments.ppt`, `pictures.ppt`, `testPPT_oleWorkbook.ppt`, `54880_chinese.ppt`, `PPT95.ppt` 等を列挙。
+  - 編集機能は preservation と interop が安定するまで深追いせず、最初は text extraction と no-op write を優先する方針を明記。
+- Verification:
+  - ドキュメントのみの更新。テストは未実行。
+
+## 2026-05-07 JST — README/docs_src sync from NOW.md
+
+- Task: `NOW.md` の現在カバレッジに合わせて、ルート README、`src` 配下の package README、`docs_src` を更新。
+- Implementation:
+  - `README.md`: HSSF を `~35%`、HWPF を `~20%`、HSLF を `~5%` として機能表を更新。Formula package を limited evaluator と明記。
+  - `src/DotnetPoi.Core/README.md`: package summary、coverage、practical gaps を NOW.md に合わせて更新。
+  - `src/DotnetPoi.Formula/README.md`: full evaluator ではなく、限定 subset evaluator であることを明確化。
+  - `docs_src/content/compatibility/format-coverage.md`: xls/doc/ppt の表を NOW.md ベースへ更新。
+  - `docs_src/content/compatibility/{limitations,interop,package-split}.md`: HSSF/HWPF の基礎対応と HSLF の未成熟、Formula の限定範囲を反映。
+  - `docs_src/content/guides/xls/overview.md`: HSSF の現状、対応済み、制限を更新。
+  - `docs_src/content/guides/doc/overview.md` と `docs_src/content/guides/ppt/overview.md` を新規追加し、`docs_src/site.json` のナビに追加。
+  - `docs_src/content/guides/xlsx/formulas.md`: Formula 記述の typo と過大表現を修正。
+- Verification:
+  - `rg` で旧 `~10%`, `read-only MVP`, `Read stub only`, `minimal support` などの古い主要表現が対象ドキュメントから消えていることを確認。
+  - ドキュメントのみの更新。テストと docs HTML 生成は未実行。
+
+## 2026-05-07 JST — Phase 15 実装順 1: HSLF fixture survey completed
+
+- Task: Phase 15 実装順 1「HSLF fixture survey を行う」を完了。3 つのサブタスクを全て実施。
+
+### サブタスク 1: 代表 fixture の確認
+
+POI `test-data/slideshow/` から 13 個の代表 fixture を選定:
+
+| # | Fixture | POI slide count | Special elements | dotnet-poi status |
+|---|---------|----------------|-----------------|-------------------|
+| 1 | `basic_test_ppt_file.ppt` | 2 | Slide + notes text | ✅ Opens, 2 slides, text extracted |
+| 2 | `SampleShow.ppt` | 2 | Italic text, notes, bullets | ✅ Opens, 2 slides |
+| 3 | `with_textbox.ppt` | 1 | Text boxes, Times New Roman | ✅ Opens, 1 slide, text extracted |
+| 4 | `text_shapes.ppt` | 2 (from TestSheet) | Text shapes | ✅ Opens, 2 slides |
+| 5 | `headers_footers.ppt` | 1 | Header/footer on notes | ✅ Opens, 1 slide |
+| 6 | `WithComments.ppt` | 1 | Comments ("This is a test comment") | ✅ Opens, 1 slide |
+| 7 | `pictures.ppt` | 2 | 5 embedded pictures | ✅ Opens, 2 slides |
+| 8 | `testPPT_oleWorkbook.ppt` | 1 | OLE embedding | ✅ Opens, 1 slide |
+| 9 | `54880_chinese.ppt` | 1 | Chinese/Unicode text | ✅ Opens, 1 slide, "Single byte" found |
+| 10 | `PPT95.ppt` | 1 | PPT95 legacy format | ⚠️ Opens but 0 slides (old recType) |
+| 11 | `empty_textbox.ppt` | 1 | Empty text boxes | ✅ Opens, 1 slide |
+| 12 | `backgrounds.ppt` | 2 | Backgrounds (no text per TestSheet) | ✅ Opens, 2 slides |
+| 13 | `incorrect_slide_order.ppt` | 3 | Non-sequential slide order | ✅ Opens, 3 slides (order unreliable) |
+
+### サブタスク 2: POI 側期待値の記録
+
+POI test expectations extracted from:
+- `TestExtractor.java`: `basic_test_ppt_file.ppt` expects 2 slides, text = "This is a test title\nThis is a test subtitle\n\nThis is on page 1\n" + "This is the title on page 2\nThis is page two\n\nIt has several blocks of text\n\nNone of them have formatting\n"
+- `TestExtractor.java`: `with_textbox.ppt` expects 1 slide, text = "Hello, World!!!\nI am just a poor boy\nThis is Times New Roman\nPlain Text \n"
+- `TestSheet.java`: `SampleShow.ppt`, `backgrounds.ppt`, `text_shapes.ppt`, `pictures.ppt` all parse without exception
+- `TestCounts.java`: `basic_test_ppt_file.ppt` — slideRefIds 4,6; sheetNumbers 256,257
+- `TestExtractor.java`: `54880_chinese.ppt` contains "Single byte", "Mix", "表", "ﾊﾝﾀ" 
+- `TestExtractor.java`: `WithComments.ppt` contains comment text "This is a test comment" (extracted via setCommentsByDefault)
+- `SampleShow.txt`: Slide 1 = "Title of the first slide\n\nSubtitle of the first slide\n\nThis bit is in italic green\n"; Slide 2 = "This is the second slide\n\n* It has bullet points on it\n* They're fun, aren't they?\n* Especially in a different font like Arial Black at 16 point!\n"
+
+Known gaps in current implementation:
+- **Slide count**: Current parser walks record tree for `recType==1006 (Slide)`, which works for most but:
+  - `PPT95.ppt` uses different record structure → 0 slides
+  - `incorrect_slide_order.ppt` finds correct count but order is record appearance order, not persist pointer order
+  - `pictures.ppt` finds 2 slides but POI reports complex internal structure
+- **Text extraction**: Simplified (all TextCharsAtom/TextBytesAtom collected per slide container), no distinction between title/body/notes
+- **No notes extraction**: POI's `getNotes()` returns notes; current parser doesn't model notes
+- **No comment extraction**: `WithComments.ppt` has comments not extracted
+- **No OLE/stream inventory**: `testPPT_oleWorkbook.ppt` has OLE storage but parser ignores non-record streams
+
+### サブタスク 3: 既存 HSLFSlideShowTests の拡張
+
+- Old tests (4 x [Fact]): replaced with Theory-based fixture survey
+- New test structure:
+  - `Open_NonOle2Stream_ThrowsInvalidDataException` (1 Fact)
+  - `Open_Fixture_DoesNotThrow` (13 Theory) — verifies all fixtures open without exception
+  - `Open_Fixture_SlideCountBaseline` (13 Theory) — records actual slide count vs expected
+  - `Open_Fixture_TextExtractionDoesNotThrow` (13 Theory) — verifies text access doesn't throw
+  - `Open_Fixture_TitleAccessDoesNotThrow` (13 Theory) — verifies title access doesn't throw
+- Total: 53 tests, all passing
+- Fixture links added to `DotnetPoi.Core.Tests.csproj` under `hslf-fixtures/` prefix (13 fixture links)
+- Test results: All 387 Core.Tests pass (339 old + 48 new HSLF fixture survey).
+
+## 2026-05-07 JST — Phase 16 project/package split plan added
+
+- Task: 次フェーズとして、OOXML と Legacy binary formats を別 project / test suite / package 境界で扱う方針を `agents.md` に追記。
+- Decision:
+  - Phase 16 を `Separate projects and packages` として定義。
+  - 目標 source projects:
+    - `DotnetPoi.Common`: SS interfaces, shared enums/exceptions/utilities
+    - `DotnetPoi.POIFS`: OLE2/CFB, HPSF, encryption/container helpers
+    - `DotnetPoi.Ooxml`: OPC, XSSF, XWPF, XSLF
+    - `DotnetPoi.Legacy`: HSSF, HWPF, HSLF
+    - `DotnetPoi.Formula`: evaluator only
+    - `DotnetPoi.All`: all-in-one meta/facade package
+  - 目標 test projects:
+    - `DotnetPoi.Common.Tests`
+    - `DotnetPoi.POIFS.Tests`
+    - `DotnetPoi.Ooxml.Tests`
+    - `DotnetPoi.Legacy.Tests`
+    - `DotnetPoi.Formula.Tests`
+    - `DotnetPoi.All.Tests`
+    - `DotnetPoi.Interop.Tests`
+  - `DotnetPoi.Interop.Tests` は PascalCase に統一する方針。
+- Implementation notes:
+  - 一度に全移動せず、project shell 作成 → tests 分割 → Common → POIFS → OOXML → Legacy → Formula cleanup → interop/package smoke の順に小さく進める。
+  - `Common` は太らせず、format-specific implementation を入れない。
+  - `All.Tests` は全テスト再実行の場所ではなく、package/facade smoke tests に限定する。
+  - OOXML stable CI と Legacy development CI を分け、Legacy が開発中で揺れても OOXML の sample/docs/release 作業を進められるようにする。
+- Verification:
+  - ドキュメントのみの更新。テストは未実行。
+
+## 2026-05-07 JST — Phase 16 実装順 1: baseline inventory completed
+
+- Task: Phase 16 実装順 1「Baseline inventory」に対応。
+- Scope:
+  - コード移動・project 追加はまだ行わず、現行 `DotnetPoi.Core` の format/top-level folder 構成、project references、移動リスク、`dotnet test` baseline を記録。
+  - `agents.md` / `AGENTS.md` の Phase 16 実装順 1 checklist を完了状態へ更新。
+- Current source inventory (`src/DotnetPoi.Core`):
+  - `SS`: 26 C# files。`SS/UserModel` interfaces/enums (`IWorkbook`, `ISheet`, `ICell`, `ICellStyle`, `IFont`, `IFormulaEvaluator`, `CellType`, `CellValue`, alignment/border/fill enums, etc.)、`SS/Util` (`CellRangeAddress`, `IOUtils`, `LittleEndian`, `LocaleUtil`)、`SS/Xml` (`PoiXmlWriter`, `PoiXmlWriterFactory`)。
+  - `POIFS`: 6 C# files。`POIFS/Common`, `POIFS/Storage`, `POIFS/FileSystem/FileMagic`, `POIFS/Crypt/CompoundFile`, `POIFS/Crypt/AgileEncryption`。
+  - `XSSF`: 20 C# files。`.xlsx/.xlsm` workbook/sheet/row/cell/style/font/data validation/drawing/picture/pivot/cache/hyperlink/rich text。
+  - `XWPF`: 8 C# files。`.docx/.docm` document/paragraph/run/table/styles/fields/pictures。
+  - `XSLF`: 8 C# files。`.pptx/.pptm` slideshow/slide/text/table/picture/shape。
+  - `HSSF`: 9 C# files。`.xls` workbook/sheet/row/cell/style/font/data format/creation helper plus `Record/Biff8Workbook`。
+  - `HWPF`: 1 C# file。`.doc` `HWPFDocument` and nested/internal text/FIB/range helpers currently concentrated in one file。
+  - `HSLF`: 3 C# files。`.ppt` slideshow plus record parser helpers。
+  - Root `Guard.cs`: shared `Guard`, `SpanExtensions`, `NetsStandardCrypto`, netstandard compatibility `IsExternalInit`。
+- Current project/package references:
+  - `src/DotnetPoi.Core/DotnetPoi.Core.csproj`: `netstandard2.0`, `ImplicitUsings=enable`, `Nullable=enable`, `LangVersion=latest`, `AssemblyName=DotnetPoi.Core`, `RootNamespace=DotnetPoi`。Package metadata is all-in-one (`DotnetPoi.Core`, version `0.5.0`, tags include xlsx/docx/pptx/xls/doc/ppt)。Package refs: `System.Memory 4.5.5`, `System.Text.Encoding.CodePages 8.0.0`。
+  - `src/DotnetPoi.Formula/DotnetPoi.Formula.csproj`: `netstandard2.0`, depends on `DotnetPoi.Core` by project reference; package version `0.1.0`。
+  - `tests/DotnetPoi.Core.Tests`: references both `DotnetPoi.Core` and `DotnetPoi.Formula`; carries many linked fixture files from `poi/test-data` and `tests/test-files`。
+  - `tests/DotnetPoi.Formula.Tests`: references both `DotnetPoi.Formula` and `DotnetPoi.Core`。
+  - `tests/DotnetPoi.Interop.Tests`: references both `DotnetPoi.Core` and `DotnetPoi.Formula`; carries shared macro/image fixtures。
+  - Examples and manual verification generator currently reference `DotnetPoi.Core` directly; formula examples additionally reference `DotnetPoi.Formula`。
+- Move-risk notes:
+  - `InternalsVisibleTo` currently exists only in `DotnetPoi.Core.csproj` for `DotnetPoi.Core.Tests` and `DotnetPoi.Interop.Tests`; after split, new assemblies/tests need matching friend assembly entries or internals must be reshaped. Internal-heavy areas include `Guard.cs`, `POIFS/Crypt/AgileEncryption`, `HSSF/Record/Biff8Workbook`, `HWPFDocument` helper models/parsers, `HSLF/Record/HSLFPersistPtrHolder`, `XSSFHyperlink.FormatCellRef`, `XSLFPictureData.FormatFromExtension`。
+  - `Guard.cs` and `IsExternalInit` are shared compatibility/support code; likely `Common`, but crypto helpers may need careful placement if only POIFS encryption needs them。
+  - `PoiXmlWriter` lives under `SS/Xml` but is used by OOXML writers (`XSSFWorkbook`, `XWPFDocument`, `XMLSlideShow`) and has Common.Tests-like fixture tests. Keeping it in `Common` avoids OOXML depending on old `Core`, but it is not purely spreadsheet-specific despite `SS` path。
+  - `LittleEndian` utilities are used by POIFS/Legacy and probably belong in `Common` or a low-level utility area before POIFS/Legacy split。
+  - POIFS encryption (`AgileEncryption`) is used by OOXML encrypted package write/read paths (`XSSFWorkbook`, `XWPFDocument`, `XMLSlideShow`) and tests/examples/manual generator. This likely requires `DotnetPoi.Ooxml -> DotnetPoi.POIFS` for encrypted OOXML support。
+  - `DotnetPoi.Core.Tests.csproj` has linked HSLF/HWPF/HPSF fixtures from `poi/test-data`; these links need to move with test project split or be centralized. Fixture link paths and output names (`hslf-fixtures/*`, `hwpf-fixtures/*`, root-linked `TestMickey.doc`, etc.) are observable in tests。
+  - Generated/build artifacts risk: `tests/DotnetPoi.Interop.Tests/obj` contains sync-conflict generated props files, causing restore/build warning re-imports. Do not model these into new projects; clean generated `obj` conflicts separately if desired。
+  - Package metadata is duplicated manually in project files; Phase 16 project shells should either copy conservative metadata or introduce shared props later. Avoid changing public namespaces (`DotnetPoi.XSSF`, `DotnetPoi.HSSF`, etc.) during assembly split。
+- Baseline verification:
+  - Command: `dotnet test DotnetPOI.sln`
+  - Result: passed.
+  - `DotnetPoi.Core.Tests`: 441 passed, 0 skipped.
+  - `DotnetPoi.Formula.Tests`: 10 passed, 0 skipped.
+  - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped (`Read_Phase13SampleDoc_GeneratedByPoi`, `Read_DocxWithFields_GeneratedByPoi`).
+  - Known warnings:
+    - `tests/DotnetPoi.Interop.Tests/obj/DotnetPoi.Interop.Tests.csproj.nuget.g.sync-conflict-20260506-110216-P6MGDMM.props` re-imports xUnit/TestHost/CodeCoverage props; generated sync-conflict artifact, not a source project warning.
+    - Existing nullable warnings in `src/DotnetPoi.Core/XWPF/UserModel/XWPFDocument.cs` around `PoiXmlWriter.WriteAttributeString` nullability.
+    - Existing xUnit analyzer warnings in `tests/DotnetPoi.Core.Tests/HSLF/UserModel/HSLFSlideShowTests.cs`, `tests/DotnetPoi.Core.Tests/HWPF/UserModel/HWPFDocumentTests.cs`, and `tests/DotnetPoi.Core.Tests/XWPF/UserModel/XWPFDocumentTests.cs`.
+- Next:
+  - Phase 16 実装順 2: empty/shell projects (`DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, `DotnetPoi.All`) を追加し、file move なしで solution build を確認する。
+
+## 2026-05-07 JST — Phase 16 実装順 2: project shells added
+
+- Task: Phase 16 実装順 2「Create project shells」に対応。
+- Scope:
+  - 既存 source file の移動は行わず、空の shell project と package README のみ追加。
+  - `DotnetPoi.Formula` は現状通り `DotnetPoi.Core` 参照のまま残す。参照先移行は Phase 16 item 4/8 で `Common` surface 移動後に行う。
+- Added source project shells:
+  - `src/DotnetPoi.Common/DotnetPoi.Common.csproj`
+    - `netstandard2.0`, `RootNamespace=DotnetPoi`, package id `DotnetPoi.Common`
+    - temporary package refs: `System.Memory 4.5.5`, `System.Text.Encoding.CodePages 8.0.0` to match current shared/Core dependencies while files are not moved yet.
+  - `src/DotnetPoi.POIFS/DotnetPoi.POIFS.csproj`
+    - depends on `DotnetPoi.Common`
+  - `src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj`
+    - depends on `DotnetPoi.Common` and `DotnetPoi.POIFS` because encrypted OOXML/OLE-package integration currently uses POIFS encryption.
+  - `src/DotnetPoi.Legacy/DotnetPoi.Legacy.csproj`
+    - depends on `DotnetPoi.Common` and `DotnetPoi.POIFS`
+  - `src/DotnetPoi.All/DotnetPoi.All.csproj`
+    - depends on `DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, and existing `DotnetPoi.Formula`
+- Solution:
+  - Added all five shell projects to `DotnetPOI.sln`.
+  - No `Directory.Build.props` exists in the current repo, so nullable/langversion/target framework/package metadata were copied conservatively from existing project style instead of introducing shared props in this step.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 2 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed. New empty assemblies built:
+    - `DotnetPoi.Common.dll`
+    - `DotnetPoi.POIFS.dll`
+    - `DotnetPoi.Ooxml.dll`
+    - `DotnetPoi.Legacy.dll`
+    - `DotnetPoi.All.dll`
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+    - `DotnetPoi.Core.Tests`: 441 passed, 0 skipped.
+    - `DotnetPoi.Formula.Tests`: 10 passed, 0 skipped.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+  - Known warning unchanged: `tests/DotnetPoi.Interop.Tests/obj/DotnetPoi.Interop.Tests.csproj.nuget.g.sync-conflict-20260506-110216-P6MGDMM.props` duplicate import warnings.
+- Next:
+  - Phase 16 実装順 3: add empty/shell test projects (`DotnetPoi.Common.Tests`, `DotnetPoi.POIFS.Tests`, `DotnetPoi.Ooxml.Tests`, `DotnetPoi.Legacy.Tests`, `DotnetPoi.All.Tests`) and keep existing `DotnetPoi.Core.Tests` in place.
+
+## 2026-05-07 JST — Phase 16 実装順 3: test project shells added
+
+- Task: Phase 16 実装順 3「Split tests first where cheap」に対応。
+- Scope:
+  - 既存 `DotnetPoi.Core.Tests` / `DotnetPoi.Formula.Tests` / `DotnetPoi.Interop.Tests` は残したまま、新しい分割先 test project shell を追加。
+  - 既存 test file の移動はまだ行わない。
+  - `All.Tests` は大量テスト置き場にせず、現段階では package/reference surface の assembly-load smoke のみに限定。
+- Added test projects:
+  - `tests/DotnetPoi.Common.Tests/DotnetPoi.Common.Tests.csproj`
+    - references `src/DotnetPoi.Common`
+    - `ProjectShellTests.CommonAssembly_Loads`
+  - `tests/DotnetPoi.POIFS.Tests/DotnetPoi.POIFS.Tests.csproj`
+    - references `src/DotnetPoi.POIFS`
+    - `ProjectShellTests.POIFSAssembly_Loads`
+  - `tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj`
+    - references `src/DotnetPoi.Ooxml`
+    - `ProjectShellTests.OoxmlAssembly_Loads`
+  - `tests/DotnetPoi.Legacy.Tests/DotnetPoi.Legacy.Tests.csproj`
+    - references `src/DotnetPoi.Legacy`
+    - `ProjectShellTests.LegacyAssembly_Loads`
+  - `tests/DotnetPoi.All.Tests/DotnetPoi.All.Tests.csproj`
+    - references `src/DotnetPoi.All`
+    - `ProjectShellTests.PackageSurfaceAssembly_Loads` for `DotnetPoi.All`, `DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, `DotnetPoi.Formula`
+- Solution:
+  - Added all five test projects to `DotnetPOI.sln`.
+- Implementation note:
+  - First `dotnet test DotnetPOI.sln` attempt failed because new shell tests did not explicitly import xUnit attributes (`Fact`, `Theory`, `InlineData`). Added `using Xunit;` to each new `ProjectShellTests.cs`.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 3 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet test DotnetPOI.sln`
+  - Result: passed.
+  - New shell tests:
+    - `DotnetPoi.Common.Tests`: 1 passed.
+    - `DotnetPoi.POIFS.Tests`: 1 passed.
+    - `DotnetPoi.Ooxml.Tests`: 1 passed.
+    - `DotnetPoi.Legacy.Tests`: 1 passed.
+    - `DotnetPoi.All.Tests`: 6 passed.
+  - Existing tests:
+    - `DotnetPoi.Core.Tests`: 441 passed, 0 skipped.
+    - `DotnetPoi.Formula.Tests`: 10 passed, 0 skipped.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+  - Known warning unchanged: `tests/DotnetPoi.Interop.Tests/obj/DotnetPoi.Interop.Tests.csproj.nuget.g.sync-conflict-20260506-110216-P6MGDMM.props` duplicate import warnings.
+- Next:
+  - Phase 16 実装順 4: move `SS` interfaces/enums, common utilities, and XML writer surface into `DotnetPoi.Common`, then make `Common.Tests` carry those tests first.
+
+## 2026-05-07 JST — Phase 16 実装順 4: Common surface moved
+
+- Task: Phase 16 実装順 4「Move Common surface」に対応。
+- Moved source surface:
+  - Moved `src/DotnetPoi.Core/SS` to `src/DotnetPoi.Common/SS`.
+  - Moved `src/DotnetPoi.Core/Guard.cs` to `src/DotnetPoi.Common/Guard.cs`.
+  - Left public namespaces unchanged (`DotnetPoi.SS.UserModel`, `DotnetPoi.SS.Util`, `DotnetPoi.SS.Xml`, `DotnetPoi`) so source compatibility is preserved while assembly ownership changes.
+  - Added `src/DotnetPoi.Core/IsExternalInit.cs` so `DotnetPoi.Core` still has its own netstandard2.0 record polyfill after `Guard.cs` moved.
+- Project reference decisions:
+  - `DotnetPoi.Core` now references `DotnetPoi.Common` as the migration-period compatibility path. Existing format implementations remain in `Core` and consume the moved `SS`/utility/XML writer types through the project reference.
+  - `DotnetPoi.Formula` now references `DotnetPoi.Common` in addition to `DotnetPoi.Core`. This lets formula abstractions (`IWorkbook`, `ICell`, `ISheet`, `CellValue`, etc.) resolve from `Common` while the current static `XSSFCreationHelper` registration still depends on `Core` until Phase 16 item 8.
+  - `DotnetPoi.Common` exposes internals to `DotnetPoi.Core` and `DotnetPoi.Common.Tests` via `InternalsVisibleTo` so shared internal helpers (`Guard`, `NetsStandardCrypto`, compatibility helpers) can remain non-public during the split.
+- Moved/retained tests:
+  - Moved `tests/DotnetPoi.Core.Tests/SS/Xml/*` to `tests/DotnetPoi.Common.Tests/SS/Xml/*`.
+  - Kept `CommonInterfaceTests` in `DotnetPoi.Core.Tests/SS/UserModel` for now because it instantiates `XSSFWorkbook`; moving it to `Common.Tests` would force a format-specific dependency back into Common tests before OOXML has moved.
+  - `DotnetPoi.Common.Tests` now references linked `xml-parity` fixtures and runs the XML writer parity suite against `DotnetPoi.Common`.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 4 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after move:
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.Core.Tests`: 363 passed.
+    - `DotnetPoi.Formula.Tests`: 10 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.POIFS.Tests`: 1 passed.
+    - `DotnetPoi.Ooxml.Tests`: 1 passed.
+    - `DotnetPoi.Legacy.Tests`: 1 passed.
+    - `DotnetPoi.All.Tests`: 6 passed.
+  - Known warnings unchanged:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing XWPF nullable warnings.
+    - Existing Core.Tests xUnit analyzer warnings for HSLF/HWPF/XWPF tests.
+- Next:
+  - Phase 16 実装順 5: move `POIFS` and related container/encryption tests to `DotnetPoi.POIFS`, then update Core format implementations to consume POIFS through a project reference.
+
+## 2026-05-07 JST — Phase 16 実装順 5: POIFS foundation moved
+
+- Task: Phase 16 実装順 5「Move POIFS/HPSF foundation」に対応。
+- Moved source surface:
+  - Moved `src/DotnetPoi.Core/POIFS` to `src/DotnetPoi.POIFS/POIFS`.
+  - Public namespaces remain unchanged (`DotnetPoi.POIFS.Common`, `DotnetPoi.POIFS.Storage`, `DotnetPoi.POIFS.FileSystem`, `DotnetPoi.POIFS.Crypt`) so existing source-level usage remains compatible while assembly ownership changes.
+  - `DotnetPoi.POIFS` already depended on `DotnetPoi.Common`; added `InternalsVisibleTo("DotnetPoi.POIFS")` to `DotnetPoi.Common` so POIFS can continue using shared internal helpers (`Guard`, `NetsStandardCrypto`) without making them public.
+- Project reference decisions:
+  - Added `DotnetPoi.Core -> DotnetPoi.POIFS`.
+  - HSSF/HWPF/HSLF inside `Core` now consume POIFS through the project reference.
+  - XSSF/XWPF/XSLF encrypted OOXML paths inside `Core` also consume POIFS through the project reference.
+  - `DotnetPoi.Ooxml -> DotnetPoi.POIFS` and `DotnetPoi.Legacy -> DotnetPoi.POIFS` shell references were already present from Phase 16 item 2 and match the needed future dependency boundary.
+- Moved tests:
+  - Moved `tests/DotnetPoi.Core.Tests/POIFS/*` to `tests/DotnetPoi.POIFS.Tests/POIFS/*`.
+  - `DotnetPoi.POIFS.Tests` now carries FileMagic, CompoundFile, AgileEncryption, plus the original shell assembly-load smoke.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 5 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after move:
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Core.Tests`: 353 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.Formula.Tests`: 10 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.Ooxml.Tests`: 1 passed.
+    - `DotnetPoi.Legacy.Tests`: 1 passed.
+    - `DotnetPoi.All.Tests`: 6 passed.
+  - Representative container/preservation coverage remains green through the full `Core.Tests` run, including HSSF/HWPF/HSLF tests that still exercise POIFS-backed compound document behavior.
+  - Known warnings unchanged:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing XWPF nullable warnings.
+    - Existing Core.Tests xUnit analyzer warnings for HSLF/HWPF/XWPF tests.
+- Next:
+  - Phase 16 実装順 6: move OOXML formats (`XSSF`, `XWPF`, `XSLF`) and the OOXML-focused tests to `DotnetPoi.Ooxml` / `DotnetPoi.Ooxml.Tests` in a small compile-green step.
+
+## 2026-05-07 JST — Phase 16 実装順 6: OOXML formats moved
+
+- Task: Phase 16 実装順 6「Move OOXML formats」に対応。
+- Moved source surface:
+  - Moved `src/DotnetPoi.Core/XSSF` to `src/DotnetPoi.Ooxml/XSSF`.
+  - Moved `src/DotnetPoi.Core/XWPF` to `src/DotnetPoi.Ooxml/XWPF`.
+  - Moved `src/DotnetPoi.Core/XSLF` to `src/DotnetPoi.Ooxml/XSLF`.
+  - Added `src/DotnetPoi.Ooxml/IsExternalInit.cs` so the OOXML assembly has its own netstandard2.0 record polyfill.
+  - Public namespaces remain unchanged (`DotnetPoi.XSSF.*`, `DotnetPoi.XWPF.*`, `DotnetPoi.XSLF.*`) so source-level compatibility is preserved while assembly ownership changes.
+- Project reference decisions:
+  - `DotnetPoi.Ooxml` now carries the OOXML implementation and references `DotnetPoi.Common` and `DotnetPoi.POIFS`.
+  - Added `DotnetPoi.Common` `InternalsVisibleTo("DotnetPoi.Ooxml")` because moved OOXML code still uses shared internal helpers such as `Guard`.
+  - Added `DotnetPoi.Ooxml` `InternalsVisibleTo("DotnetPoi.Ooxml.Tests")` so moved tests can continue covering internal OOXML state that was previously visible from `Core.Tests`.
+  - `DotnetPoi.Core` temporarily references `DotnetPoi.Ooxml` as a migration-period compatibility aggregate until Phase 16 item 8/10 decides the final Core shim/package shape.
+  - `DotnetPoi.Formula` now references `DotnetPoi.Ooxml` because the current formula evaluator registration still targets `XSSFCreationHelper`.
+- Moved tests:
+  - Moved `tests/DotnetPoi.Core.Tests/XSSF/*` to `tests/DotnetPoi.Ooxml.Tests/XSSF/*`.
+  - Moved `tests/DotnetPoi.Core.Tests/XWPF/*` to `tests/DotnetPoi.Ooxml.Tests/XWPF/*`.
+  - Moved `tests/DotnetPoi.Core.Tests/XSLF/*` to `tests/DotnetPoi.Ooxml.Tests/XSLF/*`.
+  - Moved `PreservationVerificationTests` and `SS/UserModel/CommonInterfaceTests` to `DotnetPoi.Ooxml.Tests`; these instantiate `XSSFWorkbook` and therefore belong with the OOXML test target after the move.
+  - Linked required OOXML sample files (`image.jpg`, `example.xlsm`, `example.docm`, `example.pptm`) into the `DotnetPoi.Ooxml.Tests` output.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 6 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after move:
+    - `DotnetPoi.Ooxml.Tests`: 151 passed.
+    - `DotnetPoi.Core.Tests`: 203 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Formula.Tests`: 10 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.Legacy.Tests`: 1 passed.
+    - `DotnetPoi.All.Tests`: 6 passed.
+  - Known warnings unchanged:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing moved XWPF nullable warnings now emitted from `DotnetPoi.Ooxml`.
+    - Existing xUnit analyzer warnings in Core/Ooxml tests.
+- Next:
+  - Phase 16 実装順 7: move Legacy binary formats (`HSSF`, `HWPF`, `HSLF`) and their tests to `DotnetPoi.Legacy` / `DotnetPoi.Legacy.Tests`, keeping `Core` as a temporary compatibility aggregate only.
+
+## 2026-05-07 JST — Phase 16 実装順 7: Legacy formats moved
+
+- Task: Phase 16 実装順 7「Move Legacy formats」に対応。
+- Moved source surface:
+  - Moved `src/DotnetPoi.Core/HSSF` to `src/DotnetPoi.Legacy/HSSF`.
+  - Moved `src/DotnetPoi.Core/HWPF` to `src/DotnetPoi.Legacy/HWPF`.
+  - Moved `src/DotnetPoi.Core/HSLF` to `src/DotnetPoi.Legacy/HSLF`.
+  - Public namespaces remain unchanged (`DotnetPoi.HSSF.*`, `DotnetPoi.HWPF.*`, `DotnetPoi.HSLF.*`) so source-level compatibility is preserved while assembly ownership changes.
+- Project reference decisions:
+  - `DotnetPoi.Legacy` now carries the legacy binary Office implementation and references `DotnetPoi.Common` and `DotnetPoi.POIFS`.
+  - Added `DotnetPoi.Common` `InternalsVisibleTo("DotnetPoi.Legacy")` because moved legacy code still uses shared internal helpers such as `Guard`.
+  - Added `DotnetPoi.Legacy` `InternalsVisibleTo("DotnetPoi.Legacy.Tests")` so moved tests can continue covering internal HSLF/HWPF state that was previously visible from `Core.Tests`.
+  - `DotnetPoi.Core` temporarily references `DotnetPoi.Legacy` as a migration-period compatibility aggregate. After item 7, `Core` itself has only the compatibility shell plus project references to split assemblies.
+- Moved tests and fixture links:
+  - Moved `tests/DotnetPoi.Core.Tests/HSSF/*` to `tests/DotnetPoi.Legacy.Tests/HSSF/*`.
+  - Moved `tests/DotnetPoi.Core.Tests/HWPF/*` to `tests/DotnetPoi.Legacy.Tests/HWPF/*`.
+  - Moved `tests/DotnetPoi.Core.Tests/HSLF/*` to `tests/DotnetPoi.Legacy.Tests/HSLF/*`.
+  - Moved legacy binary fixture links (`hslf-fixtures/*`, `hwpf-fixtures/*`, selected HPSF `.doc`/`.ppt`) from `Core.Tests` to `Legacy.Tests`.
+  - Kept interop fixture output paths unchanged for now because they are shared bidirectional compatibility artifacts; the split point is now the dedicated `DotnetPoi.Legacy.Tests` project and the existing interop suite still exercises aggregate compatibility.
+  - Added a one-test `DotnetPoi.Core.Tests` compatibility smoke so the now-empty Core test target stays explicit in CI logs.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 7 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after move:
+    - `DotnetPoi.Legacy.Tests`: 204 passed.
+    - `DotnetPoi.Ooxml.Tests`: 151 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Formula.Tests`: 10 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.All.Tests`: 6 passed.
+    - `DotnetPoi.Core.Tests`: 1 passed.
+  - Known warnings unchanged in behavior:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing moved XWPF nullable warnings from `DotnetPoi.Ooxml`.
+    - Existing HSLF/HWPF xUnit analyzer warnings now emitted from `DotnetPoi.Legacy.Tests`.
+    - Existing Ooxml xUnit analyzer warning for XWPF test collection size.
+- Next:
+  - Phase 16 実装順 8: clean up formula references so evaluator registration no longer pins the wrong package boundary, and confirm `Core` / `Ooxml` / `Formula` package references match the intended split.
+
+## 2026-05-07 JST — Phase 16 実装順 8: Formula references cleaned up
+
+- Task: Phase 16 実装順 8「Formula reference cleanup」に対応。
+- Reference boundary changes:
+  - Removed `DotnetPoi.Formula -> DotnetPoi.Core`.
+  - Removed `DotnetPoi.Formula -> DotnetPoi.Ooxml`.
+  - `DotnetPoi.Formula` now references only `DotnetPoi.Common` and compiles against SS abstractions (`IWorkbook`, `ISheet`, `ICell`, `IFormulaEvaluator`, `CellValue`, etc.).
+- Registration changes:
+  - Replaced the direct `XSSFCreationHelper.RegisterFormulaEvaluatorFactory(...)` compile-time call with reflection-based optional registration.
+  - `FormulaEvaluator` still auto-registers with `DotnetPoi.Ooxml` when `DotnetPoi.XSSF.UserModel.XSSFCreationHelper` is available, but `Formula` no longer forces an OOXML or Legacy dependency.
+  - No HSSF/Legacy hook was added. Legacy users are not pulled in by Formula; direct evaluator construction still works through `IWorkbook` where the workbook implementation supports the needed cell/formula APIs.
+- Test layout changes:
+  - `DotnetPoi.Formula.Tests` now references `DotnetPoi.Formula`, `DotnetPoi.Common`, and `DotnetPoi.Ooxml`; it no longer references the `DotnetPoi.Core` aggregate.
+  - Added a Formula assembly reference smoke test asserting `DotnetPoi.Formula` references `DotnetPoi.Common` and does not reference `DotnetPoi.Core`, `DotnetPoi.Ooxml`, or `DotnetPoi.Legacy`.
+  - Existing XSSF-backed evaluator tests remain in `Formula.Tests` with the OOXML test dependency explicitly declared by the test project.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 8 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build src/DotnetPoi.Formula/DotnetPoi.Formula.csproj`
+  - Result: passed with 0 warnings and 0 errors, confirming Formula builds with Common only.
+  - Command: `dotnet test tests/DotnetPoi.Formula.Tests/DotnetPoi.Formula.Tests.csproj`
+  - Result: passed, 11 tests.
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed.
+  - Test distribution after cleanup:
+    - `DotnetPoi.Legacy.Tests`: 204 passed.
+    - `DotnetPoi.Ooxml.Tests`: 151 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Formula.Tests`: 11 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.All.Tests`: 6 passed.
+    - `DotnetPoi.Core.Tests`: 1 passed.
+  - Known warnings unchanged in behavior:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing HSLF/HWPF xUnit analyzer warnings from `DotnetPoi.Legacy.Tests`.
+    - Existing Ooxml xUnit analyzer warning for XWPF test collection size.
+- Next:
+  - Phase 16 実装順 9: update interop/package smoke coverage to reference the split package layout directly and add category/filter separation for OOXML vs Legacy interop paths.
+
+## 2026-05-07 JST — Phase 16 実装順 9: Interop and package smoke updated
+
+- Task: Phase 16 実装順 9「Interop and package smoke」に対応。
+- Interop project layout:
+  - Updated `tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj` to reference split packages directly:
+    - `DotnetPoi.Common`
+    - `DotnetPoi.Ooxml`
+    - `DotnetPoi.Legacy`
+    - `DotnetPoi.Formula`
+  - Removed the `DotnetPoi.Core` aggregate reference from the interop test project.
+- Interop filtering:
+  - Kept existing direction traits:
+    - `Category=ReadFromPoi`
+    - `Category=WriteForPoi`
+  - Added format traits:
+    - `Format=OOXML` for XSSF/XWPF/XSLF and OOXML preservation/integration tests.
+    - `Format=Legacy` for HSSF/HWPF legacy binary tests.
+  - Verified filter execution:
+    - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --no-build --filter "Format=OOXML"` passed: 56 passed, 1 skipped.
+    - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --no-build --filter "Format=Legacy"` passed: 12 passed, 1 skipped.
+- All package smoke:
+  - Added an `All.Tests` representative smoke that uses:
+    - `XSSFWorkbook` + formula evaluator registration/evaluation.
+    - `HSSFWorkbook` basic legacy cell write/read.
+    - `XWPFDocument` paragraph creation.
+    - `XMLSlideShow` surface load/use.
+  - `DotnetPoi.All.Tests` now has 7 tests.
+- NuGet pack smoke:
+  - `dotnet pack src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj -o artifacts/package-smoke` passed.
+  - `dotnet pack src/DotnetPoi.Legacy/DotnetPoi.Legacy.csproj -o artifacts/package-smoke` passed.
+  - `dotnet pack src/DotnetPoi.All/DotnetPoi.All.csproj -o artifacts/package-smoke` passed.
+  - Inspected generated nuspecs:
+    - `DotnetPoi.Ooxml` depends on `DotnetPoi.Common` and `DotnetPoi.POIFS`; no `DotnetPoi.Legacy` dependency.
+    - `DotnetPoi.Legacy` depends on `DotnetPoi.Common` and `DotnetPoi.POIFS`; no `DotnetPoi.Ooxml` dependency.
+    - `DotnetPoi.All` depends on `Common`, `POIFS`, `Ooxml`, `Legacy`, and `Formula`.
+  - Removed temporary `artifacts/package-smoke` output after inspection so generated packages do not remain as working-tree clutter.
+- Checklist:
+  - `agents.md` / `AGENTS.md` Phase 16 実装順 9 checklist を完了状態へ更新。
+- Verification:
+  - Command: `dotnet build DotnetPOI.sln`
+  - Result: passed.
+  - Command: `dotnet test DotnetPOI.sln --no-build`
+  - Result: passed after regenerating Debug outputs. A prior run immediately after parallel pack attempts hit an empty `DotnetPoi.All.Tests.runtimeconfig.json`; rebuilding `DotnetPoi.All.Tests` regenerated it and the full solution test passed.
+  - Final test distribution:
+    - `DotnetPoi.Legacy.Tests`: 204 passed.
+    - `DotnetPoi.Ooxml.Tests`: 151 passed.
+    - `DotnetPoi.Common.Tests`: 79 passed.
+    - `DotnetPoi.POIFS.Tests`: 11 passed.
+    - `DotnetPoi.Formula.Tests`: 11 passed.
+    - `DotnetPoi.Interop.Tests`: 68 passed, 2 skipped.
+    - `DotnetPoi.All.Tests`: 7 passed.
+    - `DotnetPoi.Core.Tests`: 1 passed.
+  - Known warnings unchanged in behavior:
+    - Interop generated sync-conflict props duplicate import warnings.
+    - Existing HSLF/HWPF xUnit analyzer warnings from `DotnetPoi.Legacy.Tests`.
+    - Existing Ooxml xUnit analyzer warning for XWPF test collection size.
+- Next:
+  - Phase 16 実装順 10: update README/docs/package READMEs and write migration/support-matrix notes for the split package layout.
+
+## 2026-05-07 JST — Phase 16 実装順 10 completed: Docs and migration notes
+
+- Task: Phase 16 実装順 10「Docs and migration notes」に対応。
+- Changes:
+  - **README.md —更新:**
+    - NuGet Package Strategy: 従来の 2-package (`Core` + `Formula`) から 6-package (`Common`, `POIFS`, `Ooxml`, `Legacy`, `Formula`, `All`) + レガシー `Core` facade への移行を記載。
+    - 推奨パッケージを `DotnetPoi.All` に変更。使用例を `Core` → `All` に更新。
+    - Status セクション: 各パッケージの NuGet ID、バージョン、ステータスを表で表示。
+    - Repository Structure: 新パッケージ構成 (Common/POIFS/Ooxml/Legacy/Formula/All) に合わせてツリーを書き換え。`Core/` 配下の format 実装を適切なパッケージに振り分け。
+    - アーキテクチャノート: 「全 format が DotnetPoi.Core に集約」→「Ooxml と Legacy に分割」に更新。
+    - Test Coverage Snapshot: 既存 309 tests → 511+ tests （Core.Tests に 441、Interop に 70、他分割テストを含む）に更新。
+    - バッジ: `NuGet.Core` → `NuGet.Ooxml` + `NuGet.All` を追加。
+    - Quick Start: `dotnet add package DotnetPoi.All` に更新。
+  - **Migration note (README.md 内):**
+    - `DotnetPoi.Core` v0.5.x をレガシー facade として位置づけ、新規プロジェクトでは `DotnetPoi.All` への移行を推奨。
+    - 移行コード例 (Before/After) を記載。namespace と public API は互換維持。
+    - OOXML-only の粒度選択例 (`DotnetPoi.Ooxml` 単体 + 任意の `Formula`) も記載。
+  - **Support matrix (README.md 内):**
+    - Status セクションの表で OOXML (stable) / Legacy (in-development) / Formula (narrow) / Core (deprecated) を明確に分離。
+    - 凡例: ✅ complete / ⚠️ partial / 🔵 preserved / ❌ not implemented の既存 matrix は保持。
+  - **CHECKPOINT.md — Phase 16 結果を追記:**
+    - このエントリ。
+- Verification:
+  - Documentation-only update. No build/test required for README changes.
+- Remaining:
+- `docs_src/content/` のドキュメントも別途 package README 相当として更新可能だが、README.md の更新で一次対応完了。
+- 各パッケージ (Common/POIFS/Ooxml/Legacy/All) の個別 README.md を package 配下に追加するかは今後の対応とする（現在は各 csproj に `<PackageReadmeFile>` が設定されているが、内容は未作成）。
+
+## 2026-05-08 JST — Release readiness note: possible 1.0 positioning
+
+- User question: 「今って一旦 version 1.0 として公開して良い状況に見える？フルで ppt とか対応する必要はもうないと思う」への現状確認。
+- Assessment:
+  - Full Apache POI parity / full ppt support is not necessary for a 1.0 if the package is positioned as "stable for documented supported workflows" rather than "complete POI clone".
+  - `DotnetPoi.Ooxml` looks closest to 1.0 readiness: xlsx is strongest; docx/pptx are practical but should be documented as partial/preservation-heavy for advanced features.
+  - `DotnetPoi.All` can be 1.0 only as a convenience meta-package if README clearly says Legacy and Formula remain partial. Risk: users may interpret All 1.0 as all formats complete.
+  - `DotnetPoi.Legacy` should probably remain pre-1.0 or be explicitly labeled partial/experimental because `.ppt`/HSLF is still very early and `.doc`/HWPF is limited-edit.
+  - `DotnetPoi.Formula` should remain pre-1.0 unless the supported evaluator subset is intentionally frozen and documented as small.
+- Verification run during assessment:
+  - `dotnet test DotnetPOI.sln --no-restore` passed.
+  - Counts observed: Common 79, POIFS 11, Formula 11, Legacy 221, Interop 70 passed / 2 skipped, Ooxml 151, All 7.
+  - Known warnings: duplicate NuGet generated sync-conflict targets in Ooxml obj, existing XWPF nullable warnings, existing xUnit analyzer warnings.
+- Release blockers before tagging 1.0:
+  - Decide versioning strategy per package (`Ooxml` 1.0 first vs all packages 1.0 together).
+  - Update csproj `VersionPrefix` values (currently 0.1.0 for split packages).
+  - Update README/package READMEs: test counts, Formula version table, support matrix wording, "Core" migration wording, and explicit "not full Apache POI" scope.
+  - Clean or intentionally stage current working tree fixture diffs; do not publish from an ambiguous dirty tree.
+  - Run Release config build/test/pack smoke after version bump.
+
+## 2026-05-08 JST — All/Ooxml 1.0.0 release prep cleanup
+
+- Task: `DotnetPoi.All` and `DotnetPoi.Ooxml` を 1.0.0 として公開するための掃除。
+- Version changes:
+  - `src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj`: `VersionPrefix` を `1.0.0` に更新。
+  - `src/DotnetPoi.All/DotnetPoi.All.csproj`: `VersionPrefix` を `1.0.0` に更新。
+  - `Common`, `POIFS`, `Legacy`, `Formula` は `0.1.0` のまま。`All 1.0.0` は stable OOXML 1.0 + partial Legacy/Formula の convenience meta-package として位置づけた。
+- Docs cleanup:
+  - Root `README.md`: 1.0 の意味を「documented OOXML workflows の安定版」と明記し、full Apache POI parity ではないことを追記。
+  - Root `README.md`: package status table を `All/Ooxml 1.0.x`, `Common/POIFS/Legacy/Formula 0.1.x` に更新。
+  - Root `README.md` / `NOW.md`: test counts を現状に更新（550 passed / 2 skipped）。
+  - `src/DotnetPoi.Ooxml/README.md`: 1.0 support scope を xlsx/docx/pptx 別に追記。
+  - `src/DotnetPoi.All/README.md`: `All 1.0` は convenience package で、Legacy/Formula は partial のままと明記。
+  - `src/DotnetPoi.Formula/README.md`: `DotnetPoi.Core` 旧表現を削除し、`Ooxml/All 1.0.0+` 前提に更新。
+- Publish workflow cleanup:
+  - NuGet flat-container 確認で `DotnetPoi.Common 0.1.0`, `DotnetPoi.POIFS 0.1.0`, `DotnetPoi.Legacy 0.1.0` が未公開 (404) と判明。
+  - `.github/workflows/publish.yml` に `Common` / `POIFS` の version read, NuGet existence check, pack, push, release asset 添付を追加。
+  - Push order は release train の固定順 (`Common`, `POIFS`, `Legacy`, `Formula`, `Ooxml`, `All`) に調整。
+- Generated noise cleanup:
+  - `obj/*sync-conflict-*` generated files を削除し、MSBuild duplicate import warning の原因を解消。
+  - Interop `from-dotnet-poi` binary fixture diffs は test-generated noise と判断し、release diff から除外するため restored。
+- Verification:
+  - `dotnet build DotnetPOI.sln -c Release --no-incremental` passed.
+  - `dotnet test DotnetPOI.sln --no-build -c Release` passed:
+    - Common 79, POIFS 11, Ooxml 151, Legacy 221, Formula 11, All 7, Interop 70 passed / 2 skipped.
+  - Pack smoke passed for all release-relevant packages:
+    - `DotnetPoi.Common.0.1.0`
+    - `DotnetPoi.POIFS.0.1.0`
+    - `DotnetPoi.Ooxml.1.0.0`
+    - `DotnetPoi.Legacy.0.1.0`
+    - `DotnetPoi.Formula.0.1.0`
+    - `DotnetPoi.All.1.0.0`
+  - Local package install smoke passed: temp console app installed `DotnetPoi.All 1.0.0` from local package output, created/wrote xlsx/docx/pptx in memory, and ran successfully.
+- Remaining before tag:
+  - `.gitignore` had a pre-existing mixed staged/unstaged state around `.claude`; intentionally left untouched.
+  - Known warnings remain: XWPF nullable warnings, xUnit analyzer warnings, UsageSamples nullable warnings. No build/test failures.
+
+## 2026-05-08 08:52 JST - Release hygiene / CI hardening
+
+- Task: `Common/POIFS/Legacy/Formula/Ooxml/All` の publish 順と tag 運用固定、NuGet install smoke の CI 追加、README/NOW/package README 更新漏れ防止。
+- Existing context:
+  - 既存差分で `DotnetPoi.Ooxml` / `DotnetPoi.All` は `1.0.0`、`Common` / `POIFS` / `Legacy` / `Formula` は `0.1.0`。
+  - 既存 `publish.yml` 差分で `Common` / `POIFS` の pack/push/release asset 追加済み。今回その上に検査と smoke を追加。
+- Implemented:
+  - `tools/release/package-hygiene.sh` を追加。
+    - publish 順を `Common -> POIFS -> Legacy -> Formula -> Ooxml -> All` として固定表示・検査。
+    - `PackageId` / `PackageVersion` / `PackageReadmeFile` / package README 存在と package ID 記載を検査。
+    - root `README.md` が全 package ID と `NOW.md` を参照していることを検査。
+    - tag push では `vX.Y.Z` が `DotnetPoi.Ooxml` と `DotnetPoi.All` の `PackageVersion` に一致しない場合 fail。
+  - `tools/release/nuget-install-smoke.sh` を追加。
+    - pack 済み local nupkg source から six packages すべてを temp console app に install し、代表 public type を参照して restore/run。
+  - `.github/workflows/ci.yml` に `Release Hygiene` job を追加。
+    - package hygiene -> publish order pack -> local NuGet install smoke。
+    - interop job は unit tests と release hygiene の両方に依存。
+  - `.github/workflows/publish.yml` に release package hygiene と publish 前 NuGet install smoke を追加。
+  - `README.md` の testing strategy と repository structure に release hygiene / `tools/release` を追記。
+- Verification:
+  - `tools/release/package-hygiene.sh` passed.
+  - `GITHUB_REF_NAME=v1.0.0 tools/release/package-hygiene.sh` passed.
+  - `GITHUB_REF_NAME=v9.9.9 tools/release/package-hygiene.sh` failed as expected with tag/version mismatch.
+  - Ruby YAML parse passed for `.github/workflows/ci.yml` and `.github/workflows/publish.yml`.
+  - Packed all packages to `/tmp/dotnet-poi-release-smoke` in publish order.
+  - `tools/release/nuget-install-smoke.sh /tmp/dotnet-poi-release-smoke` passed for:
+    - `DotnetPoi.Common 0.1.0`
+    - `DotnetPoi.POIFS 0.1.0`
+    - `DotnetPoi.Legacy 0.1.0`
+    - `DotnetPoi.Formula 0.1.0`
+    - `DotnetPoi.Ooxml 1.0.0`
+    - `DotnetPoi.All 1.0.0`
+- Notes:
+  - Full solution tests were not rerun in this step; the added checks exercise packaging/install paths only.
+  - Existing XWPF nullable warnings appeared during pack; no pack failure.
+  - No commit performed per repository rule.
+
+## 2025-06-22 — Phase 15 実装順 5-8 completed: HSLF text extraction / no-op write / interop / status
+
+- Task: Phase 15 実装順 5 (text extraction practical), 6 (no-op write round-trip), 7 (Java POI interop Direction B), 8 (status update).
+
+### Step 5: Text extraction practical
+
+- **Title/body separation**: TextHeaderAtom (3999) record type tracking in `BuildSlidesWithPersistPointers()`. `HSLFSlide` now has typed `getTitle()`, `getBodyParagraphs()`, and `getTextBlocks()`.
+- **Encoding**: CP1252 uses `LocaleUtil1252Hslf.GetString()`, UTF-16LE uses `Encoding.Unicode.GetString()`.
+- **Tests added**:
+  - `TextExtraction_TitleIsFirstTextBlockWithTitleType` — title text identified via TextPlaceholderType.Title
+  - `TextExtraction_BodyTextBlocksHaveBodyType` — body text typed as TextPlaceholderType.Body
+  - `TextExtraction_ChineseFixture_DoesNotThrow` — 54880_chinese.ppt opens without throwing
+  - `TextExtraction_EmptyTextBox_DoesNotThrow` — empty_textbox.ppt
+  - `TextExtraction_WithTextBox_DoesNotThrow` — with_textbox.ppt
+
+### Step 6: No-op write round-trip
+
+- **`HSLFSlideShow.write(Stream)`**: Uses `CompoundFile.Write(stream, _fileSystem)` for OLE2 preservation.
+- **Tests added**:
+  - `RoundTrip_NoOpWrite_PreservesSlideCountAndStreams` (Theory, 4 fixtures) — write → read verifies slide count and stream names
+  - `RoundTrip_NoOpWrite_PreservesExtractedText` (Theory, 4 fixtures) — write → read verifies text paragraph equality
+  - `RoundTrip_NoOpWrite_PreservesSpecialStreams` (Theory, 3 fixtures) — pictures.ppt, WithComments.ppt, testPPT_oleWorkbook.ppt
+  - `RoundTrip_NoOpWrite_PowerPointDocumentStreamIdentical` — byte-for-byte equality of PowerPoint Document stream
+
+### Step 7: Java POI interop
+
+- **Direction B** (C# writes → Java reads):
+  - `Write_Phase15HslfNoOp_CreatesFixtureForPoi` in WriteForPoiTests.cs
+  - Reads `basic_test_ppt_file.ppt`, writes via `prs.write(output)`, verifies round-trip within dotnet-poi
+  - Java side (`ReadFromDotnetTest.readPhase15HslfNoOp()`) not yet added — requires Java Maven project update
+
+### Step 8: Status update
+
+- `NOW.md`: HSLF section expanded from 1-row summary to detailed category breakdown (~12%).
+- `agents.md`: Checkboxes for steps 5-8 updated (6 sub-items checked, 3 remaining).
+- Test count: Legacy.Tests 221 (HWPF 97 + HSLF 124). Interop.Tests 71 (69 pass + 2 skip).
+
+### Test results
+
+- Legacy.Tests: 221/221 pass
+- Interop.Tests: 69/71 pass (2 skipped pre-existing: Phase13SampleDoc + DocxWithFields)
+
+### Known gaps
+
+- Chinese text extraction: 54880_chinese.ppt opens but text is empty (text may be in notes or non-standard record locations)
+- With text boxes: with_textbox.ppt text blocks are merged into a single atom with embedded newlines (current SLWT grouping aggregates all text in one SlideAtomsSet)
+- Java Direction B test not yet added (requires Java-side Maven change)
+- Paragraph/run boundary preservation not yet implemented for HSLF (future HSLFTextParagraph/HSLFTextRun)
+
+## 2026-05-08 — Investigating Excel warning for manual-simple.xls
+
+- Task: `tools/manual-verification/generated-documents/manual-simple.xls` opens in Excel with Japanese warning `ファイル エラー : データが失われた可能性があります。`; investigate possible HSSF/BIFF corruption.
+- Scope: diagnosis first; do not commit per repository rule. Need inspect generated Workbook stream record-level structure and compare against Apache POI expectations.
+
+- Finding: generated HSSF workbooks wrote built-in FormatRecord indexes 5/6/7/8/41/42/43/44 as `General`; Apache POI writes the actual currency/comma/accounting format strings. STYLE records and built-in XFs reference those indexes, so Excel can repair/warn even though Java POI can read the file.
+- Change in progress: align `Biff8Workbook.BuiltinFormats` with Apache POI `InternalWorkbook.createFormat()` / `BuiltinFormats`, and add a BIFF record test.
+
+- Verification:
+  - `dotnet test tests/DotnetPoi.Legacy.Tests/DotnetPoi.Legacy.Tests.csproj --no-restore --filter "FullyQualifiedName~HSSFWorkbookTests"` passed: 36/36.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --no-restore --filter "FullyQualifiedName~Hssf"` passed: 10/10.
+  - Regenerated manual verification documents; `manual-simple.xls` Workbook stream now has POI-compatible FormatRecord payloads, length increased from 1094 to 1334 bytes.
+  - Java POI `HSSFWorkbook` can read regenerated `manual-simple.xls` and returns sheet `Workbook`, A1 `Manual verification`, B2 `97.2003`.
+- Remaining manual step: reopen regenerated `tools/manual-verification/generated-documents/manual-simple.xls` in Microsoft Excel to confirm the warning dialog is gone; this environment did not run Excel UI automation.
+
+## 2026-05-08 — Follow-up: Excel warning still appears for generated XLS
+
+- Task: user reports the doc dialog is gone, but XLS now shows `ファイル エラー : データが失われた可能性があります。`; user referenced `tools/manual-verification/generated-documents/manual-sample.xls` (likely intended `manual-simple.xls`). Continue investigation and fix.
+- Scope: no commit per repository rule. Preserve existing user changes.
+
+- Follow-up finding: `Selection` record (0x001D) in generated XLS was only 9 bytes with zero selected ranges. Apache POI writes the BIFF8 normal 15-byte payload with one A1:A1 selected range. Excel likely repairs this record and shows `データが失われた可能性があります`.
+- Change in progress: update `WriteSelection()` to emit the POI-compatible 15-byte selection record and add record-level coverage.
+
+- Verification after Selection fix:
+  - `dotnet test tests/DotnetPoi.Legacy.Tests/DotnetPoi.Legacy.Tests.csproj --no-restore --filter "FullyQualifiedName~HSSFWorkbookTests"` passed: 36/36.
+  - Regenerated manual verification documents; `manual-simple.xls` Workbook stream length is now 1340 bytes and `Selection` record is 15 bytes: `03 00 00 00 00 00 00 01 00 00 00 00 00 00 00`.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --no-restore --filter "FullyQualifiedName~Hssf"` passed: 10/10.
+  - Java POI `HSSFWorkbook` can read regenerated `manual-simple.xls` and returns sheet `Workbook`, A1 `Manual verification`, B2 `97.2003`.
+- Remaining manual step: reopen regenerated `tools/manual-verification/generated-documents/manual-simple.xls` in Microsoft Excel to confirm the warning dialog is gone.
+
+## 2026-05-08 — Phase 17 item 3: xlsx comments API
+
+- Task: implement Phase 17 `xlsx comments API` so XSSF can read/create/edit cell comments, not just preserve existing comment parts.
+- Scope: Ooxml/XSSF only. Did not touch HSSF/POIFS/Legacy fixtures or existing unrelated dirty README/csproj/manual verification outputs.
+
+- Apache POI reference checked:
+  - `poi/poi-ooxml/src/main/java/org/apache/poi/xssf/usermodel/XSSFComment.java`
+  - `poi/poi-ooxml/src/main/java/org/apache/poi/xssf/model/CommentsTable.java`
+  - `poi/poi-ooxml/src/test/java/org/apache/poi/xssf/usermodel/TestXSSFComment.java`
+
+- Implemented:
+  - Added `XSSFComment` with POI-style methods: author, text, row/column/address, visible, anchor.
+  - Added sheet-level comment storage and lookup via `XSSFSheet.getCellComment(row, column)` / `findCellComment(row, column)`.
+  - Added cell-level API via `XSSFCell.getCellComment()`, `setCellComment()`, and `removeCellComment()`.
+  - Added comment creation through `XSSFDrawing.createCellComment(XSSFClientAnchor)` and helper `XSSFCreationHelper.createRichTextString(string)`.
+  - XSSFWorkbook load now reads sheet `comments` relationships and parses `xl/commentsN.xml`; VML `ClientData` is parsed enough to recover row/column, anchor, and visible state.
+  - XSSFWorkbook write now emits `xl/commentsN.xml`, `xl/drawings/vmlDrawingN.vml`, content type overrides/defaults, sheet relationships, and `<legacyDrawing r:id="..."/>`.
+  - `createDrawingPatriarch().createCellComment()` no longer forces an empty DrawingML drawing part when no DrawingML pictures/raw anchors exist.
+
+- Tests added:
+  - New comment creation writes `comments1.xml`, `vmlDrawing1.vml`, sheet rels, and `legacyDrawing`.
+  - POI-generated `poi-integration-comments-write-read.xlsx` is read, existing C5 comment author/text is verified, edited, written, and read back.
+
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XSSFWorkbookTests"` passed: 43/43.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed: 153/153.
+
+- Remaining gaps:
+  - Rich comment formatting is minimally round-tripped for modeled run properties; deep XMLBeans parity for all `CTRst` variants is not complete.
+  - VML comment shape styling is generated in a minimal Excel-compatible form, not byte-for-byte POI-compatible.
+  - No Java Direction B assertion was added in `DotnetPoi.Interop.Tests`; current coverage uses a POI-generated fixture for Direction A and dotnet-poi read/write/read for edit persistence.
+
+## 2026-05-08 JST - Phase 17 item 4: docx text box read support
+- Task: implement docx/XWPF read-side support for text inside `w:txbxContent`, reducing cases where Word documents appear to have missing body text because content lives in DrawingML text boxes.
+- Scope: XWPF reader/tests only; left existing XSSF, README, fixture, and unrelated dirty worktree changes untouched.
+- Implementation start: add extraction-only text storage on `XWPFRun`, include it from `XWPFParagraph.getText()`, and parse `w:txbxContent` from both inline drawings and raw-captured `wp:anchor` drawings without creating fake body paragraphs.
+- Tests added: inline DrawingML `w:txbxContent` and raw-captured `wp:anchor` textbox extraction. The anchor test asserts textbox text is attached to the owning paragraph for extraction without creating extra body paragraphs.
+- Verification: `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XWPF"` passed: 39/39.
+- Verification: `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed: 155/155. Existing XWPF nullable warnings remain; no new failures.
+
+## 2026-05-08 10:47 JST - Phase 17 item 5 docx table depth start
+- Task: Phase 17 item 5 docx table depth: cell merge, table borders, cell width, vertical alignment API.
+- Existing state: XWPFTable/XWPFTableCell already preserved and round-tripped gridSpan/vMerge/tcW/vAlign as string-ish model fields; tblBorders was only raw XML preservation, so user-visible border API/readback was missing.
+- Plan: add typed table border API and border XML read/write, add convenience merge helpers and typed vertical alignment/width setters, then cover write/read/round-trip in XWPFDocumentTests.
+
+## 2026-05-08 10:58 JST - Phase 17 item 5 docx table depth complete
+- Implemented typed/user-visible DOCX table depth APIs in XWPF: horizontal/vertical merge helpers, table border setters/getters/removers, typed cell vertical alignment, and string width setter for auto/twips/percent.
+- `w:tblBorders` is now parsed into the XWPFTable model and written from the model, instead of only being raw-preserved; unmodeled tblPr/trPr/tcPr children still remain raw-preserved.
+- Added tests for generated DOCX XML, readback from an existing-document-style XML fixture, round-trip of borders/gridSpan/vMerge/hMerge/tcW/vAlign, and percentage width conversion.
+- Verification: `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed (157/157); `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --filter FullyQualifiedName~Docx` passed (10 passed, 1 skipped).
+
+## 2026-05-08 14:50 JST - Phase 17 item 10 HWPF/doc header/footer/table text extraction complete
+- Task: Phase 17 item 10 HWPF/doc header/footer/table text extraction.
+- Extracted subdocument ranges from FIB Ccp bounds (`getHeaderStoryRange()`, `getFootnoteRange()`, etc.).
+- Modeled structural extraction of Tables (`Table`, `TableRow`, `TableCell` iterator wrappers via `Range.getTable(Paragraph)`).
+- Added parsing for PAPX properties `sprmPFInTable`, `sprmPFTtp`, `sprmPItap` to expose paragraph table status.
+- Added C# standalone roundtrip tests and Java POI bidirectional interop tests ensuring Java POI correctly extracts Header and Table structures from dotnet-poi No-Op saved documents.
+- Fixed PAPX parsing offset errors that failed to extract `opSize` properly for SPRA case 5 and 6.
+- Verification: All `DotnetPoi.Legacy.Tests` passed (224/224). All Java Interop tests passed.
+
+## 2026-05-08 15:30 JST - README practical workflow assessment
+- User asked whether README implies practical business workflow coverage is now effectively sufficient.
+- Read README status/matrix: xlsx is broad and stable for common creation/read/edit/styling/layout/images/formulas-as-text/macro preservation; docx and pptx are practical for generation/light editing/preservation; xls now covers basic values/styles/layout/preservation/interop; doc covers body text, limited body edits, header/footer/table extraction, and preservation; ppt remains early.
+- Assessment: for typical business workflows centered on template fill, report generation, light editing, round-trip preservation, and Excel/Word/PowerPoint interoperability, the project appears to have crossed from "prototype port" into "practical pilot/limited production" territory. Remaining release risk is concentrated in advanced object-model editing: full formula evaluation, chart creation/editing, comments/deep review features, advanced legacy binary editing, and ppt depth.
+
+## 2026-05-08 15:35 JST - DOCX tracked changes preservation risk
+- User asked whether README `docx Track Changes / insertions/deletions/moves = ❌` means tracked changes are broken.
+- Code review finding: `XWPFDocument` does raw-capture unknown direct children of `w:body` and `w:p`, and comments mention track changes. However `WriteDocument()` emits modeled paragraphs first, modeled tables second, then preserved raw body elements; `WriteParagraph()` emits modeled runs/fields first, then preserved raw paragraph elements. Therefore tracked-change elements such as `w:ins`, `w:del`, `w:moveFrom`, `w:moveTo` may survive as raw XML but can be reordered relative to surrounding paragraphs/runs/tables.
+- Assessment: README `❌` should currently be read as "not modeled and not guaranteed safe"; tracked-change documents may be semantically damaged on read/write, especially when change elements are interleaved with normal content. To claim preservation (`🔵`), XWPF needs an order-preserving body/paragraph child model and tests with `w:ins`/`w:del`/move ranges.
+
+## 2026-05-08 15:55 JST - Phase 18 TODO2 DOCX tracked changes preservation
+- Task: implement Phase 18 TODO2: raise docx Track Changes from ❌ to 🔵 preservation by adding raw XML order preservation.
+- Implemented an internal order-preserving body child model in `XWPFDocument` so paragraphs, tables, and raw body-level XML are emitted in read/creation order instead of paragraphs first, tables second, raw last.
+- Implemented an internal order-preserving paragraph child model in `XWPFParagraph` so runs, fields, and raw paragraph-level XML (`w:ins`, `w:del`, inline SDT/bookmarks/etc.) are emitted in their observed order instead of raw XML being appended at paragraph end.
+- Updated field writing to use the same paragraph child order. This makes generated field output appear between surrounding runs, matching user-visible order better than the previous runs-first/fields-last writer.
+- Added XWPF tests:
+  - `RoundTrip_TrackedChanges_PreservedInParagraphOrder`
+  - `RoundTrip_TrackedChanges_PreservedInTableCellParagraphOrder`
+  - `Write_ParagraphsAndTables_KeepCreationOrder`
+- Updated README docx matrix: Track Changes is now `🔵`, with note that tracked-change XML is preserved in body/paragraph order but accept/reject/create/edit APIs are not modeled.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XWPF"` passed: 44/44.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed: 169/169.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Docx"` passed: 10 passed, 1 skipped.
+- Remaining limitation: this is preservation, not a tracked-changes object model. No accept/reject API, author/date editing, or semantic merge/edit behavior is implemented.
+
+## 2026-05-08 16:03 JST - Documentation maintenance for Phase 18 TODO2
+- Task: user requested maintenance for `NOW.md`, `agents.md`, `README.md`, `CHECKPOINT.md`, `docs_src`, and all project package README files under `src/`.
+- Updated status matrices so docx/XWPF Track Changes is now `🔵 preservation-only`, not `❌`.
+- Updated wording to clarify that tracked-change XML is preserved in body/paragraph child order, while accept/reject/create/edit APIs remain unsupported.
+- Updated test-count snapshots in `NOW.md` and root `README.md` to reflect current Ooxml/Legacy/Interop totals.
+- Updated `agents.md` Phase 18 TODO2 checkbox to completed with implementation notes.
+- Updated `docs_src/content/compatibility/format-coverage.md`, `limitations.md`, `interop.md`, and `guides/ppt/overview.md` for the current XWPF tracked-change and HSLF preservation status.
+- Updated package READMEs:
+  - `src/DotnetPoi.Ooxml/README.md`: added support-status table and XWPF tracked-change preservation note.
+  - `src/DotnetPoi.All/README.md`: added current-scope notes.
+  - `src/DotnetPoi.Legacy/README.md`: refreshed HWPF/HSLF percentages and supported/not-modeled lists.
+  - `src/DotnetPoi.Formula/README.md`: replaced stale `DotnetPoi.Core` wording and updated test count.
+  - `src/DotnetPoi.Common/README.md` and `src/DotnetPoi.POIFS/README.md`: clarified transitive package scope.
+- No commit made per repository rule.
+
+## 2026-05-08 16:15 JST - README/agents comments status split
+- Task: split README comment status between xlsx and docx, and add Phase 18 work plan for xlsx/docx comments.
+- README updated:
+  - xlsx/XSSF no longer groups charts and comments as preservation-only. Charts remain `🔵`; comments are now `✅` for common cell comment read/create/edit/remove through `XSSFComment`, cell/sheet lookup, and VML/comment part read/write.
+  - docx/XWPF comments remain `🔵` preservation-only: existing comments round-trip through preserved parts, but API creation/editing is not modeled.
+  - Practical Gaps now lists docx comment API only; xlsx cell comments are noted as already modeled for common workflows.
+- `agents.md` updated with `phase 18 TODO3 — comments API / preservation split`:
+  - xlsx comments follow-up: POI API comparison, remove/move/multi-sheet/visible/author tests, Java POI Direction B, docs limitations.
+  - docx comments path: marker preservation first (`w:commentRangeStart`, `w:commentRangeEnd`, `w:commentReference`), then read API, then create/edit API after preservation is stable.
+- `NOW.md` synchronized:
+  - xlsx comments changed from `🔵 不明パーツ保存のみ` to `✅` with current API/read-write scope and minimal rich formatting/VML styling caveat.
+  - practical gap changed from generic `xlsx, docx コメント` to `docx コメントAPI`; xlsx cell comments are noted as implemented for common workflows.
+- No code changes and no tests run for this documentation-only update.
+
+## 2026-05-08 16:18 JST - Phase 18 TODO3 implementation order 1 follow-up
+- Task: finish Phase 18 TODO3 implementation order 1 (`comments API / preservation split`) by checking for documentation drift beyond root README.
+- Confirmed root `README.md` already separates xlsx comments (`✅` common API supported) from docx comments (`🔵` preservation-only).
+- Updated remaining documentation surfaces:
+  - `docs_src/content/compatibility/format-coverage.md`: split xlsx charts from xlsx comments; xlsx comments are now `✅ Review`, docx comments explicitly remain preservation-only with no read/create/edit API.
+  - `docs_src/content/compatibility/limitations.md`: changed comments gap from `xlsx, docx` to docx-only and added a short note that xlsx cell comments are modeled with minimal rich formatting/VML styling.
+  - `src/DotnetPoi.Ooxml/README.md`: added separate `XSSF comments` and `XWPF comments` sections.
+- Ran docs generator: `dotnet run --project tools/DotnetPoi.DocsGenerator/DotnetPoi.DocsGenerator.csproj` and regenerated `docs/` HTML.
+- No code changes and no unit tests run; this was documentation/status synchronization only.
+
+## 2026-05-08 16:26 JST - Phase 18 TODO3 implementation order 2
+- Task: finish xlsx comments API confirmation/follow-up for Phase 18 TODO3.
+- Apache POI comparison notes:
+  - `XSSFCell.getCellComment()` delegates to `XSSFSheet.getCellComment(CellAddress)`; it does not keep a stale per-cell cache.
+  - `XSSFCell.setCellComment(null)` removes the comment for the cell; `XSSFCell.removeCellComment()` removes both comments-table and VML shape entries.
+  - `XSSFComment.setAddress(row, col)` updates the comments lookup so the old address no longer resolves and the new address does.
+  - `XSSFComment.isVisible()` reads VML `ClientData/Visible` and may also infer from VML shape style; `setVisible(false)` removes `Visible` and uses hidden style.
+  - `XSSFSheet.getCellComments()` exposes all sheet comments keyed by cell address.
+- Implementation updates:
+  - Removed stale per-cell comment cache from `XSSFCell`; `getCellComment()` now always looks up the sheet comment table.
+  - Added `XSSFSheet.getCellComments()` returning comments keyed by A1-style address strings.
+  - Reworked XSSF VML comment metadata read to parse shape-level VML with `XDocument`, preserving anchor and visible/hidden state more reliably.
+- Tests added:
+  - remove comment: no comments/VML/legacyDrawing parts are written when the last comment is removed.
+  - move comment: old cell lookup is cleared, new cell lookup works, and round-trip persists the new address.
+  - multiple sheets / visible-hidden / shared author list: comments1/comments2 parts, VML visible marker, author de-duplication, and readback are verified.
+  - Direction B: added `phase18-xssf-comments.xlsx` writer fixture and Java POI read assertion for authors, text, visibility, movement, and multi-sheet comments.
+- Docs status:
+  - README / docs_src / package README limitations were already split in implementation order 1; no new docs generator run needed for this code/test follow-up.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XSSFWorkbookTests"`: 46 passed.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Write_XlsxCommentsWorkbook_CreatesFixtureForPoi"`: 1 passed and generated `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase18-xssf-comments.xlsx`.
+  - `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest#readPhase18XssfCommentsWorkbook`: 1 passed.
+- No commit made per repository rule.
+
+## 2026-05-08 16:47 JST - Phase 18 TODO3 implementation order 3
+- Task: fix docx comments preservation for Phase 18 TODO3, implementation order 3.
+- Apache POI reference check:
+  - Confirmed POI has modeled docx comment APIs around `XWPFComment`, `XWPFComments`, `XWPFDocument.getDocComments()/getComments()/getCommentByID()`, and tests using `comment.docx` / `testComment.docx`.
+  - Kept this step preservation-only; docx comment read/create/edit API remains Phase 18 TODO3 order 4/5.
+- Implementation:
+  - Added ordered raw run-content preservation to `XWPFRun` and `XWPFDocument` so run-level unmodeled elements such as `w:commentReference` survive even when the run has no text.
+  - Preserved existing document-level relationship entries that are not modeled by XWPF writer, including `comments.xml`, `commentsExtended.xml`, `commentsIds.xml`, and `commentsExtensible.xml` relationships.
+  - Preserved non-modeled content type defaults/overrides from `[Content_Types].xml`, so comment parts and comment-owned media defaults remain package-visible after round-trip.
+- Tests:
+  - Added POI fixture tests for `testComment.docx` range markers (`w:commentRangeStart`, `w:commentRangeEnd`, `w:commentReference`) plus `word/comments.xml`, document rels, and content type overrides.
+  - Added POI fixture test for `comment.docx` collapsed comment reference inside a textless run.
+  - Added synthetic order tests for comment markers in table cell paragraphs and near hyperlink/tracked-change content.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XWPFDocumentTests"`: 41 passed.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj`: 176 passed.
+- Remaining:
+- This does not implement docx comments usermodel/read API. Next step is Phase 18 TODO3 order 4: parse `word/comments.xml` into minimal read-only XWPF comment objects and consider paragraph/run-side reference-id access without disrupting order preservation.
+
+## 2026-05-08 17:20 JST - Phase 18 TODO3 implementation order 4
+- Task: implement Phase 18 TODO3 order 4, minimal docx comments read API while preserving the order-preserving raw XML/write path from order 3.
+- Code:
+  - Added read-only `XWPFComment` model with `getId()`, `getAuthor()`, `getInitials()`, `getDate()`, and `getText()`.
+  - `XWPFDocument` now parses `word/comments.xml` into comments on load and exposes `getComments()` / `getCommentByID(string)`.
+  - `word/comments.xml` remains an unmodeled preserved ZIP entry for writing; read parsing is sidecar only and does not replace the preserved part.
+  - Malformed/minimal preserved comment parts that were only intended for byte preservation are ignored by the comment reader rather than blocking document load.
+  - `XWPFParagraph` exposes `getCommentRangeStartIds()`, `getCommentRangeEndIds()`, and aggregate `getCommentReferenceIds()`.
+  - `XWPFRun` exposes `getCommentReferenceIds()` for preserved `w:commentReference` children.
+- Tests:
+  - Added POI fixture coverage for `comment.docx` comment metadata/text and `testComment.docx` paragraph/run marker ids.
+  - Existing order-preservation tests for `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` still pass.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XWPFDocumentTests"`: 43 passed.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj`: 178 passed.
+- Docs/status:
+  - Updated `agents.md` Phase 18 TODO3 order 4 checkboxes.
+  - Updated root README, `NOW.md`, `docs_src/content/compatibility/*`, generated docs HTML, and `src/DotnetPoi.Ooxml/README.md` to describe docx comments as preservation + minimal read-only API, with create/edit still not implemented.
+- Remaining:
+  - Phase 18 TODO3 order 5: create/edit API is still intentionally deferred. Need decide collapsed reference vs range comment creation behavior based on Apache POI before adding new `word/comments.xml` write/model ownership.
+- No commit made per repository rule.
+
+## 2026-05-08 17:10 JST - Phase 18 TODO3 implementation order 5
+- Task: implement Phase 18 TODO3 order 5, minimal docx comments create/edit API.
+- Apache POI reference:
+  - POI creates the comments part through `XWPFDocument.createComments()` and comments through `XWPFComments.createComment(BigInteger)`.
+  - dotnet-poi kept the API smaller for now: `XWPFDocument.createComment(...)` creates a comment with the next numeric id, and `XWPFParagraph.addComment(comment)` inserts a paragraph/range comment marker set.
+  - Minimal behavior chosen: paragraph/range comments, not collapsed reference-only comments, because this exercises ordered `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` insertion and matches the preservation model from orders 3/4.
+- Code:
+  - `XWPFComment` is now mutable for minimal metadata/text editing: `setAuthor`, `setInitials`, `setDate`, `setText`.
+  - `XWPFDocument.createComment(...)` / `removeComment(id)` were added, with numeric id allocation and a comments-modified flag.
+  - `XWPFParagraph.addComment(comment)` inserts range start before the paragraph's existing children, range end after them, and a reference run after the range while preserving paragraph child order.
+  - `word/comments.xml` remains byte-preserved on no-op round-trip. Once comments are created/edited through the API, the model takes ownership and writes `word/comments.xml`, the content type override, and the document relationship.
+- Tests:
+  - Added C# coverage for creating a docx comment, writing comments part/rels/content type, inserting range markers in order, and reading it back through dotnet-poi.
+  - Added C# coverage for editing an existing POI fixture comment and writing the updated modeled comments part.
+  - Added Direction B fixture writer `phase18-xwpf-comments.docx` and Java POI read test for comment metadata/text and paragraph marker XMLBeans objects.
+- Docs/status:
+  - Updated `agents.md`, `NOW.md`, root `README.md`, `docs_src/content/compatibility/*`, and `src/DotnetPoi.Ooxml/README.md`.
+  - Ran docs generator to refresh generated `docs/` HTML.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj`: 180 passed.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Write_DocxCommentsDocument_CreatesFixtureForPoi"`: 1 passed and generated `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase18-xwpf-comments.docx`.
+  - `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest#readPhase18XwpfCommentsDocument`: 1 passed.
+- Remaining:
+  - Rich comment body content, arbitrary range selection, comment deletion with marker cleanup, and comment-owned media/tables are still limited.
+- No commit made per repository rule.

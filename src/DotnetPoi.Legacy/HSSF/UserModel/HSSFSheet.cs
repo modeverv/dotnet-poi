@@ -1,0 +1,107 @@
+using DotnetPoi.SS.UserModel;
+using DotnetPoi.SS.Util;
+
+namespace DotnetPoi.HSSF.UserModel;
+
+public sealed class HSSFSheet : ISheet
+{
+    private readonly SortedDictionary<int, HSSFRow> _rows = new();
+    private readonly HSSFWorkbook _workbook;
+    private readonly List<CellRangeAddress> _mergedRegions = new();
+    private readonly SortedDictionary<int, int> _columnWidths = new();
+    private readonly HashSet<int> _hiddenColumns = new();
+    private int _freezeColSplit;
+    private int _freezeRowSplit;
+
+    internal HSSFSheet(HSSFWorkbook workbook, string sheetName)
+    {
+        _workbook = workbook;
+        SheetName = sheetName;
+    }
+
+    public string SheetName { get; }
+
+    public HSSFRow createRow(int rownum)
+    {
+        if (rownum < 0)
+        {
+            throw new ArgumentException("Row number must be non-negative.", nameof(rownum));
+        }
+
+        // POI semantics: return existing row if already created
+        if (_rows.TryGetValue(rownum, out var existing))
+            return existing;
+
+        var row = new HSSFRow(this, rownum);
+        _rows[rownum] = row;
+        return row;
+    }
+
+    public HSSFRow? getRow(int rownum) => _rows.TryGetValue(rownum, out var row) ? row : null;
+
+    public int getLastRowNum() => _rows.Count == 0 ? 0 : _rows.Keys.Max();
+
+    public HSSFWorkbook getWorkbook() => _workbook;
+
+    internal IReadOnlyCollection<HSSFRow> Rows => _rows.Values;
+
+    public void addMergedRegion(CellRangeAddress region)
+    {
+        Guard.ThrowIfNull(region, nameof(region));
+        _mergedRegions.Add(region);
+    }
+
+    public IReadOnlyList<CellRangeAddress> getMergedRegions() => _mergedRegions;
+
+    public void setColumnWidth(int columnIndex, int width)
+    {
+        if (width < 0)
+            throw new ArgumentException("Column width must be non-negative.", nameof(width));
+        _columnWidths[columnIndex] = width;
+    }
+
+    public int getColumnWidth(int columnIndex)
+    {
+        return _columnWidths.TryGetValue(columnIndex, out var width) ? width : 0;
+    }
+
+    public void createFreezePane(int colSplit, int rowSplit)
+    {
+        _freezeColSplit = colSplit;
+        _freezeRowSplit = rowSplit;
+    }
+
+    public void createFreezePane(int colSplit, int rowSplit, int leftmostColumn, int topRow) =>
+        createFreezePane(colSplit, rowSplit);
+
+    public void setColumnHidden(int columnIndex, bool hidden)
+    {
+        if (hidden) _hiddenColumns.Add(columnIndex);
+        else _hiddenColumns.Remove(columnIndex);
+    }
+
+    public bool isColumnHidden(int columnIndex) => _hiddenColumns.Contains(columnIndex);
+
+    internal int FreezeColSplit => _freezeColSplit;
+    internal int FreezeRowSplit => _freezeRowSplit;
+    internal IEnumerable<int> HiddenColumns => _hiddenColumns;
+    internal IEnumerable<int> ExplicitColumnWidthIndices => _columnWidths.Keys;
+
+    public void protectSheet(bool protect) { }
+    public bool isSheetProtected() => false;
+
+    public void setAutoFilter(CellRangeAddress range) { }
+    public CellRangeAddress? getAutoFilter() => null;
+
+    // Active cell / selection
+    public void setActiveCell(string cell) { }
+    public string? getActiveCell() => null;
+    public void setSelected(bool selected) { }
+    public bool isSelected() => false;
+
+    IRow ISheet.createRow(int rownum) => createRow(rownum);
+
+    IRow? ISheet.getRow(int rownum) => getRow(rownum);
+
+    IWorkbook ISheet.getWorkbook() => getWorkbook();
+}

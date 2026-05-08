@@ -77,6 +77,18 @@
 </ul>
 </div>
 <div class="nav-section">
+<div class="nav-title">doc (HWPF)</div>
+<ul>
+<li><a href="../doc/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">ppt (HSLF)</div>
+<ul>
+<li><a href="../ppt/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
 <div class="nav-title">Reference</div>
 <ul>
 <li><a href="../../reference/examples-index.html">Examples Index</a></li>
@@ -86,9 +98,10 @@
     </aside>
     <main class="content">
 <h1>xls (HSSF) Overview</h1>
-<p>HSSF provides read and write support for the legacy xls (BIFF) format. Coverage is ~10%.</p>
+<p>HSSF provides read and write support for the legacy xls (BIFF8) format. Coverage is ~35%.</p>
 <h2>Status</h2>
-<p>HSSF is the oldest and least complete format implementation in dotnet-poi. It supports basic cell read/write operations but most advanced features (styles, images, charts, formulas, data validation, filters, pivot tables) are not implemented.</p>
+<p>HSSF has grown beyond the original bootstrap reader/writer. It now supports practical basic workbook operations: common cell types, multiple sheets, basic styles, layout records, representative Apache POI fixture loading, Java POI interop slices, and preservation of non-workbook OLE streams, VBA streams, and unknown BIFF records during light edits.</p>
+<p>It is still not a full Apache POI HSSF port. Images, shapes, chart creation, comment editing, filters, pivots, and new BIFF formula token writing are not modeled through public APIs.</p>
 <h2>Basic Read and Write</h2>
 <pre><code class="language-csharp">using DotnetPoi.HSSF.UserModel;
 
@@ -110,6 +123,8 @@ var value = wb2.getSheetAt(0).getRow(0).getCell(0).getStringCellValue();</code><
 <li>You need to read or update existing xls files without style changes</li>
 <li>You have a legacy workflow that requires xls output</li>
 <li>You are migrating from xls to xlsx and need a transitional solution</li>
+<li>You need to extract values from old xls files for indexing or migration</li>
+<li>You need light edits while preserving unmodeled OLE/BIFF content as much as possible</li>
 </ul>
 <h2>When to Use XSSF Instead</h2>
 <ul>
@@ -118,17 +133,27 @@ var value = wb2.getSheetAt(0).getRow(0).getCell(0).getStringCellValue();</code><
 <li>Excel can open xlsx files from Excel 2007 onwards</li>
 <li>LibreOffice/OpenOffice handles xlsx as well as xls</li>
 </ul>
+<h2>Supported Today</h2>
+<ul>
+<li>String, numeric, boolean, blank, and error cells</li>
+<li>Multiple sheets, sparse rows/cells, and high column indexes</li>
+<li>Basic font and cell style round-trips: font name/size/bold/italic/color, data formats, alignment, wrap, borders, fills</li>
+<li>Column width, row height, hidden rows/columns, merged regions, freeze panes</li>
+<li>Reading formula text and cached formula values from existing files</li>
+<li>Representative Apache POI <code>.xls</code> fixture loading</li>
+<li>Java POI interop fixtures for basic, styles, layout, unicode, and comprehensive workbooks</li>
+<li>Preservation of non-Workbook OLE streams, macro/VBA streams, directory metadata, and unknown BIFF records</li>
+</ul>
 <h2>Limitations</h2>
 <ul>
-<li>No formula support</li>
-<li>No image support</li>
-<li>No style support (fonts, fills, borders, number formats)</li>
+<li>No formula evaluation</li>
+<li>No new BIFF formula token writing</li>
+<li>No image or drawing usermodel</li>
+<li>No chart creation/editing</li>
+<li>No comment or hyperlink editing API</li>
 <li>No data validation</li>
-<li>No conditional formatting</li>
 <li>No auto filter</li>
 <li>No pivot tables</li>
-<li>No protection</li>
-<li>No chart support</li>
 <li>No rich text</li>
 </ul>
 <p>HSSF is maintained for compatibility but is not a priority for new development.</p>

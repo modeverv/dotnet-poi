@@ -7,7 +7,7 @@
 ![.NET Standard](https://img.shields.io/badge/.NET%20Standard-2.0-%23820171)
 ![Status](https://img.shields.io/badge/status-early%20beta-yellow)
 
-**Formula evaluator for dotnet-poi — evaluate spreadsheet formulas in xlsx workbooks.**
+**Limited formula evaluator for dotnet-poi — evaluate a small, intentionally bounded subset of spreadsheet formulas in xlsx workbooks.**
 
 > ⚠️ This is an **unofficial** port and is **not affiliated with the Apache Software Foundation**. Apache POI is a registered trademark of the Apache Software Foundation.
 
@@ -23,7 +23,7 @@ dotnet add package DotnetPoi.Formula
 <PackageReference Include="DotnetPoi.Formula" Version="..." />
 ```
 
-> Requires **DotnetPoi.Core** 0.1.0+ and **.NET 8.0+** or **.NET Framework 4.7.2+**.
+> Requires **DotnetPoi.Ooxml** (or **DotnetPoi.All**) 0.1.0+ and **.NET 8.0+** or **.NET Framework 4.7.2+**.
 
 ---
 
@@ -38,17 +38,19 @@ dotnet add package DotnetPoi.Formula
 
 | Use DotnetPoi.Formula if you need… | Don't need it if you only… |
 |---|---|
-| `IFormulaEvaluator.evaluate()` / `evaluateAll()` / `evaluateInCell()` | Read/write formula text and cached values |
-| Programmatic access to freshly calculated results | Template fill → save → open in Excel |
-| Use SUM, AVERAGE, COUNT, MIN, MAX, CONCATENATE | Write/save/reload xlsx files without calculation |
+| `IFormulaEvaluator.evaluate()` / `evaluateAll()` / `evaluateInCell()` for the limited supported subset | Read/write formula text and cached values |
+| Programmatic calculation for simple arithmetic and listed functions | Template fill → save → open in Excel |
+| SUM, AVERAGE, COUNT, MIN, MAX, CONCATENATE and basic operators | Full Excel-compatible calculation |
 
-> All formula **text preservation** (`setCellFormula`, `getCellFormula`, cached `<v>` value) lives in **DotnetPoi.Core** and works without this package.
+> All formula **text preservation** (`setCellFormula`, `getCellFormula`, cached `<v>` value) lives in the format packages (e.g., **DotnetPoi.Ooxml**) and works without this package.
+>
+> Full formula evaluation is not a current project goal. Excel-compatible calculation should be delegated to Excel, LibreOffice, Apache POI, or another calculation engine when accuracy across the full formula language matters.
 
 ---
 
 ## How it works
 
-`DotnetPoi.Formula` references `DotnetPoi.Core`, **not the other way around**. When this package is in your project, `createFormulaEvaluator()` is automatically enabled via lazy assembly discovery (`Type.GetType` + `RuntimeHelpers.RunClassConstructor`). No configuration needed — just add the NuGet reference.
+`DotnetPoi.Formula` depends on the shared abstractions in `DotnetPoi.Common`. When this package is in your project, `createFormulaEvaluator()` is automatically enabled in your workbook via lazy assembly discovery (`Type.GetType` + `RuntimeHelpers.RunClassConstructor`). No configuration needed — just add the NuGet reference.
 
 ---
 
@@ -162,7 +164,7 @@ Accuracy of the formula engine is verified through:
 
 ## Version
 
-This is a **v0.x** package. The supported function set will grow over time independently of `DotnetPoi.Core`, which targets v1.0 stability.
+This is a **v0.x** package with intentionally limited scope. The format packages (`DotnetPoi.Ooxml` / `DotnetPoi.Legacy`) own formula text and cached-value preservation; this package is only for the small evaluator subset listed above.
 
 ---
 
@@ -170,7 +172,7 @@ This is a **v0.x** package. The supported function set will grow over time indep
 
 | Project | Tests |
 |---|---|
-| Formula.Tests | 10 |
+| Formula.Tests | 11 |
 
 ---
 

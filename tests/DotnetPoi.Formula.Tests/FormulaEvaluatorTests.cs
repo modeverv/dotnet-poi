@@ -8,6 +8,21 @@ namespace DotnetPoi.Formula.Tests;
 public class FormulaEvaluatorTests
 {
     [Fact]
+    public void FormulaAssembly_DoesNotReferenceFormatImplementations()
+    {
+        var referencedAssemblies = typeof(FormulaEvaluator)
+            .Assembly
+            .GetReferencedAssemblies()
+            .Select(a => a.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Contains("DotnetPoi.Common", referencedAssemblies);
+        Assert.DoesNotContain("DotnetPoi.Core", referencedAssemblies);
+        Assert.DoesNotContain("DotnetPoi.Ooxml", referencedAssemblies);
+        Assert.DoesNotContain("DotnetPoi.Legacy", referencedAssemblies);
+    }
+
+    [Fact]
     public void EvaluateFormulaCell_Sum_StoresCachedNumericValue()
     {
         using var workbook = new XSSFWorkbook();

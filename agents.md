@@ -25,7 +25,7 @@ Apache POI source lives in `poi/` as a git submodule. **Always refer to the orig
 dotnet-poi/
 ├── poi/                        # Apache POI submodule (read-only, do not edit)
 ├── src/
-│   ├── DotnetPoi.Core/         # ★ NuGet: DotnetPoi.Core (all implementations)
+│   ├── DotnetPoi.Legacy/         # ★ NuGet: DotnetPoi.Legacy (HSSF, HWPF, HSLF)
 │   │   ├── SS/                 #   Common interfaces, enums, XML writer
 │   │   ├── POIFS/              #   OLE2 compound document container
 │   │   ├── XSSF/               #   xlsx (Excel 2007+)
@@ -36,7 +36,7 @@ dotnet-poi/
 │   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
 │   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
 ├── tests/
-│   ├── DotnetPoi.Core.Tests/       # Core tests (244) — all formats (+7: pptx group shapes, xlsx auto-shapes, docx header/footer, docx SDT, docx floating images, docx table/rPr raw preservation)
+│   ├── DotnetPoi.Legacy.Tests/      # Legacy tests (HSSF/HWPF/HSLF)
 │   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
 │   ├── DotnetPoi.Interop.Tests/   # Bidirectional compatibility tests
 │   │   ├── java/                #   Maven project (Apache POI dependency)
@@ -61,21 +61,23 @@ The project is split into **two NuGet packages** to decouple Core stability from
 
 | Package | Contents | Stability target |
 |---|---|---|
-| **DotnetPoi.Core** | All format implementations (SS, POIFS, XSSF, HSSF, XWPF, HWPF, XSLF, HSLF) | **Stable v1.0** (release independently) |
+| **DotnetPoi.Ooxml** | OOXML formats (XSSF/xlsx, XWPF/docx, XSLF/pptx) | **Stable v1.0** (release independently) |
+| **DotnetPoi.Legacy** | Legacy binary formats (HSSF/xls, HWPF/doc, HSLF/ppt) | **In development** |
 | **DotnetPoi.Formula** | Formula evaluator (`FormulaEvaluator`) | **v0.x** (iterate freely) |
+| **DotnetPoi.All** | Meta-package — references Ooxml + Legacy + Formula | **Aggregate** |
 
 **Rules:**
-- `Core` MUST NOT reference `Formula` in any way. Zero compile-time dependency.
-- `Formula` references `Core` (it consumes Core types like `ICell`, `IWorkbook`).
-- `Formula` registers itself with `Core` via `XSSFCreationHelper.RegisterFormulaEvaluatorFactory()` in its static constructor. At runtime, `createFormulaEvaluator()` uses lazy assembly discovery (`Type.GetType` + `RuntimeHelpers.RunClassConstructor`) to auto-detect `DotnetPoi.Formula`.
-- All non-evaluator work (formula text read/write, cached value preservation, `setCellFormula`, `getCellFormula`, `calcPr fullCalcOnLoad`) lives in Core. Only actual evaluation lives in Formula.
-- All new features go into Core first unless they are specifically formula evaluation logic.
+- `Ooxml` MUST NOT reference `Formula` in any way. Zero compile-time dependency.
+- `Formula` references `Ooxml` (it consumes Ooxml types like `ICell`, `IWorkbook`).
+- `Formula` registers itself with `Ooxml` via `XSSFCreationHelper.RegisterFormulaEvaluatorFactory()` in its static constructor. At runtime, `createFormulaEvaluator()` uses lazy assembly discovery (`Type.GetType` + `RuntimeHelpers.RunClassConstructor`) to auto-detect `DotnetPoi.Formula`.
+- All non-evaluator work (formula text read/write, cached value preservation, `setCellFormula`, `getCellFormula`, `calcPr fullCalcOnLoad`) lives in Ooxml/Legacy. Only actual evaluation lives in Formula.
+- All new features go into Ooxml/Legacy first unless they are specifically formula evaluation logic.
 
 **Implications for development:**
-- Core can be stabilized and released as v1.0 without waiting for Formula.
-- Formula tests (`DotnetPoi.Formula.Tests`) are independent of Core tests.
+- Ooxml can be stabilized and released as v1.0 without waiting for Formula.
+- Formula tests (`DotnetPoi.Formula.Tests`) are independent of Ooxml/Legacy tests.
 - `createFormulaEvaluator()` must always handle the missing-Formula case with `NotSupportedException`.
-- When modifying Core interfaces that Formula depends on (e.g., `ICell`, `ICellStyle`), consider forward compatibility. Adding non-breaking members is safe; breaking changes require coordinated Formula updates.
+- When modifying Ooxml interfaces that Formula depends on (e.g., `ICell`, `ICellStyle`), consider forward compatibility. Adding non-breaking members is safe; breaking changes require coordinated Formula updates.
 
 Note: For now, formula evaluation and setting formula result values are intentionally omitted in the library; formulas may be preserved as text and cached results are only handled when present.
 
@@ -153,421 +155,636 @@ XML output parity is the lowest layer of the entire port. If this layer has dive
 
 #### Approach
 
-**Step 1: Use LLM to generate a comprehensive POI fixture generator**
+### Phase 12 — xls/HSSF Practical Completion
 
-Ask the LLM to write a Java program using Apache POI that generates xlsx files covering all cases likely to produce XML output divergence between Java and .NET:
+目標: `.xls` を BIFF8 / OLE2 の古い Excel 形式として実用的に read / write / light-edit / round-trip できる状態へ引き上げる。現代 Office 形式（xlsx/docx/pptx）がかなり実用域に入った後の次の主戦場として、業務現場に残る古い Excel ファイル対応を優先する。
 
-```
-Write a Java program using Apache POI that generates xlsx files
-covering the following cases exhaustively:
+このフェーズは **HSSF を最小実用から段階的に完成へ近づける** ためのフェーズ。Apache POI の HSSF 実装・テスト・BIFF record 構造を必ず参照し、OOXML 風の独自モデルに作り替えない。`.xls` は XML ではなく BIFF record stream なので、XML parity ではなく **record-level semantic parity** と **unknown record preservation** を重視する。
 
-- Cells with value 0 (integer and float)
-- Empty cells
-- String, numeric, boolean, date, and formula cell types
-- Multiple sheets
-- Cases where multiple XML namespaces appear
-- Deeply nested elements
-- Empty elements
-- Attributes with default values that POI writes explicitly
-- Shared strings vs inline strings
+前提:
 
-The goal is to generate fixtures for detecting byte-level XML
-output divergence between Java (StAX) and C# (XmlWriter).
-Unzip each xlsx and save the internal XMLs as fixtures.
-```
-
-**Step 2: Run the generator in CI and capture fixtures**
-
-The Java fixture generator runs as part of CI and saves raw XML files:
-
-```
-tests/DotnetPoi.Interop.Tests/
-└── fixtures/
-    └── xml-parity/
-        ├── cell-zero-int.xml
-        ├── cell-zero-float.xml
-        ├── cell-empty.xml
-        ├── cell-types.xml
-        ├── multi-sheet.xml
-        ├── namespaces.xml
-        └── ...
-```
-
-**Step 3: Use LLM to identify divergence candidates**
-
-Feed the captured XMLs to the LLM:
-
-```
-The following XML was produced by Apache POI (Java / StAX).
-List every location where C# System.Xml.XmlWriter might produce
-different byte-level output when reproducing this XML.
-
-Focus on:
-- Empty element closing style (<tag/> vs <tag />)
-- Zero-value attributes that might be omitted
-- Namespace declaration placement
-- Encoding declaration differences
-
-[paste XML here]
-```
-
-**Step 4: Implement PoiXmlWriter and write failing tests**
-
-Each divergence candidate becomes a failing test. Fix `PoiXmlWriter` until all pass.
-
-**Step 5: Gate Phase 0 on full parity**
-
-`PoiXmlWriter` replaces all direct `XmlWriter` usage throughout the codebase — no exceptions.
-
-**Do not start Phase 0 until all XML parity tests pass.**
-
-### Phase 0 (Bootstrap) — Minimal xlsx Write
-
-Goal: `v0.1` release. Write strings and numbers to cells and save as xlsx.
-
-- XSSF write path only
-- No POIFS, no HSSF dependency
-- No formulas, no styles, no charts, no images
-
-Minimum class set:
-
-| Class | Role |
-|---|---|
-| `XSSFWorkbook` | Workbook |
-| `XSSFSheet` | Sheet |
-| `XSSFRow` | Row |
-| `XSSFCell` | Cell (string / number only) |
-| `XSSFCreationHelper` | Helper |
-
-### Phase 1 — xlsx Read
-
-Goal: `v0.2`. Round-trip: read back what was written.
-
-### Phase 2 — Styles & Formatting
-
-Goal: `v0.3`. Font, color, borders, number formats.
-
-Phase 2 is a practical baseline, not full XSSF parity. Track the remaining work in `PHASE_2_X_BACKLOG.md` and implement it in small POI-compatible slices with xUnit and Java interop coverage.
-
-Before Phase 3, prioritize Phase 2.x items that affect public API shape: boolean/date/blank/error cells, row/column layout, merged regions, and style properties that belong on common interfaces. Do not block Phase 3 on formula evaluation; formula write/read may be added earlier, but evaluator work belongs to Phase 5.
-
-### Phase 2.5 — Images & Drawing
-
-Goal: `v0.35`. Embed images into xlsx sheets. No HSSF dependency — OOXML only.
-
-Key classes: `XSSFDrawing`, `XSSFPicture`, `XSSFClientAnchor`, `POIXMLDocumentPart`.
-
-### Phase 3 — SS Common Interface
-
-Goal: `v0.4`. `IWorkbook` / `ISheet` / `IRow` / `ICell`.
-
-### Phase 3.1 細かいところ画像の回転
-
-### Phase 3.2 docxの対応
-
-### Phase 3.2.1 docxの画像の埋め込み、回転の動作
-
-### Phase 3.3 pptxの対応,pptxの画像の埋め込み、回転の動作
-
-### Phase 3.4 agile 暗号化
-
-Working notes and handoff for this phase live in `PHASE_3_4_AGILE_ENCRYPTION_NOTES.md`.
-Read that file before changing Agile encryption, `EncryptionInfo` XML output, `EncryptedPackage`
-chunking/HMAC code, or before removing the temporary `OpenMcdf` dependency.
-
-### Phase 4 — POIFS + HSSF (xls support)
-
-Goal: `v0.5`. OLE2 container → BIFF read/write. Heaviest phase.
-
-### Phase 5 — Formula Engine
-
-**Permanently deferred.** Full formula evaluation is out of scope.
-The partial `XSSFFormulaEvaluator` (handles SUM, AVERAGE, CONCATENATE, basic arithmetic) stays as-is to support the existing interop fixtures and will not be expanded.
-Formula text write/read and cached-value preservation remain in scope; formula evaluation does not.
-
-### Phase 6 — Word / PowerPoint Formats
-
-Goal: `v1.x`. HWPF / XWPF / HSLF / XSLF. Low priority.
-
-Minimum bar if POIFS is considered “full” (to unblock HWPF/HSLF work):
-
-- Read/write OLE2 header, FAT, mini FAT, and DIFAT chains for multi-stream files
-- Directory tree with storage/stream entries, sibling ordering, timestamps, and CLSIDs
-- Mini stream support with cutoff behavior and mini stream allocation
-- Sector allocation/chain validation for non-contiguous and large streams
-- Stream APIs for random access read/write (seek, length, overwrite)
-- CodePage handling and UTF-16LE name storage rules
-- Graceful handling of unknown streams/properties without data loss
-- Test fixtures:
-  - round-trip multiple streams with mixed sizes (mini + regular)
-  - verify directory tree ordering matches POI’s comparator
-  - Java POI interop: POI reads dotnet-poi CFB, dotnet-poi reads POI CFB
-
-### Phase 7 — Remaining Compatibility
-
-Goal: close practical compatibility gaps left after the MVP. Work in this priority order:
-
-1. **Round-trip correctness** — read a file, write it, read it back; assert every value (cells, styles, images) survives unchanged. This is the most fundamental correctness test.
-2. **Bidirectional Java POI interop** — Java POI writes → dotnet-poi reads (correct parsing), dotnet-poi writes → Java POI reads (correct output). One test pair per supported format.
-3. **API completeness** — fill in the POI API surface that each format needs.
-4. **Macro-enabled file preservation** — when round-tripping xlsm/docm/pptm without touching macros, `vbaProject.bin` and all macro parts must survive byte-for-byte.
-5. **XML byte-level parity** — only pursue this when a concrete interop failure cannot be fixed by semantic means. Do not chase attribute ordering or `standalone` differences as goals in themselves.
-
-#### Progress assessment (2026-05-05)
-
-| step | format | progress | notes |
-|---|---|---|---|
-| 1 | xlsx/XSSF | ~78% | basic value/formula round-trip ✅; styles (font/dataFormat/fill/border/alignment) ✅; layout (merge cells/col width/row height/freeze panes) ✅; hidden rows/cols ✅; hyperlinks ✅; print settings ✅; data validation ✅; conditional formatting ✅; shared strings ✅; rich text (per-character formatting) ✅; pivot tables (programmatic create + unknown parts preserve) ✅; auto filter ✅; sheet/workbook protection ✅; active sheet/active cell API ✅ (activeSheet round-trip, activeCell in-memory only); no formula evaluation; charts deferred |
-| 2 | xls/HSSF | ~10% | basic write/read 2 tests; BIFF detail not done |
-| 3 | docx/XWPF | ~70% | paragraph/run/image write/read ✅; bold/italic ✅; alignment (left/center/right/both) ✅; run font name/size/color/underline/strike ✅; paragraph indent/spacing ✅; bullet/numbered lists ✅; tables ✅; hyperlinks ✅; headers/footers ✅; page setup ✅; fields (TOC/page numbers/mail merge) ✅; styles/comments/footnotes/endnotes/OLE round-trip preserve 🔵; SDT/content controls (block-level + inline) preserve 🔵 |
-| 4 | pptx/XSLF | ~40% | slide/image/rotation write ✅; text box (p:sp) write/read ✅; run formatting (bold/italic/underline/strikethrough/size/font/color) ✅; multiple paragraphs ✅; slide size read/write ✅; anchor/rotation round-trip ✅; unknown part preservation ✅; tables (p:graphicFrame/a:tbl) write/read ✅; non-image media (video/audio) round-trip preserve ✅; 18 round-trip tests |
-| 5 | macro formats | ~70% | VBA byte preservation ✅; Java interop in progress |
-| 6 | doc/HWPF | ~5% | read-only stub only |
-| 7 | ppt/HSLF | ~5% | read-only stub only |
-
-**Model-layer XML divergences remaining in xlsx** (not blocking interop; Excel ignores these):
-`fileVersion`, `workbookPr` metadata attributes, `workbookView` window sizes, `spans` attribute on rows, `s="0"` style attribute on cells.
-Do not add these as fixture-specific constants — only fix when a concrete interop failure requires it.
-
-#### step 1 xlsx / XSSF
-
-- [x] Round-trip: write xlsx → read back → assert cell values, types, and styles are identical. *(values/formulas/font/dataFormat/fill/border/alignment read/write done)*
-- [x] Interop A: Java POI writes xlsx → dotnet-poi reads → assert values match.
-- [x] Interop B: dotnet-poi writes xlsx → Java POI reads → assert values match.
-- [x] Style parity: fonts, fills, borders, number formats, alignment, protection, row/column styles. *(fill/border/alignment read/write done)*
-- [x] Layout: merged regions, row heights, column widths, hidden rows/columns, freeze panes, print settings. *(merge cells/col width/row height/print settings done; freeze panes/hidden pending)*
-- [x] Drawing: multiple images, anchors, rotation, hyperlinks. *(charts/comments/shapes not done)*
-- [~] Formulas: write formula text + cached value, read back. *(evaluation permanently deferred — see Phase 5)*
-- [x] Rich text / shared strings coverage.
-
-#### step 2 xls / HSSF
-
-- [~] Round-trip: write xls → read back → assert values. *(basic only)*
-- [~] Interop A/B with Java POI. *(basic cases only)*
-- [ ] BIFF records: Row, MulRK, MulBlank, Formula, XF, Font, Format, Palette, MergeCells, ColumnInfo, Hyperlink, drawing.
-- [ ] Styles, formats, merged regions, row/column layout, formulas, pictures, charts, comments, hyperlinks.
-- [ ] Preserve unknown OLE2 streams and BIFF records during round-trip.
-
-#### step 3 docx / XWPF
-
-- [x] Round-trip: open docx → write → read back → assert paragraph/run text and formatting are identical.
-- [x] Interop B: dotnet-poi writes docx → Java POI reads. *(comprehensive fixture with tables, hyperlinks, headers/footers, numbering, page setup, rich text)*
-- [x] Interop A: Java POI writes docx → dotnet-poi reads. *(comprehensive fixture with plain/bold/italic paragraphs, table, header/footer)*
-- [x] Tables, numbering, styles, headers/footers, sections, page settings, fields, hyperlinks, comments, footnotes/endnotes.
-- [x] Preserve unknown parts and relationships during round-trip.
-
-#### step 4 pptx / XSLF
-
-- [x] Round-trip: open pptx → write → read back → assert slide content is identical. *(text boxes, formatting, pictures, anchors, slide size, tables, unknown part preservation — 8 round-trip tests)*
-- [x] Interop B: dotnet-poi writes pptx → Java POI reads. *(comprehensive fixture with text boxes + tables + formatting)*
-- [x] Interop A: Java POI writes pptx → dotnet-poi reads. *(comprehensive fixture with text boxes + formatting)*
-- [~] Text boxes, rich text, placeholders, layouts, masters, themes, tables, charts, notes, shapes. *(text boxes + rich text + tables done; layouts/masters/themes preserved via unknown parts; charts/notes/shapes pending)*
-- [x] Preserve unknown parts and relationships during round-trip.
-
-#### step 5 Macro-enabled formats (xlsm, docm, pptm)
-
-- [x] Round-trip without macro modification: `vbaProject.bin` and macro content types survive byte-for-byte.
-- [x] Workbook/document edits do not disturb macro parts.
-- [x] Interop: dotnet-poi writes xlsm/docm/pptm → Java POI reads and verifies values.
-
-#### step 6 doc / HWPF
-
-- [ ] Round-trip text read/write.
-- [ ] Interop A/B with Java POI for representative `.doc` files.
-- [ ] Paragraphs/runs, tables, headers/footers, styles, fields, pictures.
-
-#### step 7 ppt / HSLF
-
-- [ ] Round-trip slide/text read/write.
-- [ ] Interop A/B with Java POI for representative `.ppt` files.
-- [ ] Shapes, pictures, text formatting, masters, layouts.
-
-
-### Phase 8 — Interop Verification Gate
-
-Goal: make interop checks explicit before declaring a format slice “done”.
-
-- **Direction A/B coverage**: For each supported format, add/maintain both directions in `tests/DotnetPoi.Interop.Tests/`.
-- **Fixture discipline**: Java outputs → `fixtures/from-poi/`, C# outputs → `fixtures/from-dotnet-poi/`; keep deterministic names.
-- **Core content matrix** (per format as applicable): values/types, formulas (text + cached value), styles, layout (merged/width/height/hidden/freeze), shared strings, hyperlinks, data validation, conditional formatting, print settings, drawings/images.
-- **Macro formats**: xlsm/docm/pptm preserve `vbaProject.bin` and macro content types byte-for-byte on round-trip.
-- **Unknown parts**: preserve unmodeled package parts/relationships during round-trip.
-- **XML parity**: only add byte-level fixtures when a real interop failure cannot be fixed semantically.
-
-### Phase 9 — Documentation Site Generation
-
-**実行計画は `DOC_PLAN.md` に詳述。このフェーズの作業を始める前に必ず読むこと。**
-
-目標: Apache POI のドキュメントを参考資料として読みつつ、dotnet-poi 独自の現代的な Markdown ドキュメントを作り、検証済み examples を根拠に HTML 化して `docs/` に配置する。
-
-このフェーズでは、実際に動く例・検証された出力・リポジトリが所有する Markdown を元に、利用者が信頼できるドキュメントサイトを作る。
-
-ルール:
-
-- **参照はするがコピーしない**: Apache POI の文書は Apache License 2.0 の著作物である。範囲・用語・利用者が知りたい内容を把握するために読むのはよいが、長文コピーや構造の丸写しは避ける。dotnet-poi の言葉で要約・再構成する。
-- **`poi/` は編集しない**: Apache POI submodule は読み取り専用。参照元としてのみ使う。
-- **docs は dotnet-poi 所有物にする**: Markdown とドキュメント生成用のソースファイルは `docs_src/` に置き、静的 HTML を `docs/` に生成する。
-- **examples を先に作る**: ドキュメント化する前に `examples/` の実コードを作成・更新する。ドキュメントは compile/run 済みの例を参照する。
-- **当面は使い方ドキュメントのみ**: 明示的に要求されるまで、Phase 9 では API リファレンス、クラス階層、アーキテクチャ解説ページを作らない。実行可能なサンプルに裏付けられた実用ガイドに集中する。
-- **examples を検証する**: `dotnet`、Java、Python、その他必要なツールを使って、サンプルと生成物が正しく動くことを確認する。ドキュメント生成には、リポジトリから再現できる限り任意の言語・ツールを使ってよい。
-- **API 情報は生成元を優先する**: public API を説明する場合、手書き一覧より C# ソースや生成メタデータから導いた情報を優先し、古くなりにくくする。
-- **パッケージ分割を明確にする**: `DotnetPoi.Core` と `DotnetPoi.Formula` の違いを明記し、数式評価については意図的に限定された範囲以上の対応を示唆しない。
-- **ソースと出力を分ける**: `docs_src/` を Markdown 原稿とドキュメント生成スクリプト/設定の標準配置場所にする。生成 HTML は `docs/` に置く。静的サイトジェネレーターがどうしても要求する場合を除き、Markdown 原稿と生成スクリプト/設定は `docs/` に置かない。runnable example code は引き続き `examples/` に置く。
-- **スニペットはページ内に埋め込み、フルコードは examples へリンクする**: ドキュメントページには単機能を示す短いスニペット（概ね 20 行以内）を直接埋め込む。スニペットの直後またはページ末尾に `examples/` のフルコードへのリンクを置き、「全体を見たい場合はこちら」という形にする。長い複合サンプルは重複させず `examples/` にのみ置いてリンクする。
-
-採用する実装方針:
-
-- **言語/ツール**: 小さな C#/.NET のコンソール生成器を使い、独立した重いドキュメントフレームワークは使わない。既存ライブラリと同じ SDK で扱えるように、既存の `DotnetPOI.sln` に追加する。
-- **生成器プロジェクト**: `tools/DotnetPoi.DocsGenerator/` に配置する。Markdown 変換には Markdig のような小さく一般的なパッケージは使ってよいが、必要になるまでは重い静的サイトスタックを避ける。
-- **標準ソース構成**:
-  - `docs_src/site.json` — サイト名、ナビゲーション順、バージョン/パッケージ注記、共通メタデータ。
-  - `docs_src/content/` — 利用者向けセクション単位で整理した Markdown ページ。
-  - `docs_src/content/getting-started/` — インストール、最初の workbook/document/presentation 例。
-  - `docs_src/content/guides/` — xlsx、xls、docx、pptx、macro preservation、interop の形式別ガイド。
-  - `docs_src/content/reference/` — 生成または C# ソース由来の API メモ。網羅的な API 一覧を手で保守しない。
-  - `docs_src/content/compatibility/` — 互換性マトリクス、制限事項、Apache POI parity notes。
-  - `docs_src/assets/` — 生成器が使う CSS、画像、小さな静的アセットのソース。
-  - `docs_src/templates/` — 生成器が使う HTML レイアウトテンプレート。
-- **生成出力構成**:
-  - `docs/` — 生成された静的サイト専用。生成 HTML を手で編集しない。
-  - `docs/assets/` — `docs_src/assets/` からコピー/最適化されたアセット。
-- **ビルドコマンド**: `dotnet run --project tools/DotnetPoi.DocsGenerator -- docs_src docs`。
-- **検証コマンド**: ドキュメント化した example project を先に実行し、その後 docs generator を実行する。完了扱いにする前に生成 HTML を spot-check する。
-- **ソリューション方針**: docs generator はメインの `DotnetPOI.sln` に入れる。docs tool を独立リリースする必要が出るまでは別 solution を作らない。
-
-推奨ワークフロー:
-
-1. ドキュメントの章立てを作る: getting started、package installation、format-specific guides、examples、compatibility notes、limitations。
-2. ドキュメント化するワークフローの runnable example を `examples/` に実装する。
-3. examples と関連テストを実行し、説明する挙動が実際に成立することを確認する。
-4. `docs_src/` に dotnet-poi 独自の言葉で Markdown を書く。単機能スニペットはページ内に直接埋め込み、スニペット直後またはページ末尾に `examples/` のフルコードへのリンクを置く。
-5. 再現可能なスクリプトまたは静的サイトジェネレーターで HTML を `docs/` に生成する。
-6. 生成された HTML を spot-check してから docs slice 完了とみなす。
-
-### Phase 10 — docx/XWPF Practical Completion
-
-目標: `.docx` / `.docm` を新しい Office 形式として実用的に生成・軽編集・round-trip できる状態へ引き上げる。Word の完全な編集エンジンを目指すのではなく、業務文書・帳票・テンプレート填充・既存ファイルの軽編集で壊れにくい XWPF を目指す。
-
-このフェーズは **docx の欠損している実用動作を埋める** ためのフェーズ。Apache POI の XWPF 実装とテストを必ず参照し、独自仕様に寄せない。
-
-マニュアルテストに使うファイル達を生成するプロジェクトが欲しいですね。自力で用意してテストすることで安定する。
-
+- Phase 4 の POIFS / CFB が HSSF 実用に足りない場合は、HSSF より先に POIFS を補強する。
+- `Core` 内で完結させ、`Formula` へ依存させない。
+- 数式評価はしない。式テキストと cached value の read/write/preserve までを対象にする。
+- 既存 `.xls` を軽微編集して保存する場合、未対応 BIFF record / OLE2 stream をできるだけ壊さず保持する。
 
 優先順位:
 
-1. **Sections / page model**
-   - page size、orientation、margins、columns、section breaks、header/footer variants（first/even/default）を POI 互換 API に寄せて実装する。
-   - 既存ヘッダー/フッターの rich content は、API 経由で変更しない限り raw XML / `_preservedEntries` で壊さない。
+1. **POIFS / Workbook stream foundation**
+   - OLE2 container の read/write、Workbook stream、SummaryInformation / DocumentSummaryInformation、unknown stream preservation を安定化する。
+   - FAT / MiniFAT / DIFAT、directory ordering、mini stream cutoff、non-contiguous stream の round-trip を HSSF fixture で確認する。
 
-2. **Styles**
-   - paragraph styles、character styles、table styles、built-in styles（Normal/Heading/Title 等）の読み書きを実装する。
-   - direct formatting と style-based formatting の境界を明確にし、style inheritance は POI の挙動を確認して段階的に実装する。
-   - 手書き style 一覧ではなく、`word/styles.xml` と POI の XWPFStyles 相当モデルを基準にする。
+2. **Minimal workbook read/write**
+   - `HSSFWorkbook` / `HSSFSheet` / `HSSFRow` / `HSSFCell` の基本 API を XSSF / SS interface と揃える。
+   - BOF / EOF、BoundSheetRecord、DimensionsRecord、RowRecord、NumberRecord、LabelSSTRecord、BlankRecord、BoolErrRecord、SST / ExtSST を実装・検証する。
+   - 複数シート、空行/空セル、Unicode 文字列、日本語シート名、日付 numeric value を含む fixtures を作る。
 
-3. **Images**
-   - inline images のサイズ・形式・relationship・読み書きを安定化する。
-   - floating/anchored images、wrap、position、rotation、header/footer 内画像を段階的に扱う。
-   - API でモデル化していない DrawingML は round-trip preservation を優先する。
+3. **Styles and formats**
+   - FontRecord、ExtendedFormatRecord、FormatRecord、PaletteRecord、StyleRecord を POI 互換 API に寄せて実装する。
+   - data format、font、fill、border、alignment、wrap、locked/hidden、row/column style を優先する。
+   - XSSF と同じ `ICellStyle` / `IFont` API で使える範囲を広げ、HSSF 固有制約（palette / BIFF limits）は POI と同じ例外・丸め方にする。
 
-4. **Tables**
-   - cell merge、row/column/cell width、borders、shading、vertical alignment、cell margins、table layout、table styles を実装する。
-   - 帳票用途を重視し、生成後に Word で開いて崩れにくいことを検証する。
+4. **Sheet layout**
+   - merged regions、column width、row height、hidden rows/columns、default row/column settings、freeze panes、print setup を実装する。
+   - Office / LibreOffice で開いた時に帳票レイアウトが崩れにくいことを Phase 11 の対象に追加する。
 
-5. **Text boxes and content controls** (SDT preservation ✅ completed as Phase 9 extension)
-   - Word text boxes (`w:txbxContent`) 内テキストの read / preserve / write 方針を決める。
-   - ~~block-level SDT だけでなく inline SDT の保持を拡張する。~~ ✅ 完了: 段落レベルの未知子要素保存でカバー済み (block-level + inline 両方)。
-   - API モデル化できない場合も、軽編集時に消さない preservation を優先する。
+5. **Formula preservation**
+   - FormulaRecord / SharedFormulaRecord / ArrayRecord / TableRecord を読み、式テキストと cached result を保持する。
+   - 評価はしない。`FormulaEvaluator` の拡張をこのフェーズに含めない。
+   - Java POI が読める formula workbook を dotnet-poi が生成できること、POI 生成 workbook の式を dotnet-poi が壊さず保存できることを確認する。
 
-6. **Review and references**
-   - comments、footnotes、endnotes、bookmarks、cross-references、tracked changes は、まず existing parts / relationships / inline references を壊さないことを優先する。
-   - API-level creation/editing は POI 互換で小さく追加する。
+6. **Hyperlinks, comments, names, data validation**
+   - NameRecord、HyperlinkRecord、DVRecord / DVALRecord、NoteRecord / TextObjectRecord を段階的に追加する。
+   - API モデル化しきれない record は保存優先。軽編集で消さないことを先に固める。
 
-完了条件:
+7. **Drawings and images**
+   - Escher aggregate、ObjRecord、MSODrawingRecord、ContinueRecord、BLIP 画像、ClientAnchor を POI の HSSF drawing model に合わせる。
+   - 画像の新規追加より先に、既存 drawing / chart / comment shape の preservation を優先する。
 
-- dotnet-poi で生成した docx を Word / LibreOffice で開いて、修復ダイアログなしで表示・保存・再オープンできる。
-- 既存 docx/docm を読み込み、本文の軽微な編集をして保存しても、未対応の styles/comments/footnotes/endnotes/images/OLE/content controls 等を壊さない。
-- C# round-trip tests、Java POI interop tests、preservation tests を追加する。
-- Phase 11 の manual verification 対象に docx/docm を追加し、リリース前に実アプリで確認できるようにする。
+8. **Manual verification**
+   - Phase 11 の generated documents に `.xls` を正式復帰させる。
+   - Excel / LibreOffice で open → edit → save → reopen し、修復ダイアログなし、値・スタイル・結合・列幅・画像の代表ケースが維持されることを証跡化する。
 
-実装順：
-1. ✅ ~~Text boxes / SDT~~ → SDT 保存完了 (inline + block-level)。テキストボックス（`w:txbxContent`）は DrawingML 深いネスト内で未対応。
-2. ✅ **Sections / page model** — 完了
-   - page size, orientation, margins ✅
-   - columns (`w:cols`) 読み書き ✅
-   - header/footer variants (default/first/even) ✅
-   - 段落レベル sectPr (section breaks) raw XML 保存 ✅
-   - sectPr 未知子要素 (pgBorders, lnNumType, docGrid, formProt) preservation ✅
-   - 複数セクション (mid-document body-level sectPr) round-trip ✅
-3. ✅ **Images（floating）** — 完了
-   - `<wp:anchor>` raw XML capture/re-emission ✅
-   - blip パース → XWPFPicture 生成 → media/ + rels 整合性維持 ✅
-4. ✅ **Table cell merge / borders** — 完了（raw XML preservation で既存文書のセル結合・罫線・`rPr` 子要素（`w:shd` 等）を保持。run-level + paragraph-level の rPr preservation 対応済。API からの新規作成は未対応）
-5. ❌ Review / references（comments, footnotes, endnotes, bookmarks, tracked changes）
-6. ✅ Styles（6-1〜6-3 完了。6-4以降は需要が出てから）
-    - 6-1. ✅ **スタイル名の read/write**（最軽量・今すぐ価値が出る）
-        - `XWPFParagraph.setStyle(styleId)` → `<w:pStyle w:val="..."/>` を書くだけ
-        - `XWPFParagraph.getStyleID()` → `<w:pStyle>` を読むだけ
-        - テンプレート由来の `word/styles.xml` が既にあれば Word 側が解決するので、参照を書くだけで動く
-        - 壊れるリスク: なし
-    - 6-2. ✅ **`word/styles.xml` のパース**（styleId ↔ name マッピング）
-        - `XWPFStyles` 相当のモデルを持ち、styleId → 表示名・basedOn・type を読み取る
-        - `XWPFDocument.getStyles().getStyle(styleId)` 相当の API
-        - 壊れるリスク: なし（読み取り専用ならリスクゼロ）
-    - 6-3. ✅ **新規文書へのデフォルトスタイル書き込み**
-        - 新規 `XWPFDocument` 作成時に最小限の `word/styles.xml` を生成する（Normal / Heading1〜3 程度）
-        - 書き方を誤ると Word が「修復しますか」ダイアログを出す可能性がある（データ消失はない）
-        - POI の `XWPFDocument` が生成する `word/styles.xml` を fixture として使い、それに合わせる
-    - 6-4. ⏸ **スタイル継承のリゾルブ**（C# 上での実効値取得）— 需要が出てから
-        - 段落の「実効フォントサイズ」などを取得するために basedOn チェーンを辿る
-        - Word 側が描画時に解決してくれるため、**表示目的なら省略可能**
-        - ライブラリ利用者が C# 上で有効値を知りたい場合にのみ必要
-    - 6-5. ⏸ **文字スタイル・表スタイル・リストスタイル全対応**— 需要が出てから
-        - POI の `XWPFStyles` 全体を移植する
+実装順:
 
-### Phase 11 — Manual Office / LibreOffice Verification
+1. POI HSSF tests / `poi/test-data/spreadsheet/*.xls` から代表 fixture を選び、現状の read/write 失敗を `CHECKPOINT.md` に記録する。
+2. POIFS の不足を洗い出し、HSSF を壊している container 問題を先に直す。
+   - [x] 読み込み済み `.xls` の OLE2 stream を `HSSFWorkbook` が保持し、保存時に Workbook stream だけ差し替える。
+   - [x] `SummaryInformation` / `DocumentSummaryInformation` / `CompObj` など root 直下の非 Workbook stream を byte-for-byte で保持する。
+   - [x] `BOOK_in_capitals.xls` の uppercase `BOOK` Workbook stream alias を read/write で保持する。
+   - [x] POIFS の storage 階層を path-aware に読み書きし、`SimpleMacro.xls` の `_VBA_PROJECT_CUR/VBA/*` stream を保持する。
+   - [x] directory entry metadata（CLSID、timestamps、color、state bits）を保持する。
+   - [ ] 元の directory sibling tree 形状を必要に応じて保持する。
+   - [x] DIFAT extension sectors（header DIFAT 109 entries 超え）を read/write できることを fixture で確認する。
+   - [x] Workbook stream 内の unknown BIFF record / unmodeled record ranges を軽編集 round-trip で保持する。
+3. 値の round-trip と Java POI interop A/B を、文字列・数値・bool/error・blank・複数シートで固める。
+   - [x] C# round-trip: string / numeric / boolean / error / blank cells が write → read で型と値を維持する。
+   - [x] C# round-trip: 複数シート、空行、空セル、疎な行列、最大列付近の基本値を維持する。
+   - [x] Java POI → dotnet-poi: POI 生成 `.xls` fixture を dotnet-poi が読み、string / numeric / boolean / error / blank / multi-sheet を検証する。
+   - [x] dotnet-poi → Java POI: dotnet-poi 生成 `.xls` fixture を Java POI が読み、同じ値・型を検証する。
+   - [x] 日本語・Unicode sheet name / string cell を双方向で検証する。
+   - [x] SST / LabelSST / Label / Number / RK / BoolErr / Blank / Dimensions / BoundSheet offsets の record-level 破綻がないことをテストで固定する。
+   - [x] 既存 `.xls` の軽編集時に、対象 cell 更新と unknown BIFF preservation が両立することを代表 fixture で確認する。
+   - [x] Phase 12 item 3 の結果と残課題を `CHECKPOINT.md` に記録する。
+4. style / layout の順に、帳票で効く機能から追加する。
+   ※ 注意: Phase 13 item 3 (codex) は HWPF/`.doc` 作業に限定。HSSF/POIFS 共通実装・`.xls` fixture には触れないこと（双方向）。
+   ※ `ICellStyle` / `IFont` インターフェースへのメンバ追加は行わない（Phase 13 item 3 との競合回避のため）。既存 API の実装を充実させる方向で進める。
+   ※ `CHECKPOINT.md` への書き込みは末尾追記のみとし、双方の作業が共存できるようにする。
 
-目標: 自動テストでは拾いにくい「実 Office アプリで開けるか」「修復ダイアログが出ないか」「保存し直しても壊れないか」を、リリース前の手元検証として運用する。
+   --- style ---
+   - [x] `Biff8Workbook` に `FontRecord` (0x0031) の read/write を実装し、`HSSFFont` の bold/italic/color/height/fontName が BIFF に保存・復元されるようにする。
+   - [x] `Biff8Workbook` に `FormatRecord` (0x041E) の read/write を実装し、カスタム number format 文字列が保存・復元されるようにする。
+   - [x] `Biff8Workbook` に `ExtendedFormatRecord` (XF record, 0x00E0) の read/write を実装し、data format index / font index / alignment / wrap / border が BIFF に保存・復元されるようにする。
+   - [x] `HSSFCellStyle` に alignment / wrapText / border (top/right/bottom/left) / fillForegroundColor / fillPattern の実際の値を保持する field を追加し、get/set が機能するようにする。
+   - [x] Cell の XF index を `WriteCellPrefixRecord` で実際の style index として書くようにする（現在は常に 0）。
+   - [x] C# round-trip テスト: font (bold/italic/size/name)、data format、alignment、wrap text、border のスタイルを設定して write → read で値が維持されることを確認する。
+   - [x] Java POI → dotnet-poi: POI がスタイル付きで書いた `phase12-hssf-styles.xls` fixture を dotnet-poi が読み、font name/bold/dataFormat/alignment を取得できることを検証する。
+   - [x] dotnet-poi → Java POI: dotnet-poi がスタイル付きで書いた `phase12-hssf-styles.xls` fixture を Java POI が読み、同じスタイルを確認できることを検証する。
 
-このフェーズは CI の代替ではない。通常の gate は `dotnet test`、Java POI interop、preservation tests、examples verification とし、Phase 11 は **release 前 manual verification suite** として扱う。GUI と Office インストールに依存するため、毎 PR の必須 CI にしない。
+   --- layout ---
+   - [x] `Biff8Workbook` に `RowRecord` (0x0208) の read/write を実装し、row height と hidden フラグが保存・復元されるようにする。HSSFRow の `setHeight`/`getHeight` を実際に動作させる。
+   - [x] `Biff8Workbook` に `ColInfo` record (0x007D) の read/write を実装し、column width と hidden フラグが保存・復元されるようにする。HSSFSheet の `setColumnWidth`/`getColumnWidth`/`setColumnHidden`/`isColumnHidden` を実際に動作させる。
+   - [x] `Biff8Workbook` に `MergeCells` record (0x00E5) の read/write を実装し、`HSSFSheet.addMergedRegion`/`getMergedRegions` が round-trip するようにする。
+   - [x] `Biff8Workbook` に `Pane` record (0x0041) の read/write を実装し、`HSSFSheet.createFreezePane` が保存・復元されるようにする。
+   - [x] C# round-trip テスト: row height、column width、merged regions、hidden row/col、freeze panes が write → read で維持されることを確認する。
+   - [x] Java POI → dotnet-poi: POI がレイアウト付きで書いた `phase12-hssf-layout.xls` fixture を dotnet-poi が読み、column width/row height/merged regions を取得できることを検証する。
+   - [x] dotnet-poi → Java POI: dotnet-poi がレイアウト付きで書いた `phase12-hssf-layout.xls` fixture を Java POI が読み、同じレイアウトを確認できることを検証する。
+   - [x] Phase 12 item 4 の結果と残課題を `CHECKPOINT.md` に記録する。
 
-対象環境:
+-- 以下は後回し1 --
 
-- **macOS**: Microsoft Excel / Word / PowerPoint を AppleScript などで操作し、open / edit / save / reopen と screenshot を取る。
-- **Windows**: Microsoft Office COM automation（Excel COM、将来的に Word/PowerPoint COM）で open / edit / save / reopen、wrong password rejection、screenshot、summary を記録する。
-- **Linux**: LibreOffice UNO + VNC/noVNC で open / edit / save / reopen、screenshot、summary を記録する。
+5. formula text / cached value preservation を追加する。
 
-対象形式:
+-- 以下は後回し2 --
 
-- xlsx / xlsm: 業務利用の中心。セル値、スタイル、画像、数式再計算、保護、マクロ保持、暗号化、既存ファイル軽編集を重点確認する。
-- docx / docm: Phase 10 の進捗に合わせて、段落、表、画像、sections、styles、headers/footers、fields、macro preservation、軽編集保存を確認する。
-- pptx / pptm: スライド、テキスト、画像、テーブル、回転、notes/charts/media/layouts/themes/group shapes の保持を確認する。
-
-標準フロー:
-
-1. `dotnet test`、interop tests、examples generation を先に通す。
-2. manual verification 用 fixture を `docs/manual-evidence/{macos,windows,linux}/workbooks` 等にコピーする。
-3. 実アプリで対象ファイルを開く。
-4. 軽微な編集を加える（例: xlsx は日本語シート追加、docx は本文段落追加、pptx はスライド/テキスト追加）。
-5. 保存して閉じる。
-6. 再オープンして、追加内容と既存内容が保持されることを確認する。
-7. 修復ダイアログ、内容削除、マクロ/リンク/保護関連の意図しない警告が出ないことを記録する。
-8. screenshot、`session.log`、`summary.md`、`manual-test-checklist.md` を保存する。
-
-証跡ルール:
-
-- 実行日時、OS、Office/LibreOffice バージョン、対象ファイル、結果 PASS/FAIL、メモを記録する。
-- screenshot は evidence として保存する。目視が必要な失敗は screenshot と log の両方を残す。
-- password / macro / encryption の検証では、正しい password で開けることと代表ケースで wrong password が拒否されることを確認する。
-- 手動検証スクリプトは `tmp/` 等で試験運用してよいが、安定したら `docs/manual-evidence/` または `tools/manual-verification/` に整理する。
+6. hyperlinks/comments/names/data validation を追加する。
+7. drawings/images は preservation → read → write の順で進める。
+8. docs/examples/manual verification を更新し、`.xls` のサポート範囲と制限を明記する。
 
 完了条件:
 
-- リリース前に xlsx/xlsm の macOS Excel、Windows Excel、Linux LibreOffice の manual verification が PASS している。
-- docx/docm と pptx/pptm は、対応機能の成熟度に応じて Word/PowerPoint/LibreOffice Impress/Writer の確認を追加する。
-- 失敗した場合は、Office 実装依存の問題として `CHECKPOINT.md` に記録し、再現 fixture と証跡を残してから修正する。
+- dotnet-poi で生成した `.xls` を Excel / LibreOffice / Java POI で開ける。
+- Java POI 生成 `.xls` を dotnet-poi が読み、値・スタイル・レイアウトの代表ケースを正しく取得できる。
+- 既存 `.xls` を読み込み、A1 などの軽微編集をして保存しても、未対応 record / stream が可能な限り保持される。
+- C# round-trip tests、Java POI interop A/B、POIFS preservation tests、Phase 11 manual verification を追加する。
 
-メモ:
-tmpディレクトリに参考にできるリソースを配置している。
+### Phase 13 — doc/HWPF Practical Completion
+
+目標: `.doc` を Word 97-2003 の古い binary Word 形式として、まず text extraction / light-edit / preservation ができる状態へ引き上げる。完全な Word 編集エンジンではなく、古い業務文書・テンプレート・アーカイブ文書を壊しにくく扱う HWPF を目指す。
+
+このフェーズは Phase 12 の後に進める。`.doc` は POIFS 上の複数 stream と複雑な binary table を使うため、HSSF で POIFS の実用性を固めてから着手する。Apache POI の HWPF 実装・テスト・Microsoft の DOC 仕様を参照し、独自のテキスト抽出器に逃げない。
+
+前提:
+
+- POIFS が multi-stream, mini-stream, directory metadata, unknown stream preservation を十分に扱えること。
+- `WordDocument`, `1Table` / `0Table`, `Data`, object pool storage を壊さず保持する。
+- 最初の価値は「読める」「軽微編集しても壊さない」。高度な layout 再構築や完全な tracked changes 編集は後回し。
+
+優先順位:
+
+1. **Container and stream preservation**
+   - `WordDocument`, `1Table` / `0Table`, `Data`, `ObjectPool`, SummaryInformation などの stream / storage を読み、未対応 stream を byte-for-byte で保持する。
+   - FIB を読み、table stream 選択、文字列範囲、piece table 位置を正しく解釈する。
+
+2. **Text extraction**
+   - Piece table、CP ↔ FC mapping、ANSI / UTF-16LE の文字列取得を実装する。
+   - `HWPFDocument.getRange()` / `Range.text()` 相当の最小 API を POI に合わせる。
+   - 日本語、混在 encoding、複数 paragraph、特殊文字、field marker を含む fixture を使う。
+
+3. **Paragraphs and runs**
+   - PAPX / CHPX、FKP、StyleSheet の読み取りを段階的に実装する。
+   - paragraph text、run text、bold/italic/underline/font/size、alignment、indent を代表ケースから対応する。
+   - style inheritance は最初から完璧にせず、POI の API surface に沿って必要な読み取りから追加する。
+
+4. **Safe light editing**
+   - まず no-op read/write round-trip を実装し、byte preservation / semantic preservation を確認する。
+   - 次に append paragraph、単純な text replacement など、範囲を限定した編集 API を追加する。
+   - 編集時に piece table / FIB / PLCF / CHP/PAP を矛盾させないことを最優先にする。
+
+5. **Tables, headers/footers, fields**
+   - table detection、cell text extraction、header/footer text extraction、footnotes/endnotes、bookmarks、fields を読み取り優先で追加する。
+   - API で編集できない要素は preservation を優先する。
+
+6. **Images, OLE, drawings**
+   - PicturesTable、OfficeArt / Escher、embedded OLE object をまず保持する。
+   - 画像抽出、新規画像追加、配置編集は後段。既存文書の軽編集で消さないことを先に達成する。
+
+7. **Manual verification**
+   - Phase 11 の対象に `.doc` を追加し、Word / LibreOffice で open → edit → save → reopen を確認する。
+   - 代表 fixtures は POI test-data と手元生成文書の両方を使う。
+
+実装順:
+
+1. POI HWPF tests / `poi/test-data/document/*.doc` から、単純本文、日本語、表、画像、ヘッダー/フッター、field を含む fixture を選ぶ。
+   - [x] `poi/poi-scratchpad/src/test/java/org/apache/poi/hwpf/` の主要 test class を確認し、text / table / picture / header-footer / field 系で参照される `.doc` fixture を洗い出す。
+   - [x] `poi/test-data/document/*.doc` から、最小本文、Unicode/日本語、複数 paragraph、table、picture、header/footer、field を含む代表 fixture を選定する。
+   - [x] 選定 fixture ごとに、関連 POI test、期待できる観測項目、dotnet-poi 側で最初に固定する read/preservation 目標を `CHECKPOINT.md` に記録する。
+   - [x] dotnet-poi 既存 HWPF reader/tests で代表 fixture を実行し、現状の成功/失敗と例外・欠損 API を確認する。
+   - [x] Phase 12 item 3 作業と衝突しないよう、HSSF/POIFS 実装や `.xls` fixture には触らず、Phase 13 調査・HWPF fixture/test 追加だけに限定する。
+   - [x] 次の Phase 13 item 2（POIFS stream preservation / FIB / table stream）に渡す blocker と優先順位を `CHECKPOINT.md` にまとめる。
+2. POIFS stream preservation と FIB / table stream 読み取りを固める。
+   - [x] Phase 12 item 3 と衝突しないよう、共有 POIFS/HSSF 実装には触れず、まず HWPF 側で stream/FIB 状態を保持・公開する。
+   - [x] `HWPFDocument` 読み込み時に OLE2 stream 一覧を保持し、`WordDocument`, `0Table` / `1Table`, `Data`, `ObjectPool` などの存在を代表 fixture で確認する。
+   - [x] FIB の基本情報（`fWhichTblStm`, `ccpText`, `fcClx`, `lcbClx`, 選択 table stream 名）をモデル化し、テストから検証できるようにする。
+   - [x] CLX 範囲が table stream 内に収まること、選択 table stream fallback が必要な場合に検出できることをテストで固定する。
+   - [x] no-op write は Phase 13 item 4 に回し、item 2 では read-side preservation inventory と FIB/table stream 読み取りの足場に限定する。
+   - [x] item 2 の結果・残課題・Phase 13 item 3 への引き継ぎを `CHECKPOINT.md` に記録する。
+3. text extraction を `Range` / paragraph / run の順に実装する。
+   - [x] Phase 12 item 3 と衝突しないよう、HSSF/POIFS 共通実装と `.xls` fixture には触れず、HWPF reader / HWPF tests / `.doc` fixture 参照に作業範囲を限定する。
+   - [x] Apache POI の `Range`, `Paragraph`, `CharacterRun`, `TextPieceTable` 周辺実装と対応 test を確認し、dotnet-poi に必要な最小 API surface を `CHECKPOINT.md` に記録する。
+   - [x] 既存 `HWPFDocument.getText()` の挙動を壊さず、`getRange()` と `Range.text()` 相当の読み取り API を追加する。
+   - [x] piece table から CP range → file offset mapping を行い、ANSI / UTF-16LE 混在 text piece を代表 fixture で読めるようにする。
+   - [x] paragraph boundary を検出し、`Range.numParagraphs()` / `getParagraph(i)` / paragraph text の最小実装を追加する。
+   - [x] run boundary を検出し、`Paragraph.numCharacterRuns()` / `getCharacterRun(i)` / run text の最小実装を追加する。
+   - [x] PAPX / CHPX / FKP から代表的な formatting（bold / italic / underline / font size / font name / alignment / indent）を読み取り、未対応 sprm は保持または無視方針を明記する。実装済み: CHPBinTable→CHPFKP→CHPX sprm 解析。bold/italic/strike/underline/fontSize/fontName (sprmCFBold, sprmCFItalic, sprmCFStrike, sprmCKul, sprmCHps, sprmCRgFtc0) を実装。SampleDoc.doc で fontName="Arial Black" size=32 を確認済み。StyleSheet デフォルト値の適用は Phase 14 TODO。
+   - [x] `SampleDoc.doc`, `HeaderFooterUnicode.doc`, `innertable.doc`, `pageref.doc`, `test-fields.doc` など item 1 で選定した fixture で C# unit tests を追加する。
+   - [x] 日本語・Unicode・複数 paragraph・field marker を含む fixture で text / paragraph / run の期待値を固定する。`Phase13Chpx_SampleDoc_ReturnsFormattingFromChpfkp` で font/fontSize の実値を固定済み。STTBFFFN 名前解決テスト済み。
+   - [x] item 3 の結果、残課題、Phase 13 item 4（no-op write round-trip）への引き継ぎを `CHECKPOINT.md` に記録する。
+4. no-op write round-trip を追加し、未対応 stream と binary table を壊さないことを確認する。
+   - [x] Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れず、HWPF/`.doc` の no-op preservation に作業範囲を限定する。
+   - [x] Apache POI の `HWPFDocument.write()` / `HWPFDocumentCore` / `FileInformationBlock` / table stream preservation 周辺実装と対応 tests を確認し、dotnet-poi の no-op write で最低限守る stream / storage / FIB / table stream 境界を `CHECKPOINT.md` に記録する。
+   - [x] `HWPFDocument` に no-op write API を追加し、既存 `.doc` を読み込んで API 経由で本文を変更しない場合は、`WordDocument`, `0Table` / `1Table`, `Data`, `ObjectPool`, summary streams など未対応 stream / storage を可能な限り保持して書き戻す。
+   - [x] no-op write 後に dotnet-poi で再読込し、stream inventory、FIB table stream 選択、CLX 範囲、`Range.text()` / paragraph / run composition が元文書と一致することを代表 fixture で固定する。
+   - [x] `SampleDoc.doc`, `HeaderFooterUnicode.doc`, `innertable.doc`, `two_images.doc`, `pageref.doc`, `test-fields.doc`, `word_with_embeded.doc` など item 1 の代表 fixture で、未対応 binary table / fields / images / OLE が no-op 保存で消えないことをテストする。
+   - [x] 可能なら Java POI で no-op 保存後 `.doc` を開ける Direction B smoke test を追加する。SampleDoc.doc を dotnet-poi が no-op 保存し、Java POI の WordExtractor でテキスト抽出を確認済み。
+   - [x] no-op write では本文編集や FIB/table rebuild を行わない方針を明記し、append paragraph / simple replacement は item 5 に残す。
+   - [x] item 4 の結果、残課題、Phase 13 item 5（限定編集）への引き継ぎを `CHECKPOINT.md` に記録する。
+
+-- 以下は後回し1 --
+
+5. append paragraph / simple replacement のような限定編集を追加する。
+   - [x] Claude Code が Phase 12 item 4（HSSF style / layout）を作業中のため、HSSF/SS 共通 API、`.xls` fixture、HSSF interop tests には触れず、HWPF/`.doc` の限定本文編集だけに作業範囲を限定する。
+   - [x] Apache POI の `Range.insertAfter()` / `Range.replaceText()` / FIB text count adjustment / piece table write path を確認し、dotnet-poi で今回実装する最小 API と未対応範囲を `CHECKPOINT.md` に記録する。
+   - [x] `HWPFDocument` に append paragraph 相当の限定編集 API を追加し、既存本文の末尾に段落終端付きテキストを追加できるようにする。
+   - [x] `HWPFDocument` または `Range` に simple replacement 相当の限定編集 API を追加し、本文内の単純 placeholder を置換できるようにする。
+   - [x] 編集後 write では、`WordDocument` / 選択 `0Table` or `1Table` の FIB `ccpText` / CLX / piece table を最小限更新し、`Data`, `ObjectPool`, summary streams など未対応 stream / storage を保持する。
+   - [x] C# round-trip tests: append paragraph 後に再読込して `getText()` / `Range.text()` / paragraph composition に追加本文が現れることを固定する。HSSF compile error は解消済み。全テスト通過確認済み (57 passed)。
+   - [x] C# round-trip tests: simple replacement 後に再読込して置換後本文が現れ、置換前 placeholder が消えることを固定する。全テスト通過確認済み (57 passed)。
+   - [x] 代表 fixture ではまず `SampleDoc.doc` など本文中心の `.doc` に限定し、table/header/footer/field/image/OLE を含む fixture は preservation 確認に留める。
+   - [x] Java POI interop は Phase 13 item 7 に残し、item 5 では dotnet-poi read/write/read の限定編集 smoke を優先する。
+   - [x] item 5 の結果、残課題、Phase 13 item 6（table/header/footer/field/image/OLE preservation/read/limited write）への引き継ぎを `CHECKPOINT.md` に記録する。
+
+-- 以下は後回し2 --
+ 
+6. table/header/footer/field/image/OLE は preservation → read → limited write の順で進める。
+7. Java POI interop A/B と Phase 11 manual verification を追加する。
+
+完了条件:
+
+- 代表的な `.doc` から本文・段落・run のテキストと基本 formatting を読める。
+- no-op round-trip と軽微編集後の保存で Word / LibreOffice の修復ダイアログが出ない。
+- Java POI 生成 `.doc` を dotnet-poi が読み、dotnet-poi 保存 `.doc` を Java POI が読める。
+- 未対応の images/OLE/fields/comments 等を、API で触らない限り可能な範囲で保持する。
+
+### Phase 14 — Structural Debt: POI 乖離ポイントの解消
+
+このフェーズは、Phase 12 / 13 でコンフリクト回避・簡略化のために POI の実装構造から意図的に外れた箇所を解消するためのフェーズ。Phase 12 / 13 の完了条件は満たしているが、POI との fidelity 向上・将来の機能追加容易性・バグ回避のために整理が必要な箇所をリストアップする。
+
+#### Phase 12 由来の乖離
+
+1. **HSSF: XF レコード (0x00E0) — built-in XF 15〜20 の欠落**
+   - POI は `createWorkbook()` で 21 個の built-in XF を書くが、dotnet-poi は 15 個の style XF のみを書き、POI が書く 6 個の built-in cell XF (XF 15〜20) を書いていない。
+   - 現状の cell XF index = `style.getIndex() + 15` は、POI の cell XF 開始位置 (15) と一致するが、POI が 21 個書く際の cell XF インデックスとずれる。
+   - 修正方針: `WriteXfRecords` で POI と同じ 21 個の built-in XF を書き、user cell XF は 21 番以降に配置する。cell XF index mapping も `style.getIndex() + 21` に変更する。
+
+2. **HSSF: RowRecord (0x0208) — 全行への書き込み欠如**
+   - POI はすべての行に RowRecord を書くが、dotnet-poi は全行に RowRecord を書いている（WriteRowBlocksAndCells で ROW record + cells を interleaved で書いている）。ただしカスタム height/hidden のみ書くようにすると記述が空になる可能性がある。確認済み。
+   - 現状で POI と互換: 全行に RowRecord が書かれているため問題なし。このアイテムはクローズ。
+
+3. **HSSF: FormatRecord (0x041E) — 組み込み format の省略**
+   - POI は `createWorkbook()` で 8 個の built-in FormatRecord を書くが、dotnet-poi は user-defined (index >= 164) のみを書く。
+   - Excel は built-in formats を知っているので動作上問題はないが、POI との出力差がある。
+   - 修正方針: `WriteFormatRecords` に built-in format entries (POI の createFormat(0..7)) を追加する。
+
+4. **HSSF: StyleRecord (0x0293) — 書き込みなし**
+   - POI は 6 個の StyleRecord を書くが、dotnet-poi は書いていない。StyleRecord がないと古い Excel バージョンで問題が出る可能性がある。
+   - 修正方針: `WriteNewWorkbook` に 6 個の hard-coded StyleRecord を追加する。
+
+5. **HSSF: 読み込み時の XF → style mapping — XF index 15 未満の style XF 無視**
+   - 現状は `xfCount >= 15` の XF のみ `AddStyleFromBiff` に渡している。XF index 0〜14 (style XF) は捨てている。
+   - style XF (0〜14) は paragraph level / cell level style の「親」として機能するが、現状は cell XF のみ保持している。
+   - 修正方針: style XF も必要に応じて保持し、cell XF の style inheritance を実装する。
+
+6. ~~**HSSF: loaded workbook へのスタイル追加 — user style が template に追記されない**~~ ✅ **完了**
+   - 既存 `.xls` を読み込んで `createCellStyle()` すると、WriteWorkbookPreservingRecords では元 XF レコードを保持するが、新たに追加した user style の XF は書かれない。
+   - 実装済み: `WriteWorkbookPreservingRecords` を拡張し、既存レコードを維持しつつ、新しく追加された `FontRecord`, `FormatRecord`, `XfRecord` をそれぞれのセクション末尾に append するようにした。また、BIFF8 の Font index 4 (reserved) を適切に扱うよう `createFont` と `WriteFontRecords` を修正した。
+   - テスト: `UserStylePreservationTests` で Font, DataFormat, XF の追加と保存・再読み込みを検証。
+
+7. ~~**HSSF: ColInfo (0x007D) — 隣接する同一設定カラムのマージなし**~~ ✅ **完了**
+   - POI は隣接する同じ幅/hidden カラムをひとつの ColInfo にまとめるが、dotnet-poi は各カラムに個別の ColInfo を書く。動作上問題はないが冗長。
+   - 実装済み: `WriteColInfoRecords` を修正し、実効的な BIFF 幅 (0 を 2275 とみなす) と hidden 状態でグルーピングし、デフォルト設定 (2275 & !hidden) は書き込まないようにした。
+   - テスト: `ColInfoMergingTests` で同一幅/hidden のマージ、および default (0 と 2275) のマージ・スキップを検証。
+
+#### Phase 13 由来の乖離
+
+8. **HWPF: CharacterRun — StyleSheet default values の反映なし**
+   - CHPX に explicit な font/size 指定がない run は `HWPFChpProperties.Default` (size=0, font="") を返す。POI は `StyleSheet` + `CHPFormattedDiskPage` の default-value mechanism で正しい値を返す。
+   - 修正方針: `HWPFDocument` に `StyleSheet` (STSH) の読み取りを実装し、CHPX の default 値を style 由来に変える。STSH は FIB field STSHF (index 1) → table stream offset。
+
+9. **HWPF: Paragraph — PAPX (paragraph properties) 未実装**
+   - `Paragraph.getJustification()` / `getIndentFromLeft()` 等はすべて 0 を返すスタブ。POI は `PAPFormattedDiskPage` から PAPX を読む。
+   - 修正方針: PAPX の読み取りを `PlcBtePapx` + PAP FKP から実装する。approach は CHPX と同様。
+
+10. **HWPF: Range.GetParagraphs() — Prc (property change records) から PAPX を適用しない**
+    - CLX の Prc entries をスキップしているため、paragraph 境界に Prc で指定された PAPX が反映されない。
+    - 修正方針: CLX の Prc entries を解析し PAPX を適用する。
+
+11. ~~**HWPF: appendParagraph / replaceText — piece table の不完全な更新**~~ ✅ **完了**
+    - 実装済み: `SetMainBodyText` で CLX 更新後、最小限の CHPBinTable と PAPBinTable をテーブルストリーム末尾に書き込み、FIB の `fcPlcfBteChpx`/`lcbPlcfBteChpx`/`fcPlcfBtePapx`/`lcbPlcfBtePapx` を更新。最小エントリ (lcb=8, 2 FC センチネル・FKP ページなし) で古い FKP 参照を残さない。
+    - テスト: `Phase14Item11_AfterEdit_ChpBinTableAndPapBinTablePointToNewTextRange` で lcbChpx=8, lcbPapx=8 を検証済み。58 passed。
+
+12. ~~**HWPF: write() — FIB の完全な再構築なし**~~ ✅ **完了**
+    - 実装済み: `RebuildFibAfterEdit(main)` を `SetMainBodyText` 末尾に追加。
+      - `fcMac` (fibBase offset 28) = new `main.Length` (POI の `fcMac = wordDocumentStream.size()` 相当)
+      - `ccpFtn` / `ccpHdd` / `ccpAtn` / `ccpEdn` / `ccpTxbx` / `ccpHdrTxbx` = 0（単一ピース書き換え後は二次ストーリーなし）
+    - FIB オフセット定数 `FibOffsetFcMac`/`FibOffsetCcpFtn`/`FibOffsetCcpHdd`/`FibOffsetCcpAtn`/`FibOffsetCcpEdn`/`FibOffsetCcpTxbx`/`FibOffsetCcpHdrTxbx` を追加。
+    - テスト: `Phase14Item12_AfterEdit_FibRebuildSetsFcMacAndZerosSecondaryStoryCounts` — fcMac=main.Length および全 ccpXxx=0 を検証済み。59 passed。
+
+
+#### Phase 15 — ppt/HSLF Practical Bootstrap
+
+目標: `.ppt` を PowerPoint 97-2003 の古い binary PowerPoint 形式として、まず **open / text extraction / no-op preservation / Java POI interop** ができる状態へ引き上げる。完全なスライド編集エンジンや描画再構築ではなく、古いプレゼン資料・アーカイブ資料を壊しにくく読み、検索/indexing 用にテキスト化できる HSLF を目指す。
+
+このトラックは Phase 12/13 で整った POIFS preservation の上に載せる。Apache POI の `poi-scratchpad` HSLF 実装・テスト・Microsoft の PPT binary record 仕様を参照し、独自の PPT パーサーに寄せすぎない。`.ppt` は XML ではなく `PowerPoint Document` stream 内の record tree と OLE2 storage 群で構成されるため、まず **record tree traversal** と **unknown stream/record preservation** を重視する。
+
+前提:
+
+- `poi/` は読み取り専用。必ず Apache POI の `org.apache.poi.hslf` 実装と test-data を参照する。
+- 既存の `HSLFSlideShow` は最小 read-only reader として存在する。これを POI 互換の方向へ拡張し、壊れる独自再実装に置き換えない。
+- 最初の価値は「古い `.ppt` を開いてテキストを抜ける」「no-op 保存で壊さない」。スライド作成、図形編集、画像追加、アニメーション編集は後回し。
+- `Core` 内で完結させ、Formula には一切依存しない。
+
+優先順位:
+
+1. **Fixture survey / current baseline**
+   - POI HSLF tests (`poi/poi-scratchpad/src/test/java/org/apache/poi/hslf/`) と `poi/test-data/slideshow/*.ppt` から代表 fixture を選ぶ。
+   - 単純テキスト、複数スライド、タイトル/本文、TextBytes/TextChars、Unicode/日本語、中国語、コメント、ヘッダー/フッター、画像、OLE、壊れ気味 fixture を分類する。
+   - 既存 `HSLFSlideShow` で開ける/開けない、slide count、抽出 text の有無を `CHECKPOINT.md` に記録する。
+
+2. **Container and stream preservation**
+   - OLE2 stream inventory を `HSLFSlideShow` が保持し、`PowerPoint Document`, `Current User`, `Pictures`, `Pictures` 相当 stream、summary streams、embedded object storages を確認できるようにする。
+   - no-op write の前段として、読み込んだ OLE2 streams/storages と directory metadata を byte-for-byte で保持できることを HSLF fixture で固定する。
+   - 既存 POIFS/HSSF/HWPF preservation 機構を再利用し、HSLF 専用に stream を落とさない。
+
+3. **Record tree model**
+   - `PowerPoint Document` stream を record header (`recVer`, `recInstance`, `recType`, `recLen`) で走査し、container/atom の tree を保持する。
+   - `Document`, `SlideListWithText`, `SlidePersistAtom`, `PersistPtrIncrementalBlock`, `UserEditAtom`, `Slide`, `Notes`, `TextHeaderAtom`, `TextCharsAtom`, `TextBytesAtom`, `StyleTextPropAtom` を優先してモデル化する。
+   - まずは raw record bytes + typed helper のハイブリッドにし、未対応 record は byte-for-byte preservation できる形にする。
+
+4. **Slide list and text extraction**
+   - `Current User` / `UserEditAtom` / persist pointers を読み、実際のスライド順と slide count を POI と同じ基準で復元する。
+   - `SlideListWithText` と slide container 内の `TextBytesAtom` / `TextCharsAtom` を使い、slide ごとの title/body text を抽出する。
+   - `HSLFSlide.getTextParagraphs()` は当面 string list でもよいが、将来 POI 互換の `HSLFTextParagraph` / `HSLFTextRun` へ拡張できる境界にする。
+   - 日本語/中国語/CP1252/UTF-16LE、空 text box、複数 paragraph、field marker 風の制御文字を含む fixture で固定する。
+
+5. **No-op write round-trip**
+   - `HSLFSlideShow.write(Stream)` を追加し、API 経由で編集していない場合は OLE2 document をそのまま保存する。
+   - no-op write 後に dotnet-poi で再読込し、stream inventory、slide count、抽出 text が維持されることを確認する。
+   - 画像、コメント、ヘッダー/フッター、OLE、animations/transitions など未対応要素は、API モデル化より先に stream/record preservation を優先する。
+
+6. **Java POI interop**
+   - Direction A: Java POI が代表 `.ppt` fixture を生成または既存 fixture を検証し、dotnet-poi が slide count/text を読む。
+   - Direction B: dotnet-poi が no-op 保存した `.ppt` を Java POI (`HSLFSlideShow` / `ExtractorFactory` / `SlideShowExtractor`) が読めることを確認する。
+   - interop fixture は `tests/DotnetPoi.Interop.Tests/fixtures/from-poi/` と `fixtures/from-dotnet-poi/` に deterministic name で置く。
+
+7. **Limited text edit only after preservation**
+   - no-op preservation と interop が安定するまで、新規 slide 作成・shape 作成・画像追加には進まない。
+   - もし編集を入れる場合は、最初は既存 text atom の同長置換または単純 text replacement に限定し、record length / style run / persist pointer を矛盾させない。
+   - append/new text box は HSLF record tree と style atom 更新が必要なので、POI の `HSLFTextParagraph.storeText()` 相当を読んでから着手する。
+
+8. **Manual verification / docs**
+   - Phase 11 manual verification 対象に `.ppt` を追加し、PowerPoint / LibreOffice Impress で open → save → reopen を確認する。
+   - `NOW.md`, README, docs compatibility には「text extraction / no-op preservation が中心」「作成・図形編集は未対応」を明記する。
+
+実装順:
+
+1. HSLF fixture survey を行う。
+   - [x] POI HSLF tests から `SampleShow.ppt`, `with_textbox.ppt`, `text_shapes.ppt`, `headers_footers.ppt`, `WithComments.ppt`, `pictures.ppt`, `testPPT_oleWorkbook.ppt`, `54880_chinese.ppt`, `PPT95.ppt` などの代表候補を確認する。
+   - [x] 各 fixture の POI 側期待値（slide count、抽出 text、特殊要素）を `CHECKPOINT.md` に記録する。
+   - [x] 既存 `HSLFSlideShowTests` を代表 fixture theory に拡張し、現状で open/text extraction できる範囲を固定する。
+
+2. HSLF read-side stream inventory を追加する。
+   - [x] `HSLFSlideShow` が読み込んだ `CompoundFileDocument` を保持し、`getStreamNames()` / `hasStream()` / `hasStorage()` / `hasEntry()` 相当を追加する。
+   - [x] `PowerPoint Document`, `Current User`, summary streams, embedded storages の存在を fixture で確認する。
+   - [x] HSLF 側では POIFS/HSSF/HWPF の既存 preservation 実装を壊さない。
+
+3. record tree parser を POI 構造に寄せる。
+   - [x] flat recursive scan だけで slide count を数える現状から、record header + container tree を保持する構造へ拡張する。
+   - [x] `recType`, `recInstance`, `recLen`, offset, raw bytes を保持し、unknown record を失わない。
+   - [x] `TextCharsAtom` / `TextBytesAtom` の抽出は既存挙動を維持しながら、record location と slide association を改善する。
+
+4. slide order / slide count を persist pointer 経由で固める。
+   - [x] POI の `HSLFSlideShowImpl`, `CurrentUserAtom`, `UserEditAtom`, `PersistPtrHolder` 周辺を読み、dotnet-poi の最小モデル (HSLFPersistPtrHolder) を設計する。
+   - [x] `incorrect_slide_order.ppt` で 3 スライドを正しい順序 ("Slide 1", "Slide 2", "Slide 3") で返す。`basic_test_ppt_file.ppt` など他の fixture で従来の挙動を維持する。
+
+5. text extraction を実用化する。
+   - [x] slide ごとに title/body text を分離できる範囲を増やす。TextHeaderAtom (3999) でタイトル/本文を識別。HSLFSlide.getTitle() / getBodyParagraphs() で type に応じた text を返す。
+   - [x] Unicode/CP1252/中国語 fixture の文字化けを防ぐ。CP1252 は LocaleUtil1252Hslf.GetString を使用。UTF-16LE は Encoding.Unicode.GetString を使用。
+   - [x] 空 textbox、複数 paragraph、style atom 付き text で例外を出さない。
+   - [ ] 将来の `HSLFTextParagraph` / `HSLFTextRun` 用に paragraph/run 境界を保存する。
+
+6. no-op write round-trip を追加する。
+   - [x] `HSLFSlideShow.write(Stream)` を no-op preservation path として追加する。CompoundFile.Write(stream, _fileSystem) で OLE2 document をそのまま保存。
+   - [x] representative fixture で write → read し、stream inventory と extracted text が一致することを確認する。RoundTrip_NoOpWrite_PreservesSlideCountAndStreams, RoundTrip_NoOpWrite_PreservesExtractedText を追加。
+   - [x] `pictures.ppt`, `WithComments.ppt`, `testPPT_oleWorkbook.ppt` など未対応要素入り fixture で stream/storage が消えないことを確認する。RoundTrip_NoOpWrite_PreservesSpecialStreams を追加。
+   - [x] PowerPoint Document stream が byte-for-byte で一致することを確認する。RoundTrip_NoOpWrite_PowerPointDocumentStreamIdentical を追加。
+
+7. Java POI interop を追加する。
+   - [x] C# Direction B: `Write_Phase15HslfNoOp_CreatesFixtureForPoi` を追加し、`basic_test_ppt_file.ppt` を dotnet-poi no-op 保存。write → read の slide count / stream name 一致を確認。
+   - [x] Java Direction B: `ReadFromDotnetTest.readPhase15HslfNoOp()` を追加し、Apache POI が dotnet-poi 保存 `.ppt` を読んで text を抽出できることを確認する。
+   - [x] Java Direction A: `WriteForDotnetTest.writePhase15HslfSampleShow()` + `ReadPoiGeneratedTests.Read_Phase15HslfSampleShow_GeneratedByPoi()` を追加し、双方向 interop を確立。
+
+8. ステータス更新。
+   - [x] `NOW.md` の `ppt / HSLF` を、open/text extraction/no-op preservation/interop の実績に合わせて更新する。詳細なカテゴリ別状態表に拡張。
+   - [ ] README / docs compatibility / examples は、実装が入った段階で「古い ppt のテキスト抽出用途に使える」範囲を明記する。
+   - [x] 進捗・残課題・fixture ごとの癖を `CHECKPOINT.md` に追記する。
+
+完了条件:
+
+- 代表的な `.ppt` を dotnet-poi で開き、slide count と主要 text を抽出できる。
+- no-op write 後に dotnet-poi / Java POI / PowerPoint or LibreOffice Impress で開ける。
+- 画像、コメント、OLE、header/footer など未対応要素を、API で触らない限り可能な範囲で保持する。
+- C# round-trip tests、Java POI interop Direction B、POIFS preservation tests、Phase 11 manual verification 対象を追加する。
+
+#### Phase 16 — Separate projects and packages
+
+目標: 現行の `DotnetPoi.Core` 1 project に全 format 実装を集約した構成から、Office 2007+ OOXML と Office 97-2003 legacy binary formats を別 project / 別 test suite / 将来の別 NuGet package として扱える構成へ段階移行する。OOXML 側を安定化・sample 追加・release 準備しながら、Legacy 側の HSSF/HWPF/HSLF を開発中状態として安全に進められるようにする。
+
+この Phase は大規模リファクタリングなので、**一度に全移動しない**。compile green を維持できる小さい単位で project を追加し、namespace と public API の互換性をできるだけ保つ。Apache POI との fidelity を変える phase ではなく、build/package/test の所有境界を整理する phase とする。
+
+目標 project 構成:
+
+```text
+src/
+  DotnetPoi.Common/
+    SS interfaces, shared enums, common exceptions, small utilities
+
+  DotnetPoi.POIFS/
+    OLE2/CFB container, HPSF, encryption/container helpers where needed
+
+  DotnetPoi.Ooxml/
+    OPC/openxml package, XSSF, XWPF, XSLF
+    depends on Common
+    may depend on POIFS for encryption/OLE-package integration
+
+  DotnetPoi.Legacy/
+    HSSF, HWPF, HSLF
+    depends on Common and POIFS
+
+  DotnetPoi.Formula/
+    evaluator only
+    depends on Common plus the minimum workbook abstractions needed
+    must not force Legacy onto OOXML-only users unless explicitly required
+
+  DotnetPoi.All/
+    meta/facade package for users who want everything
+    depends on Common, POIFS, Ooxml, Legacy, Formula
+```
+
+目標 test 構成:
+
+```text
+tests/
+  DotnetPoi.Common.Tests/
+    SS interfaces, shared utilities, exceptions, common XML writer behavior
+
+  DotnetPoi.POIFS.Tests/
+    OLE2/CFB, HPSF, encryption container, stream/storage preservation
+
+  DotnetPoi.Ooxml.Tests/
+    OPC, XSSF, XWPF, XSLF, .xlsx/.docx/.pptx
+
+  DotnetPoi.Legacy.Tests/
+    HSSF, HWPF, HSLF, .xls/.doc/.ppt
+
+  DotnetPoi.Formula.Tests/
+    formula evaluator only
+
+  DotnetPoi.All.Tests/
+    all-in-one package/facade smoke tests only
+
+  DotnetPoi.Interop.Tests/
+    Java POI compatibility and cross-package fixtures
+```
+
+依存ルール:
+
+- `Common` は最小に保つ。format-specific implementation を入れない。
+- `POIFS` は `Common` にのみ依存する。
+- `Ooxml` は `Common` に依存し、暗号化 OOXML / OLE embedding で必要な場合のみ `POIFS` に依存する。
+- `Legacy` は `Common` と `POIFS` に依存する。
+- `Formula` は evaluator 実装だけを持つ。`Core` 時代と同じく、非 evaluator 機能（formula text read/write、cached value preservation、`setCellFormula`, `getCellFormula`, fullCalcOnLoad など）は format 側に残す。
+- `All` は code duplication しない。原則として package dependency / facade / smoke surface のみ。
+- Project split 後も public namespace は原則 `DotnetPoi.XSSF`, `DotnetPoi.HSSF` など既存互換を維持する。assembly 名と namespace を無理に一致させるための breaking change は避ける。
+
+実装順:
+
+1. **Baseline inventory**
+   - [x] 現行 `DotnetPoi.Core` 内の top-level folders (`SS`, `POIFS`, `XSSF`, `XWPF`, `XSLF`, `HSSF`, `HWPF`, `HSLF`) と project references を棚卸しする。
+   - [x] `internal` 型、friend assembly、resource/fixture path、generated files、package metadata の移動リスクを `CHECKPOINT.md` に記録する。
+   - [x] `dotnet test` の現状 baseline と known failing/slow tests を記録する。
+
+2. **Create project shells**
+   - [x] `DotnetPoi.Common`, `DotnetPoi.POIFS`, `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, `DotnetPoi.All` の csproj を追加する。
+   - [x] 既存 `DotnetPoi.Formula` は残し、参照先の移行計画を決める。
+   - [x] solution file / Directory.Build.props / package metadata / nullable/langversion/analyzers を既存 project と揃える。
+   - [x] この段階ではできるだけ file move をせず、empty project が build できることを確認する。
+
+3. **Split tests first where cheap**
+   - [x] `DotnetPoi.Common.Tests`, `DotnetPoi.POIFS.Tests`, `DotnetPoi.Ooxml.Tests`, `DotnetPoi.Legacy.Tests`, `DotnetPoi.All.Tests` を追加する。
+   - [x] 新規 tests から分割先に追加し、既存 `DotnetPoi.Core.Tests` は一時的に残す。
+   - [x] `All.Tests` は大量テスト置き場にしない。代表 format の create/read と package reference smoke のみに限定する。
+
+4. **Move Common surface**
+   - [x] `SS` interfaces/enums、共通 exception、共通 utility、XML writer などを `DotnetPoi.Common` に移す。
+   - [x] `DotnetPoi.Core` 側は移行期間中だけ compatibility facade として残した。空の facade + 全 example を `DotnetPoi.All` に移行後に削除完了 (2025)。
+   - [x] `Formula` が参照する workbook/cell/style abstractions はこの段階で `Common` に寄せる。
+   - [x] `Common.Tests` を green にしてから次へ進む。
+
+5. **Move POIFS/HPSF foundation**
+   - [x] `POIFS` と HPSF/encryption container helpers を `DotnetPoi.POIFS` に移す。
+   - [x] HSSF/HWPF/HSLF から POIFS への参照を project reference 経由に変更する。
+   - [x] OOXML encryption/OLE embedding が POIFS を必要とする箇所を確認し、必要最小限で `Ooxml -> POIFS` 参照を追加する。
+   - [x] `POIFS.Tests` と代表 HSSF/HWPF/HSLF preservation tests を実行し、container behavior が変わっていないことを確認する。
+
+6. **Move OOXML formats**
+   - [x] OPC/openxml package、`XSSF`, `XWPF`, `XSLF` を `DotnetPoi.Ooxml` に移す。
+   - [x] OOXML tests を `DotnetPoi.Ooxml.Tests` へ段階移動する。
+   - [x] `.xlsx/.docx/.pptx` samples/docs/tests が Legacy build 状態に依存しないことを確認する。
+   - [x] OOXML-only CI job を作れる状態にする。
+
+7. **Move Legacy formats**
+   - [x] `HSSF`, `HWPF`, `HSLF` を `DotnetPoi.Legacy` に移す。
+   - [x] Legacy tests を `DotnetPoi.Legacy.Tests` へ段階移動する。
+   - [x] Legacy は開発中扱いとして、CI 上で stable OOXML job と分けられるようにする。allow-failure にするかどうかは release 方針に合わせて決める。
+   - [x] HSSF/HWPF/HSLF の fixture path と interop output path を整理する。
+
+8. **Formula reference cleanup**
+   - [x] `DotnetPoi.Formula` が `Common` の abstraction だけで動けるか確認する。
+   - [x] concrete XSSF/HSSF hooks が必要な場合は、factory registration / reflection / optional adapter を使い、OOXML-only users に Legacy dependency を強制しない。
+   - [x] `Formula.Tests` を新 project layout に合わせて更新する。
+
+9. **Interop and package smoke**
+   - [x] `DotnetPoi.Interop.Tests` を新 package layout に合わせて更新する。
+   - [x] Direction A/B を OOXML と Legacy で filter/category 分割できるようにする。
+   - [x] `DotnetPoi.All.Tests` で全 package を参照した代表 smoke を追加する。
+   - [x] NuGet pack smoke を行い、`DotnetPoi.Ooxml` だけ、`DotnetPoi.Legacy` だけ、`DotnetPoi.All` のそれぞれで依存漏れがないことを確認する。
+
+10. **Docs and migration notes**
+   - [x] README を新 package names に更新する（NuGet Package Strategy、Repository Structure、Status、Test Coverage Snapshot、Quick Start、Architecture note）。
+   - [x] 既存 `DotnetPoi.Core` users 向けに migration note を書く。`DotnetPoi.Core` を facade として残し、新規プロジェクトでは `DotnetPoi.All` への移行を推奨する方針を明記。
+   - [x] stable support matrix を `OOXML (stable)`, `Legacy (in-development)`, `Formula (narrow)` に分けて Status 表に表示。
+   - [x] Phase 16 の結果、残課題、次に移すべき tests を `CHECKPOINT.md` に追記する。
+
+CI 方針:
+
+```text
+stable:
+  DotnetPoi.Common.Tests
+  DotnetPoi.POIFS.Tests
+  DotnetPoi.Ooxml.Tests
+  DotnetPoi.Formula.Tests
+
+development:
+  DotnetPoi.Legacy.Tests
+
+integration:
+  DotnetPoi.All.Tests
+  DotnetPoi.Interop.Tests
+```
+
+完了条件:
+
+- `DotnetPoi.Ooxml` が Legacy 実装の壊れ具合に依存せず build/test/release できる。
+- `DotnetPoi.Legacy` が `Common` + `POIFS` 上で HSSF/HWPF/HSLF を開発できる。
+- `DotnetPoi.Formula` が evaluator package として独立性を保つ。
+- `DotnetPoi.All` で従来の全部入り利用者向け導線を提供できる。
+- Existing public namespaces and common user code are preserved unless an explicit migration note is written.
+- `DotnetPoi.Interop.Tests` が新 package layout でも Java POI Direction A/B を維持する。
+
+#### Phase 17 TODO
+- [-] *優先度高*
+  - [x] 1. *Release hygiene / CI 強化*
+      - =Common/POIFS/Legacy/Formula/Ooxml/All= の publish 順と tag 運用を固定
+      - NuGet install smoke を CI に追加
+      - README / NOW / package README の更新漏れを防ぐ
+  - [ ]  ️2. *xlsx chart creation*
+    - 既存 chart preservation はあるので、まず棒/折れ線/円グラフの新規作成
+    - 帳票・レポート用途で一番需要が出そう
+  - [x] 3. ⭐*xlsx comments API*
+     - 既存コメント保存だけでなく read/create/edit
+     - レビュー済み Excel テンプレートで使われやすい
+  - [x] 4. ⭐*docx text box read support*
+     - =w:txbxContent= のテキスト抽出
+     - Word 文書で「本文が読めない」系の体感バグをかなり減らせる
+  - [x] 5. ⭐*docx table depth*
+     - cell merge、table borders、cell width、vertical alignment の API 化
+     - 帳票生成でかなり効く
+- [ ] *中優先*
+  - [ ] 6. *pptx chart creation*
+    - xlsx chart 実装の知見を流用
+    - 資料生成ユースケースに刺さる
+  - [x] 7. ⭐*pptx layouts/masters の最小操作*
+     - 既存 preservation に加えて、title/content layout の読み取り・選択       
+     - 「テンプレート pptx を軽編集」が強くなる
+  - [ ] 8. *Formula evaluator の明確な subset 拡張*
+    - =SUMIF=, =COUNTIF=, =IFERROR=, =VLOOKUP/XLOOKUP= あたり
+    - ただし “Excel 完全互換” を目指さず、README に関数表を置く
+  - [ ] 9. *HSSF/xls の実用補強*
+    - formula token write は重いので、先に hyperlinks/comments/filter の read/preservation/API
+    - 古い業務 Excel 対応として価値あり
+  - [x] 10. ⭐*HWPF/doc の header/footer/table text extraction*
+     - 編集より読み取り優先
+     - アーカイブ文書の検索・移行用途に向く
+- [ ] *低優先 / 後回しでよさそう*
+  - [ ] 11. *HSLF/ppt の新規作成・編集*
+    - 需要はあるが重い。no-op preservation と text extraction があるなら当面十分
+  - [ ] 12. *SmartArt / animations / transitions*
+    - preservation で足りるケースが多い
+    - API 化コストに対してリターンが小さめ
+  - [ ] 13. *Full formula engine*
+    - 沼です。やるなら =Formula= 2.0 相当の別プロジェクト感覚
+  - [ ] 14. *Full Apache POI API parity*
+    - 1.0 後の目標としては広すぎる
+    - 実用ワークフロー単位で増やす方が良いです
+
+#### phase 18 TODO2
+- [x] 1. docx | **変更履歴** | **トラックチェンジ** | 🔵 preservation-only |
+         raw XMLの順序保持モデルを入れて 🔵 preservation に上げる対応完了。`XWPFDocument` は body child order（paragraph/table/raw）を保持し、`XWPFParagraph` は paragraph child order（run/field/raw）を保持する。`w:ins` / `w:del` などの変更履歴XMLは通常runとの相対順序を保って round-trip する。accept/reject/create/edit API は未実装。
+
+#### phase 18 TODO3 — comments API / preservation split
+
+目的: README上のコメント状態を xlsx と docx で正確に分離し、実装も「xlsx は実装済み API の仕上げ」「docx は preservation → read → create/edit」の順で進める。
+
+前提:
+- xlsx / XSSF comments API は Phase 17 item 3 で基本実装済み。`XSSFComment`, `XSSFSheet.getCellComment()/findCellComment()`, `XSSFCell.getCellComment()/setCellComment()/removeCellComment()`, `XSSFDrawing.createCellComment()`, `xl/commentsN.xml`, VML comment shape, sheet rels の読み書きがある。
+- docx / XWPF comments は `word/comments.xml` などの part preservation に加え、最小 read/create/edit API を実装済み。本文側の `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` は参照 id を読み取れる。
+- Phase 18 TODO2 の body/paragraph child order preservation を前提に、docx comment range markers は通常 run / raw XML / tracked changes と相対順序を壊さないことを最優先にする。
+
+実装順:
+1. [x] README を修正し、xlsx comments は ✅ common API supported、docx comments は当初 🔵 preservation-only として分離する。
+   - xlsx の注意: rich comment formatting と VML shape styling は minimal / not byte-for-byte POI compatible。
+   - docx の注意: order 4/5 完了後は minimal read/create/edit API まで対応済み。
+2. [x] xlsx comments API の仕上げ確認。
+   - [x] Apache POI の `XSSFComment`, `CommentsTable`, `TestXSSFComment` を再確認し、API名・例外・移動/削除挙動の差分を `CHECKPOINT.md` に記録する。
+   - [x] 既存 `ReadAndEdit_PoiCommentFixture_RoundTripsUpdatedText` に加え、remove comment、move comment、複数 sheet comments、visible/hidden、author list の round-trip を追加する。
+   - [x] Java POI Direction B で dotnet-poi 生成 comment workbook を POI が読めることを確認する。
+   - [x] README / docs_src / package README で xlsx comments の制限（rich formatting, VML styling）を明記する。
+3. [x] docx comments preservation を順序保持レベルまで固定する。
+   - [x] Apache POI の `XWPFComment`, `XWPFComments`, `XWPFParagraph`, `XWPFRun` 周辺と `poi/test-data/document/comment*.docx` fixture を確認する。
+   - [x] `word/comments.xml`, `word/_rels/document.xml.rels`, `[Content_Types].xml` の保持だけでなく、本文内の `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` が paragraph child order を保って round-trip するテストを追加する。
+   - [x] table cell 内、hyperlink 内/近傍、tracked changes 近傍の comment marker preservation を代表ケースで固定する。
+4. [x] docx comments read API を最小実装する。
+   - [x] `XWPFComment` 相当の model を追加し、id / author / initials / date / text を読めるようにする。
+   - [x] `XWPFDocument.getComments()` / `getCommentByID()` 相当を追加する。
+   - [x] paragraph/run 側から comment reference id を取得できる最小 API を追加する。ただし本文の順序保持を壊す refactor は避ける。
+5. [x] docx comments create/edit API は read/preservation が安定してから着手する。
+   - [x] まず collapsed comment（単一位置の `commentReference`）か paragraph/range comment のどちらを最小対応にするか Apache POI に合わせて決める。最小対応は paragraph/range comment とし、comment part 作成は POI の `createComments().createComment(id)` に寄せる。
+   - [x] 新規 `word/comments.xml` 作成、content type override、document rels、comment id 採番を実装する。
+   - [x] `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` を order-preserving paragraph child として挿入する。
+   - [x] Java POI Direction B で dotnet-poi 生成 docx comments を POI が読めることを確認する。
+6. [x] 完了時に `NOW.md`, root `README.md`, `docs_src/content/compatibility/*`, `src/DotnetPoi.Ooxml/README.md`, `CHECKPOINT.md` を更新する。
+
 ---
 
 ## Porting Procedure (Per Class)

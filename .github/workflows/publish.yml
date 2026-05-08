@@ -40,12 +40,19 @@ jobs:
       - name: Build solution (Release)
         run: dotnet build DotnetPOI.sln --no-incremental -c Release
 
-      # ── Core + Formula tests ───────────────────────────────────────
-      - name: "Test — Core (all formats)"
-        run: dotnet test tests/DotnetPoi.Core.Tests/ --no-build -c Release
-
-      - name: "Test — Formula"
+      # ── All test suites ───────────────────────────────────────────────
+      - name: "Test — Common.Tests (shared infrastructure)"
+        run: dotnet test tests/DotnetPoi.Common.Tests/ --no-build -c Release
+      - name: "Test — POIFS.Tests (OLE2 container)"
+        run: dotnet test tests/DotnetPoi.POIFS.Tests/ --no-build -c Release
+      - name: "Test — Ooxml.Tests (xlsx, docx, pptx)"
+        run: dotnet test tests/DotnetPoi.Ooxml.Tests/ --no-build -c Release
+      - name: "Test — Legacy.Tests (xls, doc, ppt)"
+        run: dotnet test tests/DotnetPoi.Legacy.Tests/ --no-build -c Release
+      - name: "Test — Formula.Tests"
         run: dotnet test tests/DotnetPoi.Formula.Tests/ --no-build -c Release
+      - name: "Test — All.Tests (meta-package smoke)"
+        run: dotnet test tests/DotnetPoi.All.Tests/ --no-build -c Release
 
       # ── Direction A: Java writes → C# reads ────────────────────────
       - name: "[A] Java writes fixtures"
@@ -94,21 +101,40 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
+      - name: Validate release package hygiene
+        run: tools/release/package-hygiene.sh
+
       - name: Read package versions
         id: packages
         run: |
           TAG="${{ github.ref_name }}"
 
-          CORE_ID="$(dotnet msbuild src/DotnetPoi.Core/DotnetPoi.Core.csproj -nologo -getProperty:PackageId)"
-          CORE_VERSION="$(dotnet msbuild src/DotnetPoi.Core/DotnetPoi.Core.csproj -nologo -getProperty:PackageVersion)"
+          COMMON_ID="$(dotnet msbuild src/DotnetPoi.Common/DotnetPoi.Common.csproj -nologo -getProperty:PackageId)"
+          COMMON_VERSION="$(dotnet msbuild src/DotnetPoi.Common/DotnetPoi.Common.csproj -nologo -getProperty:PackageVersion)"
+          POIFS_ID="$(dotnet msbuild src/DotnetPoi.POIFS/DotnetPoi.POIFS.csproj -nologo -getProperty:PackageId)"
+          POIFS_VERSION="$(dotnet msbuild src/DotnetPoi.POIFS/DotnetPoi.POIFS.csproj -nologo -getProperty:PackageVersion)"
+          OOXML_ID="$(dotnet msbuild src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj -nologo -getProperty:PackageId)"
+          OOXML_VERSION="$(dotnet msbuild src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj -nologo -getProperty:PackageVersion)"
+          LEGACY_ID="$(dotnet msbuild src/DotnetPoi.Legacy/DotnetPoi.Legacy.csproj -nologo -getProperty:PackageId)"
+          LEGACY_VERSION="$(dotnet msbuild src/DotnetPoi.Legacy/DotnetPoi.Legacy.csproj -nologo -getProperty:PackageVersion)"
           FORMULA_ID="$(dotnet msbuild src/DotnetPoi.Formula/DotnetPoi.Formula.csproj -nologo -getProperty:PackageId)"
           FORMULA_VERSION="$(dotnet msbuild src/DotnetPoi.Formula/DotnetPoi.Formula.csproj -nologo -getProperty:PackageVersion)"
+          ALL_ID="$(dotnet msbuild src/DotnetPoi.All/DotnetPoi.All.csproj -nologo -getProperty:PackageId)"
+          ALL_VERSION="$(dotnet msbuild src/DotnetPoi.All/DotnetPoi.All.csproj -nologo -getProperty:PackageVersion)"
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "core_id=$CORE_ID" >> "$GITHUB_OUTPUT"
-          echo "core_version=$CORE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "common_id=$COMMON_ID" >> "$GITHUB_OUTPUT"
+          echo "common_version=$COMMON_VERSION" >> "$GITHUB_OUTPUT"
+          echo "poifs_id=$POIFS_ID" >> "$GITHUB_OUTPUT"
+          echo "poifs_version=$POIFS_VERSION" >> "$GITHUB_OUTPUT"
+          echo "ooxml_id=$OOXML_ID" >> "$GITHUB_OUTPUT"
+          echo "ooxml_version=$OOXML_VERSION" >> "$GITHUB_OUTPUT"
+          echo "legacy_id=$LEGACY_ID" >> "$GITHUB_OUTPUT"
+          echo "legacy_version=$LEGACY_VERSION" >> "$GITHUB_OUTPUT"
           echo "formula_id=$FORMULA_ID" >> "$GITHUB_OUTPUT"
           echo "formula_version=$FORMULA_VERSION" >> "$GITHUB_OUTPUT"
+          echo "all_id=$ALL_ID" >> "$GITHUB_OUTPUT"
+          echo "all_version=$ALL_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Check existing NuGet packages
         id: nuget
@@ -132,17 +158,40 @@ jobs:
             fi
           }
 
-          CORE_STATUS="$(check_package "${{ steps.packages.outputs.core_id }}" "${{ steps.packages.outputs.core_version }}")"
+          COMMON_STATUS="$(check_package "${{ steps.packages.outputs.common_id }}" "${{ steps.packages.outputs.common_version }}")"
+          POIFS_STATUS="$(check_package "${{ steps.packages.outputs.poifs_id }}" "${{ steps.packages.outputs.poifs_version }}")"
+          OOXML_STATUS="$(check_package "${{ steps.packages.outputs.ooxml_id }}" "${{ steps.packages.outputs.ooxml_version }}")"
+          LEGACY_STATUS="$(check_package "${{ steps.packages.outputs.legacy_id }}" "${{ steps.packages.outputs.legacy_version }}")"
           FORMULA_STATUS="$(check_package "${{ steps.packages.outputs.formula_id }}" "${{ steps.packages.outputs.formula_version }}")"
+          ALL_STATUS="$(check_package "${{ steps.packages.outputs.all_id }}" "${{ steps.packages.outputs.all_version }}")"
 
-          echo "core_status=$CORE_STATUS" >> "$GITHUB_OUTPUT"
+          echo "common_status=$COMMON_STATUS" >> "$GITHUB_OUTPUT"
+          echo "poifs_status=$POIFS_STATUS" >> "$GITHUB_OUTPUT"
+          echo "ooxml_status=$OOXML_STATUS" >> "$GITHUB_OUTPUT"
+          echo "legacy_status=$LEGACY_STATUS" >> "$GITHUB_OUTPUT"
           echo "formula_status=$FORMULA_STATUS" >> "$GITHUB_OUTPUT"
-          echo "${{ steps.packages.outputs.core_id }} ${{ steps.packages.outputs.core_version }}: $CORE_STATUS"
+          echo "all_status=$ALL_STATUS" >> "$GITHUB_OUTPUT"
+          echo "${{ steps.packages.outputs.common_id }} ${{ steps.packages.outputs.common_version }}: $COMMON_STATUS"
+          echo "${{ steps.packages.outputs.poifs_id }} ${{ steps.packages.outputs.poifs_version }}: $POIFS_STATUS"
+          echo "${{ steps.packages.outputs.ooxml_id }} ${{ steps.packages.outputs.ooxml_version }}: $OOXML_STATUS"
+          echo "${{ steps.packages.outputs.legacy_id }} ${{ steps.packages.outputs.legacy_version }}: $LEGACY_STATUS"
           echo "${{ steps.packages.outputs.formula_id }} ${{ steps.packages.outputs.formula_version }}: $FORMULA_STATUS"
+          echo "${{ steps.packages.outputs.all_id }} ${{ steps.packages.outputs.all_version }}: $ALL_STATUS"
 
       - name: Pack NuGet packages
         run: |
-          dotnet pack src/DotnetPoi.Core/DotnetPoi.Core.csproj \
+          rm -rf /tmp/nuget-publish
+          mkdir -p /tmp/nuget-publish
+
+          dotnet pack src/DotnetPoi.Common/DotnetPoi.Common.csproj \
+            -c Release \
+            -o /tmp/nuget-publish
+
+          dotnet pack src/DotnetPoi.POIFS/DotnetPoi.POIFS.csproj \
+            -c Release \
+            -o /tmp/nuget-publish
+
+          dotnet pack src/DotnetPoi.Legacy/DotnetPoi.Legacy.csproj \
             -c Release \
             -o /tmp/nuget-publish
 
@@ -150,25 +199,40 @@ jobs:
             -c Release \
             -o /tmp/nuget-publish
 
+          dotnet pack src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj \
+            -c Release \
+            -o /tmp/nuget-publish
+
+          dotnet pack src/DotnetPoi.All/DotnetPoi.All.csproj \
+            -c Release \
+            -o /tmp/nuget-publish
+
+      - name: NuGet install smoke
+        run: tools/release/nuget-install-smoke.sh /tmp/nuget-publish
+
       - name: Push missing packages to NuGet.org
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          if [ "${{ steps.nuget.outputs.core_status }}" = "missing" ]; then
-            dotnet nuget push "/tmp/nuget-publish/${{ steps.packages.outputs.core_id }}.${{ steps.packages.outputs.core_version }}.nupkg" \
-              --api-key "$NUGET_API_KEY" \
-              --source https://api.nuget.org/v3/index.json
-          else
-            echo "Skipping ${{ steps.packages.outputs.core_id }} ${{ steps.packages.outputs.core_version }} because it already exists on NuGet.org."
-          fi
+          push_if_missing() {
+            local pkg_id="$1"
+            local pkg_version="$2"
+            local pkg_status="$3"
+            if [ "$pkg_status" = "missing" ]; then
+              dotnet nuget push "/tmp/nuget-publish/${pkg_id}.${pkg_version}.nupkg" \
+                --api-key "$NUGET_API_KEY" \
+                --source https://api.nuget.org/v3/index.json
+            else
+              echo "Skipping ${pkg_id} ${pkg_version} because it already exists on NuGet.org."
+            fi
+          }
 
-          if [ "${{ steps.nuget.outputs.formula_status }}" = "missing" ]; then
-            dotnet nuget push "/tmp/nuget-publish/${{ steps.packages.outputs.formula_id }}.${{ steps.packages.outputs.formula_version }}.nupkg" \
-              --api-key "$NUGET_API_KEY" \
-              --source https://api.nuget.org/v3/index.json
-          else
-            echo "Skipping ${{ steps.packages.outputs.formula_id }} ${{ steps.packages.outputs.formula_version }} because it already exists on NuGet.org."
-          fi
+          push_if_missing "${{ steps.packages.outputs.common_id }}" "${{ steps.packages.outputs.common_version }}" "${{ steps.nuget.outputs.common_status }}"
+          push_if_missing "${{ steps.packages.outputs.poifs_id }}" "${{ steps.packages.outputs.poifs_version }}" "${{ steps.nuget.outputs.poifs_status }}"
+          push_if_missing "${{ steps.packages.outputs.legacy_id }}" "${{ steps.packages.outputs.legacy_version }}" "${{ steps.nuget.outputs.legacy_status }}"
+          push_if_missing "${{ steps.packages.outputs.formula_id }}" "${{ steps.packages.outputs.formula_version }}" "${{ steps.nuget.outputs.formula_status }}"
+          push_if_missing "${{ steps.packages.outputs.ooxml_id }}" "${{ steps.packages.outputs.ooxml_version }}" "${{ steps.nuget.outputs.ooxml_status }}"
+          push_if_missing "${{ steps.packages.outputs.all_id }}" "${{ steps.packages.outputs.all_version }}" "${{ steps.nuget.outputs.all_status }}"
 
       - name: Generate release notes
         id: release_notes
@@ -179,19 +243,27 @@ jobs:
           See [CHANGELOG / CHECKPOINT](https://github.com/${{ github.repository }}/blob/master/CHECKPOINT.md) for detailed working notes.
 
           ### NuGet packages
-          - `DotnetPoi.Core` — ${{ steps.packages.outputs.core_version }} (${{ steps.nuget.outputs.core_status }})
+          - `DotnetPoi.Common` — ${{ steps.packages.outputs.common_version }} (${{ steps.nuget.outputs.common_status }})
+          - `DotnetPoi.POIFS` — ${{ steps.packages.outputs.poifs_version }} (${{ steps.nuget.outputs.poifs_status }})
+          - `DotnetPoi.Ooxml` — ${{ steps.packages.outputs.ooxml_version }} (${{ steps.nuget.outputs.ooxml_status }})
+          - `DotnetPoi.Legacy` — ${{ steps.packages.outputs.legacy_version }} (${{ steps.nuget.outputs.legacy_status }})
           - `DotnetPoi.Formula` — ${{ steps.packages.outputs.formula_version }} (${{ steps.nuget.outputs.formula_status }})
+          - `DotnetPoi.All` — ${{ steps.packages.outputs.all_version }} (${{ steps.nuget.outputs.all_status }})
 
           ### Installation
           ```shell
-          dotnet add package DotnetPoi.Core --version ${{ steps.packages.outputs.core_version }}
+          dotnet add package DotnetPoi.All --version ${{ steps.packages.outputs.all_version }}
           dotnet add package DotnetPoi.Formula --version ${{ steps.packages.outputs.formula_version }}
           ```
 
           ### Test results
-          - Core: 228+ tests
-          - Formula: 10 tests
-          - Interop: 55+ tests (bidirectional Java↔.NET)
+          - Ooxml: 151 tests
+          - Legacy: 221 tests
+          - Formula: 11 tests
+          - Common: 79 tests
+          - POIFS: 11 tests
+          - All: 7 tests
+          - Interop: 70 passed / 2 skipped (bidirectional Java↔.NET)
           EOF
 
           echo "notes_path=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
@@ -203,8 +275,16 @@ jobs:
           name: "${{ steps.packages.outputs.tag }}"
           body_path: ${{ steps.release_notes.outputs.notes_path }}
           files: |
-            /tmp/nuget-publish/DotnetPoi.Core.*.nupkg
-            /tmp/nuget-publish/DotnetPoi.Core.*.snupkg
+            /tmp/nuget-publish/DotnetPoi.Common.*.nupkg
+            /tmp/nuget-publish/DotnetPoi.Common.*.snupkg
+            /tmp/nuget-publish/DotnetPoi.POIFS.*.nupkg
+            /tmp/nuget-publish/DotnetPoi.POIFS.*.snupkg
+            /tmp/nuget-publish/DotnetPoi.Ooxml.*.nupkg
+            /tmp/nuget-publish/DotnetPoi.Ooxml.*.snupkg
+            /tmp/nuget-publish/DotnetPoi.Legacy.*.nupkg
+            /tmp/nuget-publish/DotnetPoi.Legacy.*.snupkg
             /tmp/nuget-publish/DotnetPoi.Formula.*.nupkg
             /tmp/nuget-publish/DotnetPoi.Formula.*.snupkg
+            /tmp/nuget-publish/DotnetPoi.All.*.nupkg
+            /tmp/nuget-publish/DotnetPoi.All.*.snupkg
           fail_on_unmatched_files: false

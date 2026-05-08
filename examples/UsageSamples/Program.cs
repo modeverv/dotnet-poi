@@ -3,6 +3,9 @@ using DotnetPoi.SS.Util;
 using DotnetPoi.XSSF.UserModel;
 using DotnetPoi.XSLF.UserModel;
 using DotnetPoi.XWPF.UserModel;
+using DotnetPoi.HSSF.UserModel;
+using DotnetPoi.HWPF.UserModel;
+using DotnetPoi.HSLF.UserModel;
 using System.IO.Compression;
 
 var repoRoot = FindRepositoryRoot(AppContext.BaseDirectory);
@@ -18,16 +21,27 @@ var presentationPath = Path.Combine(outputDirectory, "usage-presentation.pptx");
 var macroWorkbookPath = Path.Combine(outputDirectory, "usage-macro-preserve.xlsm");
 var macroTemplatePath = Path.Combine(repoRoot, "tests", "test-files", "example.xlsm");
 
+var legacyXlsPath = Path.Combine(outputDirectory, "usage-workbook.xls");
+var legacyDocPath = Path.Combine(outputDirectory, "usage-document.doc");
+var legacyDocTemplatePath = Path.Combine(repoRoot, "poi", "test-data", "document", "SampleDoc.doc");
+var legacyPptTemplatePath = Path.Combine(repoRoot, "poi", "test-data", "slideshow", "SampleShow.ppt");
+
 CreateSpreadsheet(spreadsheetPath);
 CreateMacroWorkbookRoundTrip(macroTemplatePath, macroWorkbookPath);
 CreateDocument(documentPath, sampleImageBytes);
 CreatePresentation(presentationPath, sampleImageBytes);
+
+CreateLegacyXls(legacyXlsPath);
+CreateLegacyDocRoundTrip(legacyDocTemplatePath, legacyDocPath);
+ProbeLegacyPpt(legacyPptTemplatePath);
 
 Console.WriteLine("Usage samples generated and verified:");
 Console.WriteLine($"  {spreadsheetPath}");
 Console.WriteLine($"  {macroWorkbookPath}");
 Console.WriteLine($"  {documentPath}");
 Console.WriteLine($"  {presentationPath}");
+Console.WriteLine($"  {legacyXlsPath}");
+Console.WriteLine($"  {legacyDocPath}");
 
 static void CreateSpreadsheet(string outputPath)
 {
@@ -309,6 +323,67 @@ static void CreatePresentation(string outputPath, byte[] imageBytes)
     AssertEqual("pptx",
         loaded.getSlides()[1].getTables()[0].Rows[1].Cells[0].Paragraphs[0].getPlainText(),
         "presentation table");
+}
+
+static void CreateLegacyXls(string outputPath)
+{
+    using var workbook = new HSSFWorkbook();
+    var sheet = workbook.createSheet("LegacySheet");
+
+    var style = workbook.createCellStyle();
+    var font = workbook.createFont();
+    font.setBold(true);
+    font.setColor((short)IndexedColors.Red);
+    style.setFont(font);
+
+    var row = sheet.createRow(0);
+    var cell = row.createCell(0);
+    cell.setCellValue("Legacy XLS (HSSF)");
+    cell.setCellStyle(style);
+
+    row.createCell(1).setCellValue(123.456);
+
+    using (var stream = File.Create(outputPath))
+    {
+        workbook.write(stream);
+    }
+
+    using var readStream = File.OpenRead(outputPath);
+    using var loaded = new HSSFWorkbook(readStream);
+    AssertEqual("Legacy XLS (HSSF)", loaded.getSheetAt(0).getRow(0).getCell(0).getStringCellValue(), "xls title");
+    AssertEqual(123.456, loaded.getSheetAt(0).getRow(0).getCell(1).getNumericCellValue(), "xls value");
+}
+
+static void CreateLegacyDocRoundTrip(string templatePath, string outputPath)
+{
+    if (!File.Exists(templatePath)) return;
+
+    using (var stream = File.OpenRead(templatePath))
+    using (var doc = new HWPFDocument(stream))
+    {
+        doc.appendParagraph("\nEdited by dotnet-poi UsageSamples.");
+        doc.replaceText("Sample", "Legacy Sample");
+
+        using var output = File.Create(outputPath);
+        doc.write(output);
+    }
+
+    using var readBack = File.OpenRead(outputPath);
+    using var loaded = new HWPFDocument(readBack);
+    var text = loaded.getText();
+    if (!text.Contains("Edited by dotnet-poi UsageSamples."))
+        throw new InvalidOperationException("doc round-trip: appended text missing.");
+}
+
+static void ProbeLegacyPpt(string templatePath)
+{
+    if (!File.Exists(templatePath)) return;
+
+    using var stream = File.OpenRead(templatePath);
+    using var ppt = new HSLFSlideShow(stream);
+    var slides = ppt.getSlides();
+    if (slides.Count == 0)
+        throw new InvalidOperationException("ppt probe: no slides detected.");
 }
 
 static void AddPptxTableRow(XSLFTable table, string left, string right)

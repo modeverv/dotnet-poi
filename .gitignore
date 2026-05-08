@@ -45,4 +45,6 @@ __pycache__
 
 tmp-*
 .m2-repo
+temp_*
+tmp_*
 

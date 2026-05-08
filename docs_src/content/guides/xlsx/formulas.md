@@ -30,7 +30,7 @@ This sets the `fullCalcOnLoad` flag in the workbook. When the file is opened in 
 
 ## Formula Evaluation
 
-Full formula evaluation is **permanently deferred**. The `DotnetPoi.Formula` package contains a partial evaluator (SU, AVERAGE, CONCATENATE, basic arithmetic) that will not be expanded.
+Full formula evaluation is **permanently deferred**. The `DotnetPoi.Formula` package contains a limited evaluator for simple arithmetic and a small function subset such as SUM, AVERAGE, COUNT, MIN, MAX, and CONCATENATE. It is not an Excel-compatible calculation engine.
 
 Without `DotnetPoi.Formula`, calling `createFormulaEvaluator()` throws `NotSupportedException`.
 

@@ -77,6 +77,18 @@
 </ul>
 </div>
 <div class="nav-section">
+<div class="nav-title">doc (HWPF)</div>
+<ul>
+<li><a href="../guides/doc/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
+<div class="nav-title">ppt (HSLF)</div>
+<ul>
+<li><a href="../guides/ppt/overview.html">Overview</a></li>
+</ul>
+</div>
+<div class="nav-section">
 <div class="nav-title">Reference</div>
 <ul>
 <li><a href="../reference/examples-index.html">Examples Index</a></li>
@@ -98,22 +110,27 @@
 </ul>
 <h3>Chart Creation</h3>
 <p>Charts in xlsx and pptx are <strong>preserved on round-trip but cannot be created or edited programmatically</strong>. If your workflow requires generating chart visuals from data, this is not yet supported.</p>
+<h3>docx Comments</h3>
+<p>Existing docx comments are preserved on round-trip, and dotnet-poi exposes a minimal XWPF comment API for comment metadata/text, paragraph/run marker reference ids, metadata/text editing, and paragraph range comment creation. Rich comment body content, arbitrary range editing, and cleanup-heavy marker deletion remain limited. xlsx cell comments are different: common read/create/edit/remove workflows are modeled through <code>XSSFComment</code>, cell/sheet lookup, and VML/comment part write/read, with rich formatting and VML shape styling still minimal.</p>
 <h3>docx Style Editing</h3>
 <p>Paragraph style references are supported with <code>setStyle()</code> / <code>getStyleID()</code>, and <code>word/styles.xml</code> is read or generated for new documents. Character styles, table styles, and full Word style inheritance are not yet editable or evaluated by dotnet-poi.</p>
 <h3>docx Table Styling</h3>
 <p>docx tables support basic creation, width, grid columns, row height, header rows, cell width, horizontal grid span, vertical merge, and vertical alignment. Detailed border and shading creation is not yet exposed as an API, but existing <code>tblPr</code> / <code>trPr</code> / <code>tcPr</code> children are preserved as raw XML during round-trip.</p>
+<h3>docx Tracked Changes</h3>
+<p>Tracked-change XML such as <code>w:ins</code>, <code>w:del</code>, and move ranges is preserved as raw XML in body/paragraph child order during read/write round-trip. This is preservation-only: dotnet-poi does not expose accept/reject, create/edit, author/date editing, or semantic merge behavior for revisions.</p>
 <h2>Moderate Gaps</h2>
 <table>
 <thead><tr><th>Feature</th><th>Format</th><th>Impact</th></tr></thead>
 <tbody>
-<tr><td>Comments (read/create)</td><td>xlsx, docx</td><td>Existing comments preserved on round-trip but cannot be read or created</td></tr>
+<tr><td>Comments API</td><td>docx</td><td>Existing comments are preserved on round-trip and can be read through minimal XWPF APIs, but cannot be created or edited through public XWPF APIs</td></tr>
 <tr><td>Content controls (SDT)</td><td>docx</td><td>Block-level and inline SDT are preserved on round-trip but cannot be edited through a public API</td></tr>
-<tr><td>Word text boxes (w:txbxContent)</td><td>docx</td><td>Text inside Word text boxes is not readable</td></tr>
-<tr><td>Track changes</td><td>docx</td><td>Revision marks not supported</td></tr>
+<tr><td>Track changes API</td><td>docx</td><td>Revision markup is preserved on round-trip, but accept/reject/create/edit APIs are not supported</td></tr>
 <tr><td>Grouped shapes</td><td>pptx</td><td>Preserved as raw <code>spTree</code> XML but cannot be edited through a public API</td></tr>
 <tr><td>Notes slides</td><td>pptx</td><td>Existing notes slides are preserved but cannot be created or read through a public API</td></tr>
 <tr><td>Sparklines</td><td>xlsx</td><td>In-cell sparkline charts not supported</td></tr>
 <tr><td>External data connections</td><td>xlsx</td><td>Existing connection parts are preserved but cannot be edited through a public API</td></tr>
+<tr><td>HSSF advanced object model</td><td>xls</td><td>Basic workbook values, styles/layout slices, interop, and preservation exist, but images, charts, comment editing, filters, pivots, and new formula writing are not modeled</td></tr>
+<tr><td>HWPF advanced object model</td><td>doc</td><td>Body/header/footer/table text extraction and limited body edits work, but images, footnotes, comments, and fields are not modeled through public APIs</td></tr>
 </tbody>
 </table>
 <h2>Minor Gaps</h2>
@@ -125,7 +142,7 @@
 <tr><td>Animations/transitions editing</td><td>pptx</td><td>Preserved as unknown parts</td></tr>
 <tr><td>Theme editing</td><td>pptx</td><td>Layout/master/theme preserved but not editable</td></tr>
 <tr><td>Password hashing</td><td>xlsx</td><td>Protection on/off works; password hash not implemented</td></tr>
-<tr><td>xls (HSSF)</td><td>xls</td><td>Legacy format; minimal support</td></tr>
+<tr><td>ppt (HSLF)</td><td>ppt</td><td>Text extraction and no-op preservation exist; new slide creation and shape/image editing are not modeled</td></tr>
 </tbody>
 </table>
 <h2>When to Use Java POI Instead</h2>
@@ -134,8 +151,10 @@
 <li>Programmatic formula evaluation (Excel calculation engine)</li>
 <li>Chart creation from data</li>
 <li>Editing character/table styles or resolving complex Word style inheritance</li>
-<li>Full xls (BIFF) support</li>
-<li>Legacy doc (HWPF) or ppt (HSLF) formats</li>
+<li>Accepting/rejecting or programmatically authoring Word tracked changes</li>
+<li>Full xls (BIFF) support beyond the current basic values/styles/layout/preservation slices</li>
+<li>Legacy doc (HWPF) features beyond body text extraction and limited body edits</li>
+<li>Legacy ppt (HSLF) workflows beyond text extraction and no-op preservation</li>
 </ul>
 
     </main>

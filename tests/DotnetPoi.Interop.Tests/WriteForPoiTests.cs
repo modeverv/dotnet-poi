@@ -14,6 +14,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_HssfWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase6-basic.xls");
@@ -36,6 +37,303 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
+    public void Write_Phase12HssfStyles_CreatesFixtureForPoi()
+    {
+        // Phase 12 item 4: Direction B — dotnet-poi writes .xls with styles → Java POI reads
+        var fixturePath = GetFixturePath("phase12-hssf-styles.xls");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new HSSFWorkbook();
+
+        var boldFont = workbook.createFont();
+        boldFont.setBold(true);
+        boldFont.setFontName("Calibri");
+        boldFont.setFontHeightInPoints(14);
+        boldFont.setItalic(true);
+
+        var style1 = workbook.createCellStyle();
+        style1.setFont(boldFont);
+        style1.setAlignment(HorizontalAlignment.Center);
+        style1.setWrapText(true);
+        style1.setBorderBottom(BorderStyle.Thin);
+        style1.setDataFormat(workbook.createDataFormat().getFormat("0.00"));
+
+        var style2 = workbook.createCellStyle();
+        style2.setAlignment(HorizontalAlignment.Right);
+        style2.setBorderLeft(BorderStyle.Medium);
+
+        var sheet = workbook.createSheet("Styles");
+        var row = sheet.createRow(0);
+        var cell0 = row.createCell(0);
+        cell0.setCellValue(42.5);
+        cell0.setCellStyle(style1);
+
+        var cell1 = row.createCell(1);
+        cell1.setCellValue("right");
+        cell1.setCellStyle(style2);
+
+        row.createCell(2).setCellValue("no style");
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+        stream.Flush();
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
+    public void Write_Phase12HssfLayout_CreatesFixtureForPoi()
+    {
+        // Phase 12 item 4: Direction B — dotnet-poi writes .xls with layout → Java POI reads
+        var fixturePath = GetFixturePath("phase12-hssf-layout.xls");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new HSSFWorkbook();
+        var sheet = workbook.createSheet("Layout");
+
+        sheet.setColumnWidth(0, 5000);
+        sheet.setColumnWidth(1, 8000);
+        sheet.setColumnHidden(2, true);
+
+        var row0 = sheet.createRow(0);
+        row0.setHeight(30.0f);
+        row0.createCell(0).setCellValue("wide col");
+
+        var row1 = sheet.createRow(1);
+        row1.setHidden(true);
+        row1.createCell(0).setCellValue("hidden row");
+
+        var row2 = sheet.createRow(2);
+        row2.setHeight(20.0f);
+        row2.createCell(0).setCellValue("normal");
+
+        sheet.addMergedRegion(new SS.Util.CellRangeAddress(3, 3, 0, 2));
+        sheet.createRow(3).createCell(0).setCellValue("merged");
+
+        sheet.createFreezePane(1, 2);
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+        stream.Flush();
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
+    public void Write_Phase13NoOpDoc_CreatesFixtureForPoi()
+    {
+        // Phase 13 item 4: Direction B — dotnet-poi no-op saves SampleDoc.doc → Java POI reads
+        var fixturePath = GetFixturePath("phase13-noop-sample.doc");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        // Find SampleDoc.doc from the POI test-data directory
+        var repoRoot = GetRepoRoot();
+        var sourceFixture = Path.Combine(repoRoot, "poi", "test-data", "document", "SampleDoc.doc");
+        if (!File.Exists(sourceFixture))
+        {
+            // Fall back to Core Tests hwpf-fixtures if available
+            sourceFixture = Path.Combine(AppContext.BaseDirectory, "hwpf-fixtures", "SampleDoc.doc");
+        }
+        Assert.True(File.Exists(sourceFixture), $"Source fixture missing: {sourceFixture}");
+
+        using var input = File.OpenRead(sourceFixture);
+        using var doc = new DotnetPoi.HWPF.UserModel.HWPFDocument(input);
+        var originalText = doc.getText();
+
+        using (var output = File.Create(fixturePath))
+        {
+            doc.write(output);
+        }
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+
+        // Verify round-trip within dotnet-poi
+        using var readBack = File.OpenRead(fixturePath);
+        using var reread = new DotnetPoi.HWPF.UserModel.HWPFDocument(readBack);
+        Assert.Equal(originalText, reread.getText());
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
+    public void Write_Phase14EditedDoc_CreatesFixtureForPoi()
+    {
+        // Phase 14: Direction B — dotnet-poi edits SampleDoc.doc → Java POI reads
+        var fixturePath = GetFixturePath("phase14-edited-sample.doc");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        var repoRoot = GetRepoRoot();
+        var sourceFixture = Path.Combine(repoRoot, "poi", "test-data", "document", "SampleDoc.doc");
+        if (!File.Exists(sourceFixture))
+        {
+            sourceFixture = Path.Combine(AppContext.BaseDirectory, "hwpf-fixtures", "SampleDoc.doc");
+        }
+        Assert.True(File.Exists(sourceFixture), $"Source fixture missing: {sourceFixture}");
+
+        using var input = File.OpenRead(sourceFixture);
+        using var doc = new DotnetPoi.HWPF.UserModel.HWPFDocument(input);
+
+        // Make edits: append paragraphs
+        doc.appendParagraph("Phase14 edited paragraph");
+        doc.appendParagraph("Second appended");
+
+        using (var output = File.Create(fixturePath))
+        {
+            doc.write(output);
+        }
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+
+        // Verify round-trip within dotnet-poi
+        using var readBack = File.OpenRead(fixturePath);
+        using var reread = new DotnetPoi.HWPF.UserModel.HWPFDocument(readBack);
+        var text = reread.getText();
+        Assert.Contains("Phase14 edited paragraph", text);
+        Assert.Contains("Second appended", text);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
+    public void Write_Phase17HwpfDocExtraction_CreatesFixtureForPoi()
+    {
+        // Phase 17: Direction B — dotnet-poi no-op saves docs with headers/tables → Java POI reads
+        var headerFixturePath = GetFixturePath("phase17-headerfooter.doc");
+        var tableFixturePath = GetFixturePath("phase17-innertable.doc");
+        Directory.CreateDirectory(Path.GetDirectoryName(headerFixturePath)!);
+
+        var repoRoot = GetRepoRoot();
+        var headerSource = Path.Combine(repoRoot, "poi", "test-data", "document", "HeaderFooterUnicode.doc");
+        var tableSource = Path.Combine(repoRoot, "poi", "test-data", "document", "innertable.doc");
+
+        using (var input = File.OpenRead(headerSource))
+        using (var doc = new DotnetPoi.HWPF.UserModel.HWPFDocument(input))
+        using (var output = File.Create(headerFixturePath))
+        {
+            doc.write(output);
+        }
+
+        using (var input = File.OpenRead(tableSource))
+        using (var doc = new DotnetPoi.HWPF.UserModel.HWPFDocument(input))
+        using (var output = File.Create(tableFixturePath))
+        {
+            doc.write(output);
+        }
+
+        Assert.True(File.Exists(headerFixturePath));
+        Assert.True(File.Exists(tableFixturePath));
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
+    public void Write_Phase15HslfNoOp_CreatesFixtureForPoi()
+    {
+        // Phase 15 Item 7: Direction B — dotnet-poi no-op saves a .ppt → Java POI reads
+        var fixturePath = GetFixturePath("phase15-hslf-noop.ppt");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        var repoRoot = GetRepoRoot();
+        var sourceFixture = Path.Combine(repoRoot, "poi", "test-data", "slideshow", "basic_test_ppt_file.ppt");
+        Assert.True(File.Exists(sourceFixture), $"Source fixture missing: {sourceFixture}");
+
+        using var input = File.OpenRead(sourceFixture);
+        using var prs = new DotnetPoi.HSLF.UserModel.HSLFSlideShow(input);
+        var slideCount = prs.getSlides().Count;
+        var streamNames = prs.getStreamNames().ToList();
+
+        using (var output = File.Create(fixturePath))
+        {
+            prs.write(output);
+        }
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+
+        // Verify round-trip within dotnet-poi
+        using var readBack = File.OpenRead(fixturePath);
+        using var reread = new DotnetPoi.HSLF.UserModel.HSLFSlideShow(readBack);
+        Assert.Equal(slideCount, reread.getSlides().Count);
+        foreach (var name in streamNames)
+            Assert.Contains(reread.getStreamNames(), n => n == name);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
+    public void Write_Phase12HssfUnicode_CreatesFixtureForPoi()
+    {
+        // Phase 12 item 3: Direction B — Unicode/Japanese sheet names and strings
+        var fixturePath = GetFixturePath("phase12-hssf-unicode.xls");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new HSSFWorkbook();
+
+        var sheet1 = workbook.createSheet("日本語");
+        var row0 = sheet1.createRow(0);
+        row0.createCell(0).setCellValue("テスト文字列");
+        row0.createCell(1).setCellValue("hello 世界");
+        row0.createCell(2).setCellValue("こんにちは");
+
+        var sheet2 = workbook.createSheet("中文测试");
+        sheet2.createRow(0).createCell(0).setCellValue("汉字测试");
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+        stream.Flush();
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
+    public void Write_Phase12HssfComprehensive_CreatesFixtureForPoi()
+    {
+        // Phase 12 item 3: Direction B — dotnet-poi writes .xls → Java POI reads
+        var fixturePath = GetFixturePath("phase12-hssf-comprehensive.xls");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var workbook = new HSSFWorkbook();
+
+        // Sheet 1: all cell types
+        var sheet1 = workbook.createSheet("CellTypes");
+        var row0 = sheet1.createRow(0);
+        row0.createCell(0).setCellValue("string value");
+        row0.createCell(1).setCellValue(42.5);
+        row0.createCell(2).setCellValue(true);
+        row0.createCell(3).setCellValue(false);
+        row0.createCell(4).setCellErrorValue(0x07);  // #DIV/0!
+        row0.createCell(5).setCellErrorValue(0x2A);  // #N/A
+        row0.createCell(6);                          // blank
+
+        // Sheet 2: sparse layout
+        var sheet2 = workbook.createSheet("Sparse");
+        sheet2.createRow(0).createCell(0).setCellValue("row0col0");
+        sheet2.createRow(5).createCell(3).setCellValue(99.9);
+        sheet2.createRow(10).createCell(0).setCellValue("row10");
+
+        using var stream = File.Create(fixturePath);
+        workbook.write(stream);
+        stream.Flush();
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_StringAndNumberWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase0-basic.xlsx");
@@ -57,6 +355,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_StyledWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase2-styles.xlsx");
@@ -91,6 +390,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_PictureWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase2_5-images.xlsx");
@@ -117,6 +417,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_RotatedPictureWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_1-rotation.xlsx");
@@ -144,6 +445,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_DocxWithText_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_2-basic.docx");
@@ -169,6 +471,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_DocxWithImageAndRotation_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_2_1-image-rotation.docx");
@@ -190,6 +493,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_ComprehensiveDocx_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-docx-comprehensive.docx");
@@ -298,6 +602,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_PptxWithPictureAndRotation_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_3-pptx.pptx");
@@ -319,6 +624,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_PptxWithTextBoxesAndTables_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-pptx-comprehensive.pptx");
@@ -364,6 +670,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_AgileEncryptedWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase3_4-agile-encrypted.xlsx");
@@ -384,6 +691,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_BooleanAndNumericCells_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase7-cell-types.xlsx");
@@ -406,6 +714,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_FormulaCells_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase5-step1-formulas.xlsx");
@@ -433,6 +742,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_ForceFormulaRecalculation_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase5-step2-recalc.xlsx");
@@ -452,6 +762,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_EvaluatedFormulaFunctions_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase5-step3-evaluated-functions.xlsx");
@@ -482,6 +793,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_DocmWithParagraphsAndVba_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-docm-interop.docm");
@@ -511,6 +823,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_PptmWithSlideAndVba_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-pptm-interop.pptm");
@@ -534,6 +847,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_XlsmWithCellsAndVba_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-xlsm-interop.xlsm");
@@ -568,6 +882,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_AutoFilterWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-autofilter.xlsx");
@@ -592,6 +907,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_ProtectedWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-protection.xlsx");
@@ -612,6 +928,7 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_ActiveSheetWorkbook_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-active-sheet.xlsx");
@@ -632,6 +949,70 @@ public class WriteForPoiTests
 
     [Fact]
     [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
+    public void Write_XlsxCommentsWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase18-xssf-comments.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var wb = new XSSFWorkbook();
+        var first = wb.createSheet("Comments A");
+        var second = wb.createSheet("Comments B");
+
+        var a1 = first.createRow(0).createCell(0);
+        a1.setCellValue("visible");
+        var visible = first.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 0, 0, 2, 4));
+        visible.setAuthor("DotnetPoi");
+        visible.setString("Visible from dotnet-poi");
+        visible.setVisible(true);
+        a1.setCellComment(visible);
+
+        var c3 = first.createRow(2).createCell(2);
+        c3.setCellValue("moved");
+        var moved = first.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 1, 1, 3, 5));
+        moved.setAuthor("DotnetPoi");
+        moved.setString("Moved to C3");
+        moved.setAddress(2, 2);
+        c3.setCellComment(moved);
+
+        var b2 = second.createRow(1).createCell(1);
+        b2.setCellValue("second sheet");
+        var other = second.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 1, 1, 3, 5));
+        other.setAuthor("Interop");
+        other.setString("Second sheet comment");
+        b2.setCellComment(other);
+
+        using var stream = File.Create(fixturePath);
+        wb.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
+    public void Write_DocxCommentsDocument_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase18-xwpf-comments.docx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var doc = new XWPFDocument();
+        var paragraph = doc.createParagraph();
+        paragraph.createRun().setText("DotnetPoi commented text");
+        var comment = doc.createComment("DotnetPoi", "Docx comment from dotnet-poi", "DP", "2026-05-08T08:30:00Z");
+        paragraph.addComment(comment);
+
+        using var stream = File.Create(fixturePath);
+        doc.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_DocxWithFields_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-docx-fields.docx");
@@ -686,5 +1067,16 @@ public class WriteForPoiTests
         }
 
         throw new DirectoryNotFoundException("Could not locate tests/DotnetPoi.Interop.Tests/fixtures.");
+    }
+
+    private static string GetRepoRoot()
+    {
+        var directory = AppContext.BaseDirectory;
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory, "DotnetPOI.sln"))) return directory;
+            directory = Directory.GetParent(directory)?.FullName;
+        }
+        throw new DirectoryNotFoundException("Could not locate repository root.");
     }
 }
