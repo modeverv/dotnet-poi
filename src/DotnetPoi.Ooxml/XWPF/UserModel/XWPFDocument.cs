@@ -898,6 +898,13 @@ public sealed class XWPFDocument : IDisposable
                                     fieldResult += tContent;
                                 }
                                 continue;
+                            case "txbxContent" when currentRun is not null:
+                                foreach (var textBoxText in ExtractTextBoxParagraphTexts(reader.ReadOuterXml()))
+                                {
+                                    currentRun.addTextBoxText(textBoxText);
+                                }
+                                skipRead = true;
+                                continue;
                             case "fldChar":
                                 var fldCharType = reader.GetAttribute("w:fldCharType");
                                 if (fldCharType == "begin" && currentParagraph is not null)
@@ -1020,6 +1027,11 @@ public sealed class XWPFDocument : IDisposable
                         {
                             var anchorXml = reader.ReadOuterXml();
                             skipRead = true;
+
+                            foreach (var textBoxText in ExtractTextBoxParagraphTexts(anchorXml))
+                            {
+                                currentRun.addTextBoxText(textBoxText);
+                            }
 
                             // Parse anchor XML to register picture data
                             var (embed, cx, cy, descr, rot) = ParseAnchorBlip(anchorXml);
@@ -1412,6 +1424,68 @@ public sealed class XWPFDocument : IDisposable
         }
 
         return (embed, cx, cy, descr, rot);
+    }
+
+    private static IReadOnlyList<string> ExtractTextBoxParagraphTexts(string xml)
+    {
+        var paragraphs = new List<string>();
+        using var sr = new StringReader(xml);
+        using var reader = XmlReader.Create(sr, new XmlReaderSettings { IgnoreWhitespace = false });
+
+        int textBoxDepth = -1;
+        int paragraphDepth = -1;
+        StringBuilder? paragraphText = null;
+
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.Element)
+            {
+                if (reader.NamespaceURI == NsW && reader.LocalName == "txbxContent")
+                {
+                    textBoxDepth = reader.Depth;
+                    continue;
+                }
+
+                if (textBoxDepth >= 0 && reader.NamespaceURI == NsW && reader.LocalName == "p")
+                {
+                    paragraphDepth = reader.Depth;
+                    paragraphText = new StringBuilder();
+                    continue;
+                }
+
+                if (paragraphText is not null && reader.NamespaceURI == NsW)
+                {
+                    switch (reader.LocalName)
+                    {
+                        case "t":
+                            paragraphText.Append(reader.ReadElementContentAsString());
+                            break;
+                        case "tab":
+                            paragraphText.Append('\t');
+                            break;
+                        case "br":
+                        case "cr":
+                            paragraphText.Append('\n');
+                            break;
+                    }
+                }
+            }
+            else if (reader.NodeType == XmlNodeType.EndElement)
+            {
+                if (reader.NamespaceURI == NsW && reader.LocalName == "p" && reader.Depth == paragraphDepth)
+                {
+                    paragraphs.Add(paragraphText?.ToString() ?? string.Empty);
+                    paragraphText = null;
+                    paragraphDepth = -1;
+                }
+                else if (reader.NamespaceURI == NsW && reader.LocalName == "txbxContent" && reader.Depth == textBoxDepth)
+                {
+                    textBoxDepth = -1;
+                }
+            }
+        }
+
+        return paragraphs;
     }
 
     private static int ExtensionToFormat(string ext) => ext switch

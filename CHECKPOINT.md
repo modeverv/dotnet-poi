@@ -3192,3 +3192,43 @@ Known gaps in current implementation:
   - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --no-restore --filter "FullyQualifiedName~Hssf"` passed: 10/10.
   - Java POI `HSSFWorkbook` can read regenerated `manual-simple.xls` and returns sheet `Workbook`, A1 `Manual verification`, B2 `97.2003`.
 - Remaining manual step: reopen regenerated `tools/manual-verification/generated-documents/manual-simple.xls` in Microsoft Excel to confirm the warning dialog is gone.
+
+## 2026-05-08 — Phase 17 item 3: xlsx comments API
+
+- Task: implement Phase 17 `xlsx comments API` so XSSF can read/create/edit cell comments, not just preserve existing comment parts.
+- Scope: Ooxml/XSSF only. Did not touch HSSF/POIFS/Legacy fixtures or existing unrelated dirty README/csproj/manual verification outputs.
+
+- Apache POI reference checked:
+  - `poi/poi-ooxml/src/main/java/org/apache/poi/xssf/usermodel/XSSFComment.java`
+  - `poi/poi-ooxml/src/main/java/org/apache/poi/xssf/model/CommentsTable.java`
+  - `poi/poi-ooxml/src/test/java/org/apache/poi/xssf/usermodel/TestXSSFComment.java`
+
+- Implemented:
+  - Added `XSSFComment` with POI-style methods: author, text, row/column/address, visible, anchor.
+  - Added sheet-level comment storage and lookup via `XSSFSheet.getCellComment(row, column)` / `findCellComment(row, column)`.
+  - Added cell-level API via `XSSFCell.getCellComment()`, `setCellComment()`, and `removeCellComment()`.
+  - Added comment creation through `XSSFDrawing.createCellComment(XSSFClientAnchor)` and helper `XSSFCreationHelper.createRichTextString(string)`.
+  - XSSFWorkbook load now reads sheet `comments` relationships and parses `xl/commentsN.xml`; VML `ClientData` is parsed enough to recover row/column, anchor, and visible state.
+  - XSSFWorkbook write now emits `xl/commentsN.xml`, `xl/drawings/vmlDrawingN.vml`, content type overrides/defaults, sheet relationships, and `<legacyDrawing r:id="..."/>`.
+  - `createDrawingPatriarch().createCellComment()` no longer forces an empty DrawingML drawing part when no DrawingML pictures/raw anchors exist.
+
+- Tests added:
+  - New comment creation writes `comments1.xml`, `vmlDrawing1.vml`, sheet rels, and `legacyDrawing`.
+  - POI-generated `poi-integration-comments-write-read.xlsx` is read, existing C5 comment author/text is verified, edited, written, and read back.
+
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XSSFWorkbookTests"` passed: 43/43.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed: 153/153.
+
+- Remaining gaps:
+  - Rich comment formatting is minimally round-tripped for modeled run properties; deep XMLBeans parity for all `CTRst` variants is not complete.
+  - VML comment shape styling is generated in a minimal Excel-compatible form, not byte-for-byte POI-compatible.
+  - No Java Direction B assertion was added in `DotnetPoi.Interop.Tests`; current coverage uses a POI-generated fixture for Direction A and dotnet-poi read/write/read for edit persistence.
+
+## 2026-05-08 JST - Phase 17 item 4: docx text box read support
+- Task: implement docx/XWPF read-side support for text inside `w:txbxContent`, reducing cases where Word documents appear to have missing body text because content lives in DrawingML text boxes.
+- Scope: XWPF reader/tests only; left existing XSSF, README, fixture, and unrelated dirty worktree changes untouched.
+- Implementation start: add extraction-only text storage on `XWPFRun`, include it from `XWPFParagraph.getText()`, and parse `w:txbxContent` from both inline drawings and raw-captured `wp:anchor` drawings without creating fake body paragraphs.
+- Tests added: inline DrawingML `w:txbxContent` and raw-captured `wp:anchor` textbox extraction. The anchor test asserts textbox text is attached to the owning paragraph for extraction without creating extra body paragraphs.
+- Verification: `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XWPF"` passed: 39/39.
+- Verification: `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed: 155/155. Existing XWPF nullable warnings remain; no new failures.

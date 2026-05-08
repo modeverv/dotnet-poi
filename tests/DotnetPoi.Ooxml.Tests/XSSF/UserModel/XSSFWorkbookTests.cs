@@ -1328,6 +1328,78 @@ public class XSSFWorkbookTests
         Assert.NotNull(result.GetEntry("xl/pivotCache/pivotCacheRecords1.xml"));
     }
 
+    [Fact]
+    public void Write_CellComment_ProducesCommentsAndVmlParts()
+    {
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Comments");
+        var cell = sheet.createRow(2).createCell(1);
+        cell.setCellValue("reviewed");
+
+        var anchor = workbook.getCreationHelper().createClientAnchor();
+        anchor.setCol1(1);
+        anchor.setRow1(2);
+        anchor.setCol2(3);
+        anchor.setRow2(6);
+        var comment = sheet.createDrawingPatriarch().createCellComment(anchor);
+        comment.setAuthor("Reviewer");
+        comment.setString("Needs follow-up");
+        cell.setCellComment(comment);
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+
+        stream.Position = 0;
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        Assert.NotNull(archive.GetEntry("xl/comments1.xml"));
+        Assert.NotNull(archive.GetEntry("xl/drawings/vmlDrawing1.vml"));
+
+        var sheetXml = ReadEntry(archive, "xl/worksheets/sheet1.xml");
+        Assert.Contains("<legacyDrawing r:id=\"rId1\"/>", sheetXml);
+
+        var relsXml = ReadEntry(archive, "xl/worksheets/_rels/sheet1.xml.rels");
+        Assert.Contains("relationships/vmlDrawing", relsXml);
+        Assert.Contains("relationships/comments", relsXml);
+
+        var commentsXml = ReadEntry(archive, "xl/comments1.xml");
+        Assert.Contains("<author>Reviewer</author>", commentsXml);
+        Assert.Contains("<comment ref=\"B3\" authorId=\"1\">", commentsXml);
+        Assert.Contains("<t>Needs follow-up</t>", commentsXml);
+    }
+
+    [Fact]
+    public void ReadAndEdit_PoiCommentFixture_RoundTripsUpdatedText()
+    {
+        var fixturePath = Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../DotnetPoi.Interop.Tests/fixtures/poi-integration/_workbooks/poi-integration-comments-write-read.xlsx");
+        fixturePath = Path.GetFullPath(fixturePath);
+
+        using var loaded = new XSSFWorkbook(File.OpenRead(fixturePath));
+        var sheet = loaded.getSheetAt(0);
+        var c5 = sheet.getRow(4)!.getCell(2)!;
+        var comment = c5.getCellComment();
+
+        Assert.NotNull(comment);
+        Assert.Equal("Apache POI", comment!.getAuthor());
+        Assert.Equal("Hello!", comment.getString()!.getString());
+        Assert.Equal(4, comment.getRow());
+        Assert.Equal(2, comment.getColumn());
+
+        comment.setAuthor("DotnetPoi");
+        comment.setString("Updated from .NET");
+
+        using var stream = new MemoryStream();
+        loaded.write(stream);
+        stream.Position = 0;
+
+        using var roundTripped = new XSSFWorkbook(stream);
+        var edited = roundTripped.getSheetAt(0).getRow(4)!.getCell(2)!.getCellComment();
+        Assert.NotNull(edited);
+        Assert.Equal("DotnetPoi", edited!.getAuthor());
+        Assert.Equal("Updated from .NET", edited.getString()!.getString());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

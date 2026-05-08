@@ -721,6 +721,89 @@ public class XWPFDocumentTests
         Assert.Equal("Before field.  After field.1", loadedPara.getText());
     }
 
+    [Fact]
+    public void Read_InlineTextBoxContent_ExtractsTextOnParagraph()
+    {
+        using var stream = CreateDocxWithDocumentXml("""
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                        xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+                        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                        xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+              <w:body>
+                <w:p>
+                  <w:r><w:t xml:space="preserve">Outer </w:t></w:r>
+                  <w:r>
+                    <w:drawing>
+                      <wp:inline>
+                        <a:graphic>
+                          <a:graphicData>
+                            <wps:wsp>
+                              <wps:txbx>
+                                <w:txbxContent>
+                                  <w:p><w:r><w:t>Text box line 1</w:t></w:r></w:p>
+                                  <w:p><w:r><w:t>Text box line 2</w:t></w:r></w:p>
+                                </w:txbxContent>
+                              </wps:txbx>
+                            </wps:wsp>
+                          </a:graphicData>
+                        </a:graphic>
+                      </wp:inline>
+                    </w:drawing>
+                  </w:r>
+                </w:p>
+                <w:sectPr/>
+              </w:body>
+            </w:document>
+            """);
+
+        using var doc = new XWPFDocument(stream);
+
+        var para = Assert.Single(doc.getParagraphs());
+        Assert.Equal("Outer Text box line 1\nText box line 2", para.getText());
+    }
+
+    [Fact]
+    public void Read_AnchoredTextBoxContent_ExtractsTextWithoutCreatingBodyParagraphs()
+    {
+        using var stream = CreateDocxWithDocumentXml("""
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                        xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+                        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                        xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+              <w:body>
+                <w:p>
+                  <w:r>
+                    <w:drawing>
+                      <wp:anchor>
+                        <wp:docPr id="1" name="Text Box 1"/>
+                        <a:graphic>
+                          <a:graphicData>
+                            <wps:wsp>
+                              <wps:txbx>
+                                <w:txbxContent>
+                                  <w:p><w:r><w:t>Anchored box text</w:t></w:r></w:p>
+                                </w:txbxContent>
+                              </wps:txbx>
+                            </wps:wsp>
+                          </a:graphicData>
+                        </a:graphic>
+                      </wp:anchor>
+                    </w:drawing>
+                  </w:r>
+                </w:p>
+                <w:sectPr/>
+              </w:body>
+            </w:document>
+            """);
+
+        using var doc = new XWPFDocument(stream);
+
+        var para = Assert.Single(doc.getParagraphs());
+        Assert.Equal("Anchored box text", para.getText());
+    }
+
     /// <summary>
     /// comments (word/comments.xml), footnotes (word/footnotes.xml), endnotes
     /// (word/endnotes.xml), OLE embeddings (word/embeddings/*) are separate
@@ -872,5 +955,18 @@ public class XWPFDocumentTests
         Assert.NotNull(entry);
         using var reader = new StreamReader(entry.Open());
         return reader.ReadToEnd();
+    }
+
+    private static MemoryStream CreateDocxWithDocumentXml(string documentXml)
+    {
+        var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var entry = archive.CreateEntry("word/document.xml");
+            using var writer = new StreamWriter(entry.Open());
+            writer.Write(documentXml);
+        }
+        stream.Position = 0;
+        return stream;
     }
 }

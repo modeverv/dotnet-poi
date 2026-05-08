@@ -99,10 +99,7 @@ public sealed class XWPFParagraph
         var sb = new System.Text.StringBuilder();
         foreach (var run in _runs)
         {
-            if (run.TextValue is not null)
-            {
-                sb.Append(run.TextValue);
-            }
+            sb.Append(run.getTextForExtraction());
         }
         return sb.ToString();
     }

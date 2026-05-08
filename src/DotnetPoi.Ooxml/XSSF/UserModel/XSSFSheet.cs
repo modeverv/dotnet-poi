@@ -13,6 +13,7 @@ public sealed class XSSFSheet : ISheet
     private readonly List<XSSFDataValidation> _dataValidations = new();
     private readonly List<XSSFConditionalFormatting> _condFormatting = new();
     private readonly List<XSSFPivotTable> _pivotTables = new();
+    private readonly SortedDictionary<(int Row, int Column), XSSFComment> _comments = new();
     private readonly XSSFWorkbook _workbook;
     private XSSFDrawing? _drawing;
 
@@ -94,7 +95,59 @@ public sealed class XSSFSheet : ISheet
 
     internal IReadOnlyCollection<XSSFRow> Rows => _rows.Values;
 
-    internal XSSFDrawing? Drawing => _drawing;
+    internal XSSFDrawing? Drawing =>
+        _drawing is not null && (_drawing.Pictures.Count > 0 || _drawing.PreservedRawAnchors.Count > 0)
+            ? _drawing
+            : null;
+
+    internal bool HasComments => _comments.Count > 0;
+
+    internal int CommentsIndex => SheetIndex;
+
+    internal IReadOnlyCollection<XSSFComment> Comments => _comments.Values;
+
+    public XSSFComment? getCellComment(int row, int column)
+    {
+        return _comments.TryGetValue((row, column), out var comment) ? comment : null;
+    }
+
+    public XSSFComment? findCellComment(int row, int column) => getCellComment(row, column);
+
+    internal void RegisterComment(XSSFComment comment)
+    {
+        Guard.ThrowIfNull(comment, nameof(comment));
+        _comments[(comment.getRow(), comment.getColumn())] = comment;
+    }
+
+    internal void MoveComment(int oldRow, int oldColumn, XSSFComment comment)
+    {
+        _comments.Remove((oldRow, oldColumn));
+        RegisterComment(comment);
+    }
+
+    internal XSSFComment CreateCellComment(XSSFClientAnchor anchor)
+    {
+        Guard.ThrowIfNull(anchor, nameof(anchor));
+        if (_comments.ContainsKey((anchor.Row1, anchor.Col1)))
+            throw new ArgumentException("Multiple cell comments in one cell are not allowed.");
+
+        var comment = new XSSFComment(this, anchor.Row1, anchor.Col1, string.Empty, null, anchor, visible: false);
+        RegisterComment(comment);
+        return comment;
+    }
+
+    internal void SetCellComment(XSSFCell cell, XSSFComment? comment)
+    {
+        var key = (cell.getRowIndex(), cell.getColumnIndex());
+        if (comment is null)
+        {
+            _comments.Remove(key);
+            return;
+        }
+
+        comment.setAddress(cell.getRowIndex(), cell.getColumnIndex());
+        RegisterComment(comment);
+    }
 
     public void addMergedRegion(CellRangeAddress region)
     {

@@ -39,6 +39,11 @@ public sealed class XSSFCreationHelper : ICreationHelper
         return new XSSFClientAnchor();
     }
 
+    public XSSFRichTextString createRichTextString(string text)
+    {
+        return new XSSFRichTextString(text);
+    }
+
     public IFormulaEvaluator createFormulaEvaluator()
     {
         if (_formulaEvaluatorFactory != null)

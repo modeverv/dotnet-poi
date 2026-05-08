@@ -21,6 +21,16 @@ public sealed class XWPFRun
     internal IReadOnlyList<string> RawAnchorXml => _rawAnchorXml;
     internal void addRawAnchorXml(string xml) => _rawAnchorXml.Add(xml);
 
+    // Text found in DrawingML/VML text boxes. This is extraction-only text:
+    // it should be visible through getText(), but not serialized as a normal run.
+    private readonly List<string> _textBoxText = new();
+    internal IReadOnlyList<string> TextBoxText => _textBoxText;
+    internal void addTextBoxText(string text)
+    {
+        if (!string.IsNullOrEmpty(text))
+            _textBoxText.Add(text);
+    }
+
     // Raw XML for unmodeled children of run properties (rPr), e.g., w:shd, highlight, etc.
     private readonly List<string> _preservedRawRPrChildren = new();
     internal IReadOnlyList<string> PreservedRawRPrChildren => _preservedRawRPrChildren;
@@ -47,6 +57,17 @@ public sealed class XWPFRun
     public void setText(string text) => _text = text;
 
     public string? getText(int pos) => _text;
+
+    internal string getTextForExtraction()
+    {
+        if (_textBoxText.Count == 0)
+            return _text ?? string.Empty;
+
+        if (string.IsNullOrEmpty(_text))
+            return string.Join("\n", _textBoxText);
+
+        return _text + "\n" + string.Join("\n", _textBoxText);
+    }
 
     public void setBold(bool bold) => _bold = bold;
 

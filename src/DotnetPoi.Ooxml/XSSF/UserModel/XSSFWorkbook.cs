@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
+using System.Xml.Linq;
 using DotnetPoi.POIFS.Crypt;
 using DotnetPoi.SS.UserModel;
 using DotnetPoi.SS.Util;
@@ -269,10 +270,15 @@ public sealed class XSSFWorkbook : IWorkbook
         foreach (var sheet in _sheets)
         {
             WriteEntry(archive, $"xl/worksheets/sheet{sheet.SheetIndex}.xml", writer => WriteWorksheet(writer, sheet));
-            bool hasRels = sheet.Drawing is not null || sheet.Hyperlinks.Count > 0 || sheet.PivotTables.Count > 0;
+            bool hasRels = sheet.Drawing is not null || sheet.HasComments || sheet.Hyperlinks.Count > 0 || sheet.PivotTables.Count > 0;
             if (hasRels)
             {
                 WriteEntry(archive, $"xl/worksheets/_rels/sheet{sheet.SheetIndex}.xml.rels", writer => WriteSheetRelationships(writer, sheet));
+            }
+            if (sheet.HasComments)
+            {
+                WriteEntry(archive, $"xl/comments{sheet.CommentsIndex}.xml", writer => WriteComments(writer, sheet));
+                WriteEntry(archive, $"xl/drawings/vmlDrawing{sheet.CommentsIndex}.vml", writer => WriteCommentVml(writer, sheet));
             }
             if (sheet.Drawing is not null)
             {
@@ -401,10 +407,11 @@ public sealed class XSSFWorkbook : IWorkbook
 
     internal void AssignHyperlinkRelationshipIds()
     {
-        int nextId = 1;
         foreach (var sheet in _sheets)
         {
-            if (sheet.Drawing is not null) nextId = 2;
+            int nextId = 1;
+            if (sheet.Drawing is not null) nextId++;
+            if (sheet.HasComments) nextId += 2;
             foreach (var hyperlink in sheet.Hyperlinks)
             {
                 hyperlink.RelationshipId = $"rId{nextId++}";
@@ -503,6 +510,7 @@ public sealed class XSSFWorkbook : IWorkbook
         {
             var sheet = createSheet(sheetInfo.Name);
             ReadWorksheet(archive, sheetInfo.PartName, sheet, sharedStrings);
+            ReadSheetComments(archive, sheetInfo.PartName, sheet);
             ReadSheetDrawing(archive, sheetInfo.PartName, sheet);
         }
 
@@ -592,9 +600,14 @@ public sealed class XSSFWorkbook : IWorkbook
         foreach (var sheet in _sheets)
         {
             names.Add($"xl/worksheets/sheet{sheet.SheetIndex}.xml");
-            bool hasRels = sheet.Drawing is not null || sheet.Hyperlinks.Count > 0;
+            bool hasRels = sheet.Drawing is not null || sheet.HasComments || sheet.Hyperlinks.Count > 0 || sheet.PivotTables.Count > 0;
             if (hasRels)
                 names.Add($"xl/worksheets/_rels/sheet{sheet.SheetIndex}.xml.rels");
+            if (sheet.HasComments)
+            {
+                names.Add($"xl/comments{sheet.CommentsIndex}.xml");
+                names.Add($"xl/drawings/vmlDrawing{sheet.CommentsIndex}.vml");
+            }
             if (sheet.Drawing is not null)
             {
                 names.Add($"xl/drawings/drawing{sheet.Drawing.DrawingIndex}.xml");
@@ -1234,6 +1247,189 @@ public sealed class XSSFWorkbook : IWorkbook
                 continue;
             }
         }
+    }
+
+    private static void ReadSheetComments(ZipArchive archive, string sheetPartName, XSSFSheet sheet)
+    {
+        var (commentsPath, vmlPath) = ReadSheetCommentRelationshipTargets(archive, sheetPartName);
+        if (commentsPath is null)
+            return;
+
+        var commentsEntry = archive.GetEntry(commentsPath);
+        if (commentsEntry is null)
+            return;
+
+        var vmlInfo = vmlPath is null
+            ? new Dictionary<(int Row, int Column), (XSSFClientAnchor? Anchor, bool Visible)>()
+            : ReadCommentVmlInfo(archive, vmlPath);
+
+        using var stream = commentsEntry.Open();
+        var document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
+        XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        var authors = document.Root?
+            .Element(ns + "authors")?
+            .Elements(ns + "author")
+            .Select(author => author.Value)
+            .ToList() ?? new List<string>();
+
+        foreach (var commentElement in document.Root?
+            .Element(ns + "commentList")?
+            .Elements(ns + "comment") ?? Enumerable.Empty<XElement>())
+        {
+            var cellRef = (string?)commentElement.Attribute("ref");
+            if (cellRef is null)
+                continue;
+
+            var authorId = (int?)commentElement.Attribute("authorId") ?? 0;
+            var author = authorId >= 0 && authorId < authors.Count ? authors[authorId] : string.Empty;
+            var (row, col) = ParseCellRef(cellRef);
+            var text = ReadRichTextElement(commentElement.Element(ns + "text"));
+
+            vmlInfo.TryGetValue((row, col), out var shapeInfo);
+            var anchor = shapeInfo.Anchor ?? new XSSFClientAnchor(0, 0, 0, 0, col, row, col + 2, row + 4);
+            var comment = new XSSFComment(sheet, row, col, author, text, anchor, shapeInfo.Visible);
+            sheet.RegisterComment(comment);
+            if (sheet.getRow(row)?.getCell(col) is XSSFCell cell)
+                cell.SetCellCommentFromXml(comment);
+        }
+    }
+
+    private static XSSFRichTextString? ReadRichTextElement(XElement? textElement)
+    {
+        if (textElement is null)
+            return null;
+
+        XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        var runElements = textElement.Elements(ns + "r").ToList();
+        if (runElements.Count > 0)
+        {
+            var runs = new List<XSSFRichTextString.TextRun>();
+            foreach (var runElement in runElements)
+            {
+                var run = new XSSFRichTextString.TextRun
+                {
+                    Text = runElement.Element(ns + "t")?.Value ?? string.Empty
+                };
+                var rPr = runElement.Element(ns + "rPr");
+                if (rPr is not null)
+                {
+                    run.Bold = rPr.Element(ns + "b") is not null;
+                    run.Italic = rPr.Element(ns + "i") is not null;
+                    run.Underline = rPr.Element(ns + "u") is not null;
+                    run.Strikethrough = rPr.Element(ns + "strike") is not null;
+                    var szVal = (string?)rPr.Element(ns + "sz")?.Attribute("val");
+                    if (szVal is not null && double.TryParse(szVal, NumberStyles.Float, CultureInfo.InvariantCulture, out var fontSize))
+                        run.FontSize = fontSize;
+                    run.FontName = (string?)rPr.Element(ns + "rFont")?.Attribute("val");
+                    run.Color = (string?)rPr.Element(ns + "color")?.Attribute("rgb")
+                        ?? (string?)rPr.Element(ns + "color")?.Attribute("val");
+                }
+                runs.Add(run);
+            }
+            return new XSSFRichTextString(runs);
+        }
+
+        return new XSSFRichTextString(textElement.Element(ns + "t")?.Value ?? string.Empty);
+    }
+
+    private static (string? CommentsPath, string? VmlPath) ReadSheetCommentRelationshipTargets(ZipArchive archive, string sheetPartName)
+    {
+        var dir = Path.GetDirectoryName(sheetPartName)?.Replace('\\', '/') ?? string.Empty;
+        var file = Path.GetFileName(sheetPartName);
+        var relsPath = $"{dir}/_rels/{file}.rels";
+        var relsEntry = archive.GetEntry(relsPath);
+        if (relsEntry is null)
+            return (null, null);
+
+        string? commentsTarget = null;
+        string? vmlTarget = null;
+        using var relsStream = relsEntry.Open();
+        using var relsReader = XmlReader.Create(relsStream, new XmlReaderSettings { IgnoreWhitespace = false });
+        while (relsReader.Read())
+        {
+            if (relsReader.NodeType != XmlNodeType.Element || relsReader.LocalName != "Relationship")
+                continue;
+
+            var type = relsReader.GetAttribute("Type");
+            var target = relsReader.GetAttribute("Target");
+            if (target is null)
+                continue;
+
+            if (string.Equals(type, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments", StringComparison.Ordinal))
+                commentsTarget = NormalizeRelativePath(dir + "/" + target);
+            else if (string.Equals(type, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing", StringComparison.Ordinal))
+                vmlTarget = NormalizeRelativePath(dir + "/" + target);
+        }
+
+        return (commentsTarget, vmlTarget);
+    }
+
+    private static Dictionary<(int Row, int Column), (XSSFClientAnchor? Anchor, bool Visible)> ReadCommentVmlInfo(ZipArchive archive, string vmlPath)
+    {
+        var result = new Dictionary<(int Row, int Column), (XSSFClientAnchor? Anchor, bool Visible)>();
+        var entry = archive.GetEntry(vmlPath);
+        if (entry is null)
+            return result;
+
+        using var stream = entry.Open();
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
+        while (reader.Read())
+        {
+            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "ClientData")
+                continue;
+
+            int? row = null;
+            int? column = null;
+            string? anchorText = null;
+            bool visible = false;
+            var depth = reader.Depth;
+            while (reader.Read() && reader.Depth > depth)
+            {
+                if (reader.NodeType != XmlNodeType.Element)
+                    continue;
+
+                switch (reader.LocalName)
+                {
+                    case "Row":
+                        if (int.TryParse(reader.ReadElementContentAsString().Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedRow))
+                            row = parsedRow;
+                        break;
+                    case "Column":
+                        if (int.TryParse(reader.ReadElementContentAsString().Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedColumn))
+                            column = parsedColumn;
+                        break;
+                    case "Anchor":
+                        anchorText = reader.ReadElementContentAsString();
+                        break;
+                    case "Visible":
+                        visible = true;
+                        break;
+                }
+            }
+
+            if (row is null || column is null)
+                continue;
+
+            result[(row.Value, column.Value)] = (ParseCommentAnchor(anchorText, row.Value, column.Value), visible);
+        }
+
+        return result;
+    }
+
+    private static XSSFClientAnchor ParseCommentAnchor(string? anchorText, int row, int column)
+    {
+        if (anchorText is null)
+            return new XSSFClientAnchor(0, 0, 0, 0, column, row, column + 2, row + 4);
+
+        var parts = anchorText
+            .Split(',')
+            .Select(part => part.Trim())
+            .ToArray();
+        if (parts.Length != 8 || parts.Any(part => !int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)))
+            return new XSSFClientAnchor(0, 0, 0, 0, column, row, column + 2, row + 4);
+
+        var nums = parts.Select(part => int.Parse(part, CultureInfo.InvariantCulture)).ToArray();
+        return new XSSFClientAnchor(nums[1], nums[3], nums[5], nums[7], nums[0], nums[2], nums[4], nums[6]);
     }
 
     /// <summary>
@@ -2060,6 +2256,8 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteStartElement("Types");
         writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/content-types");
         WriteDefault(writer, "rels", "application/vnd.openxmlformats-package.relationships+xml");
+        if (_sheets.Any(sheet => sheet.HasComments))
+            WriteDefault(writer, "vml", "application/vnd.openxmlformats-officedocument.vmlDrawing");
         foreach (var pictureDefault in _pictures
             .GroupBy(picture => picture.Extension, StringComparer.Ordinal)
             .Select(group => group.First())
@@ -2082,6 +2280,10 @@ public sealed class XSSFWorkbook : IWorkbook
             if (sheet.Drawing is not null)
             {
                 WriteOverride(writer, $"/xl/drawings/drawing{sheet.Drawing.DrawingIndex}.xml", "application/vnd.openxmlformats-officedocument.drawing+xml");
+            }
+            if (sheet.HasComments)
+            {
+                WriteOverride(writer, $"/xl/comments{sheet.CommentsIndex}.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml");
             }
         }
         // Pivot table content types
@@ -2115,6 +2317,11 @@ public sealed class XSSFWorkbook : IWorkbook
         if (sheet.Drawing is not null)
         {
             WriteRelationship(writer, $"rId{relId++}", $"../drawings/drawing{sheet.Drawing!.DrawingIndex}.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing");
+        }
+        if (sheet.HasComments)
+        {
+            WriteRelationship(writer, $"rId{relId++}", $"../drawings/vmlDrawing{sheet.CommentsIndex}.vml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing");
+            WriteRelationship(writer, $"rId{relId++}", $"../comments{sheet.CommentsIndex}.xml", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments");
         }
         foreach (var hyperlink in sheet.Hyperlinks)
         {
@@ -2610,6 +2817,184 @@ public sealed class XSSFWorkbook : IWorkbook
         writer.WriteEndElement(); // sst
     }
 
+    private static void WriteComments(PoiXmlWriter writer, XSSFSheet sheet)
+    {
+        var comments = sheet.Comments.OrderBy(c => c.getRow()).ThenBy(c => c.getColumn()).ToList();
+        var authors = new List<string> { string.Empty };
+        foreach (var comment in comments)
+        {
+            var author = comment.getAuthor() ?? string.Empty;
+            if (!authors.Contains(author, StringComparer.Ordinal))
+                authors.Add(author);
+        }
+
+        writer.WriteStartElement("comments");
+        writer.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
+        writer.WriteStartElement("authors");
+        foreach (var author in authors)
+        {
+            writer.WriteStartElement("author");
+            writer.WriteString(author);
+            writer.WriteEndElement();
+        }
+        writer.WriteEndElement();
+
+        writer.WriteStartElement("commentList");
+        foreach (var comment in comments)
+        {
+            writer.WriteStartElement("comment");
+            writer.WriteAttributeString("ref", comment.CellRef);
+            writer.WriteAttributeString("authorId", authors.FindIndex(author => string.Equals(author, comment.getAuthor() ?? string.Empty, StringComparison.Ordinal)).ToString(CultureInfo.InvariantCulture));
+            writer.WriteStartElement("text");
+            WriteRichTextContent(writer, comment.getString() ?? new XSSFRichTextString(string.Empty));
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+        }
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+    }
+
+    private static void WriteRichTextContent(PoiXmlWriter writer, XSSFRichTextString rts)
+    {
+        if (rts.IsRichText)
+        {
+            foreach (var run in rts.Runs)
+            {
+                writer.WriteStartElement("r");
+                if (run.Bold || run.Italic || run.Underline || run.Strikethrough
+                    || run.FontSize > 0 || run.FontName is not null || run.Color is not null)
+                {
+                    writer.WriteStartElement("rPr");
+                    if (run.Bold) { writer.WriteStartElement("b"); writer.WriteEndElement(); }
+                    if (run.Italic) { writer.WriteStartElement("i"); writer.WriteEndElement(); }
+                    if (run.Underline) { writer.WriteStartElement("u"); writer.WriteEndElement(); }
+                    if (run.Strikethrough) { writer.WriteStartElement("strike"); writer.WriteEndElement(); }
+                    if (run.FontSize > 0)
+                    {
+                        writer.WriteStartElement("sz");
+                        writer.WriteAttributeString("val", run.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
+                        writer.WriteEndElement();
+                    }
+                    if (run.FontName is not null)
+                    {
+                        writer.WriteStartElement("rFont");
+                        writer.WriteAttributeString("val", run.FontName);
+                        writer.WriteEndElement();
+                    }
+                    if (run.Color is not null)
+                    {
+                        writer.WriteStartElement("color");
+                        writer.WriteAttributeString("rgb", run.Color);
+                        writer.WriteEndElement();
+                    }
+                    writer.WriteEndElement();
+                }
+                WriteTextElement(writer, run.Text);
+                writer.WriteEndElement();
+            }
+        }
+        else
+        {
+            WriteTextElement(writer, rts.getString());
+        }
+    }
+
+    private static void WriteTextElement(PoiXmlWriter writer, string text)
+    {
+        writer.WriteStartElement("t");
+        if (text.Length > 0 && (char.IsWhiteSpace(text[0]) || char.IsWhiteSpace(text[text.Length - 1])))
+            writer.WriteAttributeString("xml", "space", "preserve");
+        writer.WriteString(text);
+        writer.WriteEndElement();
+    }
+
+    private static void WriteCommentVml(PoiXmlWriter writer, XSSFSheet sheet)
+    {
+        writer.WriteStartElement("xml");
+        writer.WriteAttributeString("xmlns:v", "urn:schemas-microsoft-com:vml");
+        writer.WriteAttributeString("xmlns:o", "urn:schemas-microsoft-com:office:office");
+        writer.WriteAttributeString("xmlns:x", "urn:schemas-microsoft-com:office:excel");
+
+        writer.WriteStartElement("o", "shapelayout");
+        writer.WriteAttributeString("v", "ext", "edit");
+        writer.WriteStartElement("o", "idmap");
+        writer.WriteAttributeString("v", "ext", "edit");
+        writer.WriteAttributeString("data", "1");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+
+        writer.WriteStartElement("v", "shapetype");
+        writer.WriteAttributeString("id", "_x0000_t202");
+        writer.WriteAttributeString("coordsize", "21600,21600");
+        writer.WriteAttributeString("o", "spt", "202");
+        writer.WriteAttributeString("path", "m,l,21600r21600,l21600,xe");
+        writer.WriteStartElement("v", "stroke");
+        writer.WriteAttributeString("joinstyle", "miter");
+        writer.WriteEndElement();
+        writer.WriteStartElement("v", "path");
+        writer.WriteAttributeString("gradientshapeok", "t");
+        writer.WriteAttributeString("o", "connecttype", "rect");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+
+        var shapeId = 1025;
+        var zIndex = 1;
+        foreach (var comment in sheet.Comments.OrderBy(c => c.getRow()).ThenBy(c => c.getColumn()))
+        {
+            var anchor = comment.getClientAnchor() ?? new XSSFClientAnchor(0, 0, 0, 0, comment.getColumn(), comment.getRow(), comment.getColumn() + 2, comment.getRow() + 4);
+            writer.WriteStartElement("v", "shape");
+            writer.WriteAttributeString("id", "_x0000_s" + shapeId.ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("type", "#_x0000_t202");
+            writer.WriteAttributeString("style", "position:absolute;z-index:" + zIndex.ToString(CultureInfo.InvariantCulture) + (comment.isVisible() ? ";visibility:visible" : ";visibility:hidden"));
+            writer.WriteAttributeString("fillcolor", "#ffffe1");
+            writer.WriteAttributeString("o", "insetmode", "auto");
+            writer.WriteStartElement("v", "fill");
+            writer.WriteAttributeString("color2", "#ffffe1");
+            writer.WriteEndElement();
+            writer.WriteStartElement("v", "shadow");
+            writer.WriteAttributeString("on", "t");
+            writer.WriteAttributeString("color", "black");
+            writer.WriteAttributeString("obscured", "t");
+            writer.WriteEndElement();
+            writer.WriteStartElement("v", "path");
+            writer.WriteAttributeString("o", "connecttype", "none");
+            writer.WriteEndElement();
+            writer.WriteStartElement("v", "textbox");
+            writer.WriteAttributeString("style", "mso-direction-alt:auto");
+            writer.WriteRaw("<div style=\"text-align:left\"/>");
+            writer.WriteEndElement();
+            writer.WriteStartElement("x", "ClientData");
+            writer.WriteAttributeString("ObjectType", "Note");
+            writer.WriteStartElement("x", "MoveWithCells");
+            writer.WriteEndElement();
+            writer.WriteStartElement("x", "SizeWithCells");
+            writer.WriteEndElement();
+            writer.WriteStartElement("x", "Anchor");
+            writer.WriteString(string.Join(", ", anchor.Col1, anchor.Dx1, anchor.Row1, anchor.Dy1, anchor.Col2, anchor.Dx2, anchor.Row2, anchor.Dy2));
+            writer.WriteEndElement();
+            writer.WriteStartElement("x", "AutoFill");
+            writer.WriteString("False");
+            writer.WriteEndElement();
+            if (comment.isVisible())
+            {
+                writer.WriteStartElement("x", "Visible");
+                writer.WriteEndElement();
+            }
+            writer.WriteStartElement("x", "Row");
+            writer.WriteString(comment.getRow().ToString(CultureInfo.InvariantCulture));
+            writer.WriteEndElement();
+            writer.WriteStartElement("x", "Column");
+            writer.WriteString(comment.getColumn().ToString(CultureInfo.InvariantCulture));
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+            shapeId++;
+            zIndex++;
+        }
+
+        writer.WriteEndElement();
+    }
+
     private int CountStringCells()
     {
         var count = 0;
@@ -2730,6 +3115,13 @@ public sealed class XSSFWorkbook : IWorkbook
         {
             writer.WriteStartElement("drawing");
             writer.WriteAttributeString("r", "id", "rId1");
+            writer.WriteEndElement();
+        }
+        if (sheet.HasComments)
+        {
+            writer.WriteStartElement("legacyDrawing");
+            var legacyDrawingRelId = sheet.Drawing is not null ? "rId2" : "rId1";
+            writer.WriteAttributeString("r", "id", legacyDrawingRelId);
             writer.WriteEndElement();
         }
         writer.WriteEndElement();

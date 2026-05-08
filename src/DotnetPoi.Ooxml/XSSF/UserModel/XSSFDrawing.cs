@@ -44,6 +44,11 @@ public sealed class XSSFDrawing
         return picture;
     }
 
+    public XSSFComment createCellComment(XSSFClientAnchor anchor)
+    {
+        return _sheet.CreateCellComment(anchor);
+    }
+
     public IReadOnlyList<XSSFPicture> getShapes()
     {
         return _pictures;
