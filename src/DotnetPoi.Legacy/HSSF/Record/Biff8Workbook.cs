@@ -97,14 +97,14 @@ internal static class Biff8Workbook
 
     private static readonly (short index, string format)[] BuiltinFormats = new[]
     {
-        ((short)5, "General"),
-        ((short)6, "General"),
-        ((short)7, "General"),
-        ((short)8, "General"),
-        ((short)42, "General"),
-        ((short)41, "General"),
-        ((short)44, "General"),
-        ((short)43, "General")
+        ((short)5, "\"$\"#,##0_);(\"$\"#,##0)"),
+        ((short)6, "\"$\"#,##0_);[Red](\"$\"#,##0)"),
+        ((short)7, "\"$\"#,##0.00_);(\"$\"#,##0.00)"),
+        ((short)8, "\"$\"#,##0.00_);[Red](\"$\"#,##0.00)"),
+        ((short)42, "_(\"$\"* #,##0_);_(\"$\"* (#,##0);_(\"$\"* \"-\"_);_(@_)"),
+        ((short)41, "_(* #,##0_);_(* (#,##0);_(* \"-\"_);_(@_)"),
+        ((short)44, "_(\"$\"* #,##0.00_);_(\"$\"* (#,##0.00);_(\"$\"* \"-\"??_);_(@_)"),
+        ((short)43, "_(* #,##0.00_);_(* (#,##0.00);_(* \"-\"??_);_(@_)")
     };
 
     private static void WriteFormatRecords(Stream stream, HSSFWorkbook workbook)
@@ -1225,8 +1225,11 @@ internal static class Biff8Workbook
     {
         WriteRecord(stream, Selection, payload =>
         {
-            Span<byte> buffer = stackalloc byte[9];
+            Span<byte> buffer = stackalloc byte[15];
             buffer.Clear();
+            buffer[0] = 0x03; // pane
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(7), 1); // one selected range
+            // Ref8U for A1:A1: rwFirst/rwLast/colFirst/colLast are zero.
             payload.Write(buffer.ToArray(), 0, buffer.Length);
         });
     }

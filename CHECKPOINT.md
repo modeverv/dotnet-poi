@@ -3162,3 +3162,33 @@ Known gaps in current implementation:
 - With text boxes: with_textbox.ppt text blocks are merged into a single atom with embedded newlines (current SLWT grouping aggregates all text in one SlideAtomsSet)
 - Java Direction B test not yet added (requires Java-side Maven change)
 - Paragraph/run boundary preservation not yet implemented for HSLF (future HSLFTextParagraph/HSLFTextRun)
+
+## 2026-05-08 — Investigating Excel warning for manual-simple.xls
+
+- Task: `tools/manual-verification/generated-documents/manual-simple.xls` opens in Excel with Japanese warning `ファイル エラー : データが失われた可能性があります。`; investigate possible HSSF/BIFF corruption.
+- Scope: diagnosis first; do not commit per repository rule. Need inspect generated Workbook stream record-level structure and compare against Apache POI expectations.
+
+- Finding: generated HSSF workbooks wrote built-in FormatRecord indexes 5/6/7/8/41/42/43/44 as `General`; Apache POI writes the actual currency/comma/accounting format strings. STYLE records and built-in XFs reference those indexes, so Excel can repair/warn even though Java POI can read the file.
+- Change in progress: align `Biff8Workbook.BuiltinFormats` with Apache POI `InternalWorkbook.createFormat()` / `BuiltinFormats`, and add a BIFF record test.
+
+- Verification:
+  - `dotnet test tests/DotnetPoi.Legacy.Tests/DotnetPoi.Legacy.Tests.csproj --no-restore --filter "FullyQualifiedName~HSSFWorkbookTests"` passed: 36/36.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --no-restore --filter "FullyQualifiedName~Hssf"` passed: 10/10.
+  - Regenerated manual verification documents; `manual-simple.xls` Workbook stream now has POI-compatible FormatRecord payloads, length increased from 1094 to 1334 bytes.
+  - Java POI `HSSFWorkbook` can read regenerated `manual-simple.xls` and returns sheet `Workbook`, A1 `Manual verification`, B2 `97.2003`.
+- Remaining manual step: reopen regenerated `tools/manual-verification/generated-documents/manual-simple.xls` in Microsoft Excel to confirm the warning dialog is gone; this environment did not run Excel UI automation.
+
+## 2026-05-08 — Follow-up: Excel warning still appears for generated XLS
+
+- Task: user reports the doc dialog is gone, but XLS now shows `ファイル エラー : データが失われた可能性があります。`; user referenced `tools/manual-verification/generated-documents/manual-sample.xls` (likely intended `manual-simple.xls`). Continue investigation and fix.
+- Scope: no commit per repository rule. Preserve existing user changes.
+
+- Follow-up finding: `Selection` record (0x001D) in generated XLS was only 9 bytes with zero selected ranges. Apache POI writes the BIFF8 normal 15-byte payload with one A1:A1 selected range. Excel likely repairs this record and shows `データが失われた可能性があります`.
+- Change in progress: update `WriteSelection()` to emit the POI-compatible 15-byte selection record and add record-level coverage.
+
+- Verification after Selection fix:
+  - `dotnet test tests/DotnetPoi.Legacy.Tests/DotnetPoi.Legacy.Tests.csproj --no-restore --filter "FullyQualifiedName~HSSFWorkbookTests"` passed: 36/36.
+  - Regenerated manual verification documents; `manual-simple.xls` Workbook stream length is now 1340 bytes and `Selection` record is 15 bytes: `03 00 00 00 00 00 00 01 00 00 00 00 00 00 00`.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --no-restore --filter "FullyQualifiedName~Hssf"` passed: 10/10.
+  - Java POI `HSSFWorkbook` can read regenerated `manual-simple.xls` and returns sheet `Workbook`, A1 `Manual verification`, B2 `97.2003`.
+- Remaining manual step: reopen regenerated `tools/manual-verification/generated-documents/manual-simple.xls` in Microsoft Excel to confirm the warning dialog is gone.

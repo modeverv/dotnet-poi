@@ -417,6 +417,43 @@ public sealed class HSSFWorkbookTests
         var blankRecords = records.Where(r => r.Sid == 0x0201).ToList();
         Assert.Single(blankRecords);
         Assert.True(blankRecords[0].Data.Length >= 6, "Blank record too short.");
+
+        var selectionRecords = records.Where(r => r.Sid == 0x001D).ToList();
+        Assert.Single(selectionRecords);
+        Assert.Equal(15, selectionRecords[0].Data.Length);
+        Assert.Equal((byte)0x03, selectionRecords[0].Data[0]);
+        Assert.Equal((ushort)1, BinaryPrimitives.ReadUInt16LittleEndian(selectionRecords[0].Data.AsSpan(7)));
+    }
+
+    [Fact]
+    public void Write_BuiltinFormatRecords_MatchPoiDefaults()
+    {
+        // Excel repair-checks the style table more strictly than Java POI's reader does.
+        // These records are written by POI's InternalWorkbook.createFormat().
+        using var workbook = new HSSFWorkbook();
+        workbook.createSheet("Workbook");
+
+        using var ms = new MemoryStream();
+        workbook.write(ms);
+
+        using var cfStream = new MemoryStream(ms.ToArray());
+        var streams = CompoundFile.ReadStreams(cfStream);
+        var records = ReadBiffRecords(streams["Workbook"]);
+
+        var formats = records
+            .Where(r => r.Sid == 0x041E)
+            .ToDictionary(
+                r => BinaryPrimitives.ReadInt16LittleEndian(r.Data.AsSpan(0)),
+                r => ReadBiffUnicodeString(r.Data.AsSpan(2)));
+
+        Assert.Equal("\"$\"#,##0_);(\"$\"#,##0)", formats[5]);
+        Assert.Equal("\"$\"#,##0_);[Red](\"$\"#,##0)", formats[6]);
+        Assert.Equal("\"$\"#,##0.00_);(\"$\"#,##0.00)", formats[7]);
+        Assert.Equal("\"$\"#,##0.00_);[Red](\"$\"#,##0.00)", formats[8]);
+        Assert.Equal("_(\"$\"* #,##0_);_(\"$\"* (#,##0);_(\"$\"* \"-\"_);_(@_)", formats[42]);
+        Assert.Equal("_(* #,##0_);_(* (#,##0);_(* \"-\"_);_(@_)", formats[41]);
+        Assert.Equal("_(\"$\"* #,##0.00_);_(\"$\"* (#,##0.00);_(\"$\"* \"-\"??_);_(@_)", formats[44]);
+        Assert.Equal("_(* #,##0.00_);_(* (#,##0.00);_(* \"-\"??_);_(@_)", formats[43]);
     }
 
     [Fact]
@@ -723,6 +760,17 @@ public sealed class HSSFWorkbookTests
         }
 
         return records;
+    }
+
+    private static string ReadBiffUnicodeString(ReadOnlySpan<byte> data)
+    {
+        var length = BinaryPrimitives.ReadUInt16LittleEndian(data);
+        var isUtf16 = data[2] != 0;
+        var byteCount = length * (isUtf16 ? 2 : 1);
+        var bytes = data.Slice(3, byteCount).ToArray();
+        return isUtf16
+            ? System.Text.Encoding.Unicode.GetString(bytes)
+            : System.Text.Encoding.GetEncoding("ISO-8859-1").GetString(bytes);
     }
 
     private sealed record TestBiffRecord(ushort Sid, int Offset, int DataOffset, int TotalLength, byte[] Data);

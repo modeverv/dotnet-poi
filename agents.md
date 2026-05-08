@@ -702,6 +702,54 @@ integration:
 - Existing public namespaces and common user code are preserved unless an explicit migration note is written.
 - `DotnetPoi.Interop.Tests` が新 package layout でも Java POI Direction A/B を維持する。
 
+#### Phase 17 TODO
+- [-] *優先度高*
+   - [x] 1. *Release hygiene / CI 強化*
+      - =Common/POIFS/Legacy/Formula/Ooxml/All= の publish 順と tag 運用を固定
+      - NuGet install smoke を CI に追加
+      - README / NOW / package README の更新漏れを防ぐ
+   - [ ] 2. *xlsx chart creation*
+      - 既存 chart preservation はあるので、まず棒/折れ線/円グラフの新規作成
+      - 帳票・レポート用途で一番需要が出そう
+   - [ ] 3. *xlsx comments API*
+      - 既存コメント保存だけでなく read/create/edit
+      - レビュー済み Excel テンプレートで使われやすい
+   - [ ] 4. *docx text box read support*
+      - =w:txbxContent= のテキスト抽出
+      - Word 文書で「本文が読めない」系の体感バグをかなり減らせる
+   - [ ] 5. *docx table depth*
+      - cell merge、table borders、cell width、vertical alignment の API 化
+      - 帳票生成でかなり効く
+- [ ] *中優先*
+   - [ ] 6. *pptx chart creation*
+      - xlsx chart 実装の知見を流用
+      - 資料生成ユースケースに刺さる
+   - [ ] 7. *pptx layouts/masters の最小操作*
+      - 既存 preservation に加えて、title/content layout の読み取り・選択
+      - 「テンプレート pptx を軽編集」が強くなる
+   - [ ] 8. *Formula evaluator の明確な subset 拡張*
+      - =SUMIF=, =COUNTIF=, =IFERROR=, =VLOOKUP/XLOOKUP= あたり
+      - ただし “Excel 完全互換” を目指さず、README に関数表を置く
+   - [ ] 9. *HSSF/xls の実用補強*
+      - formula token write は重いので、先に hyperlinks/comments/filter の read/preservation/API
+      - 古い業務 Excel 対応として価値あり
+   - [ ] 10. *HWPF/doc の header/footer/table text extraction*
+      - 編集より読み取り優先
+      - アーカイブ文書の検索・移行用途に向く
+- [ ] *低優先 / 後回しでよさそう*
+   - [ ] 11. *HSLF/ppt の新規作成・編集*
+      - 需要はあるが重い。no-op preservation と text extraction があるなら当面十分
+   - [ ] 12. *SmartArt / animations / transitions*
+      - preservation で足りるケースが多い
+      - API 化コストに対してリターンが小さめ
+   - [ ] 13. *Full formula engine*
+      - 沼です。やるなら =Formula= 2.0 相当の別プロジェクト感覚
+   - [ ] 14. *Full Apache POI API parity*
+      - 1.0 後の目標としては広すぎる
+      - 実用ワークフロー単位で増やす方が良いです
+
+
+
 ---
 
 ## Porting Procedure (Per Class)
