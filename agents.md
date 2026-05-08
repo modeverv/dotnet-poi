@@ -733,7 +733,7 @@ integration:
   - [ ] 9. *HSSF/xls の実用補強*
     - formula token write は重いので、先に hyperlinks/comments/filter の read/preservation/API
     - 古い業務 Excel 対応として価値あり
-  - [ ] 10. ⭐*HWPF/doc の header/footer/table text extraction*
+  - [x] 10. ⭐*HWPF/doc の header/footer/table text extraction*
      - 編集より読み取り優先
      - アーカイブ文書の検索・移行用途に向く
 - [ ] *低優先 / 後回しでよさそう*

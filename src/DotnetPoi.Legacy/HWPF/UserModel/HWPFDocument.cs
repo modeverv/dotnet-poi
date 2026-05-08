@@ -30,12 +30,13 @@ public sealed class HWPFDocument : IDisposable
     private const int FibOffsetFcMac            = 28;   // fcMac = total byte length of WordDocument stream
     // fibRgLw97 fields (base at 64; each field = int32 at 64 + relative_offset)
     internal const int FibOffsetCcpText         = 76;   // fibRgLw97 base (64) + 0xC
-    private const int FibOffsetCcpFtn           = 80;   // 64 + 0x10
-    private const int FibOffsetCcpHdd           = 84;   // 64 + 0x14 (header/footer story)
-    private const int FibOffsetCcpAtn           = 92;   // 64 + 0x1C (annotation story)
-    private const int FibOffsetCcpEdn           = 96;   // 64 + 0x20 (endnote story)
-    private const int FibOffsetCcpTxbx          = 100;  // 64 + 0x24 (text box story)
-    private const int FibOffsetCcpHdrTxbx       = 104;  // 64 + 0x28 (header text-box story)
+    internal const int FibOffsetCcpFtn          = 80;   // 64 + 0x10
+    internal const int FibOffsetCcpHdd          = 84;   // 64 + 0x14 (header/footer story)
+    internal const int FibOffsetCcpMcr          = 88;   // 64 + 0x18
+    internal const int FibOffsetCcpAtn          = 92;   // 64 + 0x1C (annotation story)
+    internal const int FibOffsetCcpEdn          = 96;   // 64 + 0x20 (endnote story)
+    internal const int FibOffsetCcpTxbx         = 100;  // 64 + 0x24 (text box story)
+    internal const int FibOffsetCcpHdrTxbx      = 104;  // 64 + 0x28 (header text-box story)
     internal const int FibOffsetFcClx           = 418;  // fibRgFcLcb start (154) + CLX index 33 * 8
     internal const int FibOffsetLcbClx          = 422;  // fcClx + 4
     // fibRgFcLcb97: starts at byte 154. Each entry = 8 bytes (fc:int32 + lcb:int32)
@@ -92,7 +93,31 @@ public sealed class HWPFDocument : IDisposable
     public int getCcpText() => _fib.CcpText;
 
     /// <summary>Returns the main document range. Ported from HWPFDocument.getRange().</summary>
-    public Range getRange() => new(this, 0, _text.Length, _textModel, _chpSegments, _papSegments);
+    public Range getRange() => GetSubdocumentRange(0);
+
+    public Range getFootnoteRange() => GetSubdocumentRange(1);
+    public Range getHeaderStoryRange() => GetSubdocumentRange(2);
+    public Range getEndnoteRange() => GetSubdocumentRange(5);
+    public Range getMainTextboxRange() => GetSubdocumentRange(6);
+
+    private Range GetSubdocumentRange(int subdocumentIndex)
+    {
+        int startCp = 0;
+        int length = 0;
+        
+        // 0=Main, 1=Ftn, 2=Hdd, 3=Mcr, 4=Atn, 5=Edn, 6=Txbx, 7=HdrTxbx
+        int[] ccps = { _fib.CcpText, _fib.CcpFtn, _fib.CcpHdd, _fib.CcpMcr, _fib.CcpAtn, _fib.CcpEdn, _fib.CcpTxbx, _fib.CcpHdrTxbx };
+        for (int i = 0; i < ccps.Length; i++)
+        {
+            if (i == subdocumentIndex)
+            {
+                length = ccps[i];
+                break;
+            }
+            startCp += ccps[i];
+        }
+        return new Range(this, startCp, startCp + length, _textModel, _chpSegments, _papSegments);
+    }
 
     /// <summary>Returns parsed File Information Block fields used by the current HWPF reader.</summary>
     public HWPFFileInformationBlock getFileInformationBlock() => _fib;
@@ -695,8 +720,8 @@ public sealed class HWPFDocument : IDisposable
 /// </summary>
 public class Range
 {
-    private readonly HWPFDocument _document;
-    private readonly HWPFTextModel _model;
+    internal readonly HWPFDocument _document;
+    internal readonly HWPFTextModel _model;
     internal readonly List<(int CpStart, int CpEnd, HWPFChpProperties Chp)> _chpSegments;
     internal readonly List<(int CpStart, int CpEnd, HWPFPapProperties Pap)> _papSegments;
     private IReadOnlyList<Paragraph>? _paragraphs;
@@ -809,6 +834,37 @@ public class Range
     private static bool IsParagraphTerminator(char ch) =>
         ch is '\r' or '\f' or '\a';
 
+    public Table getTable(Paragraph paragraph)
+    {
+        if (!paragraph.isInTable())
+            throw new ArgumentException("This paragraph is not in a table");
+
+        int levelNum = paragraph.getTableLevel();
+        if (levelNum == 0) levelNum = 1;
+
+        var paragraphs = GetParagraphs();
+        int pIndex = -1;
+        for (int i = 0; i < paragraphs.Count; i++)
+        {
+            if (paragraphs[i].getStartOffset() == paragraph.getStartOffset())
+            {
+                pIndex = i;
+                break;
+            }
+        }
+        if (pIndex < 0) throw new ArgumentException("Paragraph not found in this range");
+
+        int startIndex = pIndex;
+        while (startIndex > 0 && paragraphs[startIndex - 1].isInTable() && paragraphs[startIndex - 1].getTableLevel() >= levelNum)
+            startIndex--;
+
+        int endIndex = pIndex;
+        while (endIndex < paragraphs.Count - 1 && paragraphs[endIndex + 1].isInTable() && paragraphs[endIndex + 1].getTableLevel() >= levelNum)
+            endIndex++;
+
+        return new Table(_document, paragraphs[startIndex].getStartOffset(), paragraphs[endIndex].getEndOffset(), _model, levelNum, _chpSegments, _papSegments);
+    }
+
     private static int Clamp(int value, int min, int max)
     {
         if (value < min) return min;
@@ -830,19 +886,23 @@ public sealed class Paragraph : Range
     }
 
     public int getJustification() => _pap.Justification;
+
+    public bool isInTable() => _pap.InTable;
+
+    public bool isTableRowEnd() => _pap.TableRowEnd;
+
+    public int getTableLevel() => _pap.TableLevel;
 }
 
 /// <summary>Minimal read-only port of org.apache.poi.hwpf.usermodel.CharacterRun.</summary>
 public sealed class CharacterRun : Range
 {
-    private readonly HWPFDocument _document;
     private readonly HWPFTextPiece? _piece;
     private readonly HWPFChpProperties _chp;
 
     internal CharacterRun(HWPFDocument document, int start, int end, HWPFTextModel model, HWPFTextPiece? piece, HWPFChpProperties chp)
         : base(document, start, end, model, null)
     {
-        _document = document;
         _piece = piece;
         _chp = chp;
     }
@@ -936,6 +996,13 @@ public sealed class HWPFFileInformationBlock
         int lcbClx,
         int fcStshf,
         int lcbStshf,
+        int ccpFtn,
+        int ccpHdd,
+        int ccpMcr,
+        int ccpAtn,
+        int ccpEdn,
+        int ccpTxbx,
+        int ccpHdrTxbx,
         string declaredTableStreamName,
         string? selectedTableStreamName,
         bool usedTableStreamFallback,
@@ -947,6 +1014,13 @@ public sealed class HWPFFileInformationBlock
         LcbClx = lcbClx;
         FcStshf = fcStshf;
         LcbStshf = lcbStshf;
+        CcpFtn = ccpFtn;
+        CcpHdd = ccpHdd;
+        CcpMcr = ccpMcr;
+        CcpAtn = ccpAtn;
+        CcpEdn = ccpEdn;
+        CcpTxbx = ccpTxbx;
+        CcpHdrTxbx = ccpHdrTxbx;
         DeclaredTableStreamName = declaredTableStreamName;
         SelectedTableStreamName = selectedTableStreamName;
         UsedTableStreamFallback = usedTableStreamFallback;
@@ -965,6 +1039,14 @@ public sealed class HWPFFileInformationBlock
     public int FcStshf { get; }
 
     public int LcbStshf { get; }
+
+    public int CcpFtn { get; }
+    public int CcpHdd { get; }
+    public int CcpMcr { get; }
+    public int CcpAtn { get; }
+    public int CcpEdn { get; }
+    public int CcpTxbx { get; }
+    public int CcpHdrTxbx { get; }
 
     public string DeclaredTableStreamName { get; }
 
@@ -1007,6 +1089,13 @@ public sealed class HWPFFileInformationBlock
             HWPFDocument.GetFibLcbClx(main),
             BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(HWPFDocument.FibOffsetFcStshf)),
             BinaryPrimitives.ReadInt32LittleEndian(main.AsSpan(HWPFDocument.FibOffsetLcbStshf)),
+            HWPFDocument.ReadInt32Safe(main, HWPFDocument.FibOffsetCcpFtn),
+            HWPFDocument.ReadInt32Safe(main, HWPFDocument.FibOffsetCcpHdd),
+            HWPFDocument.ReadInt32Safe(main, HWPFDocument.FibOffsetCcpMcr),
+            HWPFDocument.ReadInt32Safe(main, HWPFDocument.FibOffsetCcpAtn),
+            HWPFDocument.ReadInt32Safe(main, HWPFDocument.FibOffsetCcpEdn),
+            HWPFDocument.ReadInt32Safe(main, HWPFDocument.FibOffsetCcpTxbx),
+            HWPFDocument.ReadInt32Safe(main, HWPFDocument.FibOffsetCcpHdrTxbx),
             declaredTableStreamName,
             selectedTableStreamName,
             usedFallback,
@@ -1083,6 +1172,9 @@ internal sealed class HWPFPapProperties
     internal static HWPFPapProperties Default { get; } = new();
 
     internal byte Justification { get; set; } // 0=left, 1=center, 2=right, 3=justified
+    internal bool InTable { get; set; }
+    internal bool TableRowEnd { get; set; }
+    internal int TableLevel { get; set; }
 
     internal static HWPFPapProperties ParsePapx(ReadOnlySpan<byte> papx)
     {
@@ -1113,20 +1205,45 @@ internal sealed class HWPFPapProperties
             switch (spra)
             {
                 case 0: case 1: opSize = 1; break;
-                case 2: case 4: opSize = 2; break;
+                case 2: case 4: case 5: opSize = 2; break;
                 case 3: opSize = 4; break;
                 case 7: opSize = 3; break;
-                case 5: opSize = pos < sprms.Length ? sprms[pos] + 1 : 0; break;
-                case 6: opSize = pos < sprms.Length ? sprms[pos] + 1 : 0; break;
+                case 6: 
+                    if (sprm == 0xd608 || sprm == 0xc615)
+                    {
+                        opSize = pos + 1 < sprms.Length ? BinaryPrimitives.ReadUInt16LittleEndian(sprms.Slice(pos)) + 1 : 0;
+                    }
+                    else
+                    {
+                        opSize = pos < sprms.Length ? sprms[pos] + 1 : 0;
+                    }
+                    break;
                 default: return;
             }
             if (pos + opSize > sprms.Length) break;
             var operand = sprms.Slice(pos, opSize);
             pos += opSize;
 
+            if (sprm == 0x2416 || sprm == 0x6649 || sprm == 0x2417)
+            {
+                Console.WriteLine($"Found table SPRM: {sprm:X4}");
+            }
+
             if (sprm == 0x2403) // sprmPJc
             {
                 props.Justification = operand[0];
+            }
+            else if (sprm == 0x2416) // sprmPFInTable
+            {
+                props.InTable = operand[0] != 0;
+            }
+            else if (sprm == 0x2417) // sprmPFTtp
+            {
+                props.TableRowEnd = operand[0] != 0;
+            }
+            else if (sprm == 0x6649) // sprmPItap
+            {
+                props.TableLevel = BinaryPrimitives.ReadInt32LittleEndian(operand);
             }
         }
     }
@@ -1146,4 +1263,96 @@ internal static class LocaleUtil1252
         }
         return _enc.GetString(data, offset, count);
     }
+}
+
+/// <summary>Minimal read-only port of org.apache.poi.hwpf.usermodel.Table.</summary>
+public sealed class Table : Range
+{
+    private IReadOnlyList<TableRow>? _rows;
+    private readonly int _tableLevel;
+
+    internal Table(HWPFDocument document, int start, int end, HWPFTextModel model, int tableLevel,
+        List<(int CpStart, int CpEnd, HWPFChpProperties Chp)>? chpSegments,
+        List<(int CpStart, int CpEnd, HWPFPapProperties Pap)>? papSegments)
+        : base(document, start, end, model, chpSegments, papSegments)
+    {
+        _tableLevel = tableLevel;
+    }
+
+    public int getTableLevel() => _tableLevel;
+
+    public int numRows() => GetRows().Count;
+
+    public TableRow getRow(int index) => GetRows()[index];
+
+    private IReadOnlyList<TableRow> GetRows()
+    {
+        if (_rows is not null) return _rows;
+        var rows = new List<TableRow>();
+        var paragraphs = GetParagraphs();
+        int rowStart = Start;
+        foreach (var p in paragraphs)
+        {
+            if (p.isTableRowEnd() && p.getTableLevel() == _tableLevel)
+            {
+                rows.Add(new TableRow(_document, rowStart, p.getEndOffset(), _model, _tableLevel, _chpSegments, _papSegments));
+                rowStart = p.getEndOffset();
+            }
+        }
+        if (rowStart < End && rows.Count == 0)
+        {
+            rows.Add(new TableRow(_document, rowStart, End, _model, _tableLevel, _chpSegments, _papSegments));
+        }
+        _rows = rows;
+        return _rows;
+    }
+}
+
+/// <summary>Minimal read-only port of org.apache.poi.hwpf.usermodel.TableRow.</summary>
+public sealed class TableRow : Range
+{
+    private IReadOnlyList<TableCell>? _cells;
+    private readonly int _tableLevel;
+
+    internal TableRow(HWPFDocument document, int start, int end, HWPFTextModel model, int tableLevel,
+        List<(int CpStart, int CpEnd, HWPFChpProperties Chp)>? chpSegments,
+        List<(int CpStart, int CpEnd, HWPFPapProperties Pap)>? papSegments)
+        : base(document, start, end, model, chpSegments, papSegments)
+    {
+        _tableLevel = tableLevel;
+    }
+
+    public int numCells() => GetCells().Count;
+
+    public TableCell getCell(int index) => GetCells()[index];
+
+    private IReadOnlyList<TableCell> GetCells()
+    {
+        if (_cells is not null) return _cells;
+        var cells = new List<TableCell>();
+        var paragraphs = GetParagraphs();
+        int cellStart = Start;
+        foreach (var p in paragraphs)
+        {
+            var txt = p.text();
+            if (txt.EndsWith("\a", StringComparison.Ordinal) || txt.EndsWith("\a\r", StringComparison.Ordinal) || txt.EndsWith("\r\a", StringComparison.Ordinal))
+            {
+                cells.Add(new TableCell(_document, cellStart, p.getEndOffset(), _model, _chpSegments, _papSegments));
+                cellStart = p.getEndOffset();
+            }
+        }
+        if (cellStart < End)
+            cells.Add(new TableCell(_document, cellStart, End, _model, _chpSegments, _papSegments));
+        _cells = cells;
+        return _cells;
+    }
+}
+
+/// <summary>Minimal read-only port of org.apache.poi.hwpf.usermodel.TableCell.</summary>
+public sealed class TableCell : Range
+{
+    internal TableCell(HWPFDocument document, int start, int end, HWPFTextModel model,
+        List<(int CpStart, int CpEnd, HWPFChpProperties Chp)>? chpSegments,
+        List<(int CpStart, int CpEnd, HWPFPapProperties Pap)>? papSegments)
+        : base(document, start, end, model, chpSegments, papSegments) { }
 }

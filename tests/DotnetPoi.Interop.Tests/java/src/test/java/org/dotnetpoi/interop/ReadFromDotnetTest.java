@@ -869,6 +869,35 @@ public class ReadFromDotnetTest {
         }
     }
 
+    @Test
+    void readPhase17HwpfDocExtraction() throws Exception {
+        // Phase 17: Direction B — Java POI reads dotnet-poi no-op saved docs with headers/tables
+        Path headerFixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase17-headerfooter.doc");
+        Path tableFixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase17-innertable.doc");
+        
+        assertTrue(Files.exists(headerFixture), "Run the C# Write_Phase17HwpfDocExtraction_CreatesFixtureForPoi test first.");
+        assertTrue(Files.exists(tableFixture), "Run the C# Write_Phase17HwpfDocExtraction_CreatesFixtureForPoi test first.");
+
+        try (InputStream input = Files.newInputStream(headerFixture);
+             org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument(input)) {
+            String headerText = doc.getHeaderStoryRange().text();
+            assertTrue(headerText.contains("Molière"));
+        }
+
+        try (InputStream input = Files.newInputStream(tableFixture);
+             org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument(input)) {
+            org.apache.poi.hwpf.usermodel.Range range = doc.getRange();
+            boolean foundTable = false;
+            for (int i = 0; i < range.numParagraphs(); i++) {
+                if (range.getParagraph(i).isInTable()) {
+                    foundTable = true;
+                    break;
+                }
+            }
+            assertTrue(foundTable, "Table should be correctly preserved in innertable.doc");
+        }
+    }
+
     private static Path findRepoRoot() {
         Path current = Paths.get("").toAbsolutePath();
         while (current != null) {

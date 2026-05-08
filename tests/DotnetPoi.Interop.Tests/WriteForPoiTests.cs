@@ -204,6 +204,38 @@ public class WriteForPoiTests
     [Fact]
     [Trait("Category", "WriteForPoi")]
     [Trait("Format", "Legacy")]
+    public void Write_Phase17HwpfDocExtraction_CreatesFixtureForPoi()
+    {
+        // Phase 17: Direction B — dotnet-poi no-op saves docs with headers/tables → Java POI reads
+        var headerFixturePath = GetFixturePath("phase17-headerfooter.doc");
+        var tableFixturePath = GetFixturePath("phase17-innertable.doc");
+        Directory.CreateDirectory(Path.GetDirectoryName(headerFixturePath)!);
+
+        var repoRoot = GetRepoRoot();
+        var headerSource = Path.Combine(repoRoot, "poi", "test-data", "document", "HeaderFooterUnicode.doc");
+        var tableSource = Path.Combine(repoRoot, "poi", "test-data", "document", "innertable.doc");
+
+        using (var input = File.OpenRead(headerSource))
+        using (var doc = new DotnetPoi.HWPF.UserModel.HWPFDocument(input))
+        using (var output = File.Create(headerFixturePath))
+        {
+            doc.write(output);
+        }
+
+        using (var input = File.OpenRead(tableSource))
+        using (var doc = new DotnetPoi.HWPF.UserModel.HWPFDocument(input))
+        using (var output = File.Create(tableFixturePath))
+        {
+            doc.write(output);
+        }
+
+        Assert.True(File.Exists(headerFixturePath));
+        Assert.True(File.Exists(tableFixturePath));
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "Legacy")]
     public void Write_Phase15HslfNoOp_CreatesFixtureForPoi()
     {
         // Phase 15 Item 7: Direction B — dotnet-poi no-op saves a .ppt → Java POI reads

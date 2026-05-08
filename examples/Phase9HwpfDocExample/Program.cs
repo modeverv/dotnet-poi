@@ -5,37 +5,45 @@ using DotnetPoi.HWPF.UserModel;
 
 var repoRoot = FindRepositoryRoot(AppContext.BaseDirectory);
 var inputPath = Path.Combine(repoRoot, "poi", "test-data", "document", "SampleDoc.doc");
+var headerInputPath = Path.Combine(repoRoot, "poi", "test-data", "document", "HeaderFooterUnicode.doc");
+var tableInputPath = Path.Combine(repoRoot, "poi", "test-data", "document", "innertable.doc");
 var outputPath = Path.Combine(repoRoot, "examples", "output", "phase9-hwpf-doc-example.doc");
 
-if (!File.Exists(inputPath))
-{
-    Console.WriteLine($"Input fixture not found: {inputPath}");
-    Console.WriteLine("Please ensure the poi submodule is initialized.");
-    return;
-}
-
-Console.WriteLine($"Reading legacy .doc file: {inputPath}");
-using (var stream = File.OpenRead(inputPath))
+Console.WriteLine($"Reading HeaderFooterUnicode.doc file: {headerInputPath}");
+using (var stream = File.OpenRead(headerInputPath))
 using (var doc = new HWPFDocument(stream))
 {
-    // 1. Basic text extraction
-    string text = doc.getText();
-    Console.WriteLine("--- Extracted Text ---");
-    Console.WriteLine(text.Length > 200 ? text.Substring(0, 200) + "..." : text);
-    Console.WriteLine("----------------------");
-
-    // 2. Limited body editing
-    Console.WriteLine("Appending a paragraph and saving...");
-    doc.appendParagraph("\nThis paragraph was added by dotnet-poi HWPF.");
-    
-    Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-    using (var output = File.Create(outputPath))
-    {
-        doc.write(output);
-    }
+    Console.WriteLine("--- Header Story Text ---");
+    Console.WriteLine(doc.getHeaderStoryRange().text());
 }
 
-Console.WriteLine($"Saved edited .doc to: {outputPath}");
+Console.WriteLine($"Reading innertable.doc file: {tableInputPath}");
+using (var stream = File.OpenRead(tableInputPath))
+using (var doc = new HWPFDocument(stream))
+{
+    Console.WriteLine("--- Tables ---");
+    var range = doc.getRange();
+    for (int i = 0; i < range.numParagraphs(); i++)
+    {
+        var p = range.getParagraph(i);
+        if (p.isInTable())
+        {
+            var table = range.getTable(p);
+            Console.WriteLine($"Table Level: {table.getTableLevel()}, Rows: {table.numRows()}");
+            for (int r = 0; r < table.numRows(); r++)
+            {
+                var row = table.getRow(r);
+                Console.WriteLine($"  Row {r}, Cells: {row.numCells()}");
+                for (int c = 0; c < row.numCells(); c++)
+                {
+                    Console.WriteLine($"    Cell {c}: {row.getCell(c).text().Replace("\r", "\\r").Replace("\a", "\\a")}");
+                }
+            }
+            // Skip paragraphs in this table
+            i += table.numParagraphs() - 1;
+        }
+    }
+}
 
 static string FindRepositoryRoot(string startDirectory)
 {
