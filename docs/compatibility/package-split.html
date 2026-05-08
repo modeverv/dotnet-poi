@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Package Split Architecture | dotnet-poi Documentation</title>
+  <title>Package Split: Core vs Formula | dotnet-poi Documentation</title>
   <meta name="description" content="Apache POI-compatible un-official .NET library for Office files, focused on faithful round-trip and Java POI interop.">
   <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -97,62 +97,46 @@
       </nav>
     </aside>
     <main class="content">
-<h1>Package Split Architecture</h1>
-<p>dotnet-poi uses a <strong>multi-package architecture</strong> with clear separation of concerns. This was designed to let OOXML stability advance independently of legacy binary format development.</p>
-<h2>The Packages</h2>
+<h1>Package Split: Core vs Formula</h1>
+<p>dotnet-poi ships as <strong>two separate NuGet packages</strong> to decouple Core stability from Formula maturity.</p>
+<h2>The Two Packages</h2>
 <table>
 <thead><tr><th>Package</th><th>NuGet ID</th><th>Contents</th><th>Stability</th></tr></thead>
 <tbody>
-<tr><td>Ooxml</td><td><code>DotnetPoi.Ooxml</code></td><td>XSSF (xlsx/xlsm), XWPF (docx/docm), XSLF (pptx/pptm) + OPC/openxml + POIFS + Common</td><td><strong>Stable</strong> — ready for v1.0</td></tr>
-<tr><td>Legacy</td><td><code>DotnetPoi.Legacy</code></td><td>HSSF (xls), HWPF (doc), HSLF (ppt) + POIFS + Common</td><td><strong>In development</strong></td></tr>
+<tr><td>Core</td><td><code>DotnetPoi.Core</code></td><td>All format implementations (XSSF/xlsx, HSSF/xls, XWPF/docx, XSLF/pptx, HWPF/doc, HSLF/ppt, POIFS) + common interfaces + XML writer</td><td><strong>Stable</strong> — ready for v1.0</td></tr>
 <tr><td>Formula</td><td><code>DotnetPoi.Formula</code></td><td>Limited formula evaluator (<code>IFormulaEvaluator</code>, <code>FormulaEvaluator</code>, <code>CellValue</code>)</td><td><strong>Experimental</strong> — intentionally small subset</td></tr>
-<tr><td>Common</td><td><code>DotnetPoi.Common</code></td><td>SS interfaces, shared enums, common exceptions, XML writer foundation</td><td><strong>Stable</strong> (transitive)</td></tr>
-<tr><td>POIFS</td><td><code>DotnetPoi.POIFS</code></td><td>OLE2/CFB compound file container, encryption helpers</td><td><strong>Stable</strong> (transitive)</td></tr>
-<tr><td><strong>All</strong></td><td><code>DotnetPoi.All</code></td><td>Meta-package referencing all of the above</td><td><strong>Smoke-tested</strong></td></tr>
 </tbody>
 </table>
 <h2>Design Rules</h2>
-<p>1. <strong>Format packages have zero knowledge of <code>Formula</code>.</strong> No compile-time dependency. Ooxml and Legacy work perfectly without Formula. 2. <strong>Formula references Ooxml (or Legacy).</strong> It consumes types like <code>ICell</code>, <code>IWorkbook</code>. 3. <strong>Auto-discovery at runtime.</strong> Formula registers itself via a static constructor. When you call <code>createFormulaEvaluator()</code>, the format package uses lazy assembly discovery (<code>Type.GetType</code> + <code>RuntimeHelpers.RunClassConstructor</code>) to find and activate Formula automatically. 4. <strong>Graceful fallback.</strong> If Formula is not installed, <code>createFormulaEvaluator()</code> throws a clear <code>NotSupportedException</code>.</p>
+<p>1. <strong>Core has zero knowledge of Formula.</strong> No compile-time dependency. Core works perfectly without Formula. 2. <strong>Formula references Core.</strong> It consumes Core types like <code>ICell</code>, <code>IWorkbook</code>. 3. <strong>Auto-discovery at runtime.</strong> Formula registers itself via a static constructor. When you call <code>createFormulaEvaluator()</code>, Core uses lazy assembly discovery (<code>Type.GetType</code> + <code>RuntimeHelpers.RunClassConstructor</code>) to find and activate Formula automatically. 4. <strong>Graceful fallback.</strong> If Formula is not installed, <code>createFormulaEvaluator()</code> throws a clear <code>NotSupportedException</code>.</p>
 <h2>What Goes Where</h2>
 <table>
 <thead><tr><th>Feature</th><th>Package</th><th>Reason</th></tr></thead>
 <tbody>
-<tr><td>Read/write xlsx, docx, pptx</td><td>Ooxml</td><td>OOXML format operations</td></tr>
-<tr><td>Read/write xls, doc, ppt</td><td>Legacy</td><td>Legacy binary format operations</td></tr>
-<tr><td>Cell values, styles, layout</td><td>Ooxml (xlsx) / Legacy (xls)</td><td>No evaluation needed</td></tr>
-<tr><td>Formula text read/write</td><td>Ooxml (xlsx) / Legacy (xls)</td><td>Preserving formula text + cached values</td></tr>
-<tr><td><code>setCellFormula</code> / <code>getCellFormula</code></td><td>Ooxml (xlsx) / Legacy (xls)</td><td>Text operations</td></tr>
-<tr><td><code>calcPr fullCalcOnLoad</code></td><td>Ooxml</td><td>Tell Excel to recalculate on open</td></tr>
-<tr><td><code>createFormulaEvaluator()</code></td><td>Ooxml/Legacy (factory), Formula (impl)</td><td>Factory in format package, evaluator in Formula</td></tr>
+<tr><td>Read/write xlsx, xls, docx, pptx</td><td>Core</td><td>Core format operations</td></tr>
+<tr><td>Cell values, styles, layout</td><td>Core</td><td>No evaluation needed</td></tr>
+<tr><td>Formula text read/write</td><td>Core</td><td>Preserving formula text + cached values</td></tr>
+<tr><td><code>setCellFormula</code> / <code>getCellFormula</code></td><td>Core</td><td>Text operations</td></tr>
+<tr><td><code>calcPr fullCalcOnLoad</code></td><td>Core</td><td>Tell Excel to recalculate on open</td></tr>
+<tr><td><code>createFormulaEvaluator()</code></td><td>Core (factory), Formula (impl)</td><td>Factory in Core, evaluator in Formula</td></tr>
 <tr><td><code>evaluate()</code> / <code>evaluateAll()</code> for supported simple expressions</td><td>Formula</td><td>Limited calculation subset</td></tr>
 <tr><td><code>evaluateFormulaCell()</code> for supported simple expressions</td><td>Formula</td><td>Refresh cached result when the formula is in scope</td></tr>
 </tbody>
 </table>
 <h2>Why This Split</h2>
 <ul>
-<li><strong>Ooxml can be stable early.</strong> All OOXML read/write/format logic is self-contained. No dependency on legacy binary development.</li>
-<li><strong>Legacy can evolve safely.</strong> HSSF/HWPF/HSLF development can proceed without destabilizing OOXML users.</li>
+<li><strong>Core can be stable early.</strong> All spreadsheet read/write/format logic is self-contained.</li>
 <li><strong>Formula can stay narrow.</strong> Evaluation is complex; full Excel-compatible calculation is not a current project goal.</li>
-<li><strong>Smaller dependency for simple use cases.</strong> Users who only need xlsx read/write don&#39;t pull in legacy format code.</li>
+<li><strong>Smaller dependency for simple use cases.</strong> Users who only need xlsx read/write don&#39;t pull in the formula engine.</li>
 <li><strong>Security.</strong> Applications handling untrusted documents can omit the formula evaluator entirely, reducing attack surface.</li>
 </ul>
-<h2>Installation Examples</h2>
-<pre><code class="language-xml">&lt;!-- OOXML only: xlsx / docx / pptx --&gt;
-&lt;PackageReference Include=&quot;DotnetPoi.Ooxml&quot; Version=&quot;...&quot; /&gt;
+<h2>Installation</h2>
+<pre><code class="language-xml">&lt;!-- Read/write only --&gt;
+&lt;PackageReference Include=&quot;DotnetPoi.Core&quot; Version=&quot;...&quot; /&gt;
 
-&lt;!-- OOXML + formula evaluation --&gt;
-&lt;PackageReference Include=&quot;DotnetPoi.Ooxml&quot; Version=&quot;...&quot; /&gt;
-&lt;PackageReference Include=&quot;DotnetPoi.Formula&quot; Version=&quot;...&quot; /&gt;
-
-&lt;!-- Legacy binary only: xls / doc / ppt --&gt;
-&lt;PackageReference Include=&quot;DotnetPoi.Legacy&quot; Version=&quot;...&quot; /&gt;
-
-&lt;!-- Legacy + formula evaluation --&gt;
-&lt;PackageReference Include=&quot;DotnetPoi.Legacy&quot; Version=&quot;...&quot; /&gt;
-&lt;PackageReference Include=&quot;DotnetPoi.Formula&quot; Version=&quot;...&quot; /&gt;
-
-&lt;!-- Everything with one dependency --&gt;
-&lt;PackageReference Include=&quot;DotnetPoi.All&quot; Version=&quot;...&quot; /&gt;</code></pre>
+&lt;!-- Add formula evaluation --&gt;
+&lt;PackageReference Include=&quot;DotnetPoi.Core&quot; Version=&quot;...&quot; /&gt;
+&lt;PackageReference Include=&quot;DotnetPoi.Formula&quot; Version=&quot;...&quot; /&gt;</code></pre>
 
     </main>
   </div>

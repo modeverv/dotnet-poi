@@ -29,8 +29,8 @@ NuGet automatically resolves transitive dependencies (`DotnetPoi.Common`, `Dotne
 
 ### HWPF (Word 97-2003)
 
-- **Supported:** OLE2 open; FIB parsing; main body text extraction (CLX/piece table); header/footer and table text extraction; basic Range/Paragraph/Run model; bold/italic/size/font; no-op write; append paragraph; simple text replacement; OLE preservation.
-- **Not yet modeled:** Images; footnotes; comments; fields; bookmarks.
+- **Supported:** OLE2 open; FIB parsing; main body text extraction (CLX/piece table); basic Range/Paragraph/Run model; bold/italic/size/font; no-op write; append paragraph; simple text replacement; OLE preservation.
+- **Not yet modeled:** Tables; images; header/footer; footnotes; comments; fields; bookmarks.
 
 ### HSLF (PowerPoint 97-2003)
 

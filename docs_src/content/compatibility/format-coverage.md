@@ -39,11 +39,11 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Links | hyperlinks (external URLs) | ✅ | |
 | Images | inline images with rotation | ✅ | |
 | Images | floating (anchored) images | 🔵 | `<wp:anchor>` elements preserved via raw XML capture/re-emission |
-| Images | text boxes (w:txbxContent) | ❌ | |
+| Images | text boxes (w:txbxContent) | ✅ | Text extraction from inline and anchored drawing textboxes is supported |
 | Annotations | comments | 🔵 | Existing parts round-trip via `_preservedEntries` |
 | Annotations | footnotes, endnotes | 🔵 | `word/footnotes.xml` / `word/endnotes.xml` round-trip preserved |
 | Fields | TOC, page numbers, mail merge | ✅ | Write/read/round-trip |
-| SDT | content controls (block-level and inline) | 🔵 | Block-level `w:sdt` in `w:body` and inline `w:sdt` inside `w:p` preserved via raw XML capture/re-emission. Text boxes (`w:txbxContent`) deeply nested inside DrawingML and not yet covered. |
+| SDT | content controls (block-level and inline) | 🔵 | Block-level `w:sdt` in `w:body` and inline `w:sdt` inside `w:p` preserved via raw XML capture/re-emission. |
 | Styles | paragraph style reference (pStyle) | ✅ | `setStyle()`/`getStyleID()` API, round-trip verified. `word/styles.xml` 🔵 preserved + default styles auto-generated. Character/table styles ❌ |
 | Track Changes | revision marks | ❌ | |
 | Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries` |
@@ -101,3 +101,4 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Format | Status | Notes |
 |---|---|---|
 | ppt (HSLF) | ~5% | Minimal reader can open OLE2 `.ppt` and scan `PowerPoint Document` for TextChars/TextBytes atoms. No no-op write or interop coverage yet. |
+SLF) | ~5% | Minimal reader can open OLE2 `.ppt` and scan `PowerPoint Document` for TextChars/TextBytes atoms. No no-op write or interop coverage yet. |

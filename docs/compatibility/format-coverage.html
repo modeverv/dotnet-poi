@@ -137,11 +137,11 @@
 <tr><td>Links</td><td>hyperlinks (external URLs)</td><td>✅</td></tr>
 <tr><td>Images</td><td>inline images with rotation</td><td>✅</td></tr>
 <tr><td>Images</td><td>floating (anchored) images</td><td>&#128309;</td><td><code>&lt;wp:anchor&gt;</code> elements preserved via raw XML capture/re-emission</td></tr>
-<tr><td>Images</td><td>text boxes (w:txbxContent)</td><td>❌</td></tr>
+<tr><td>Images</td><td>text boxes (w:txbxContent)</td><td>✅</td><td>Text extraction from inline and anchored drawing textboxes is supported</td></tr>
 <tr><td>Annotations</td><td>comments</td><td>&#128309;</td><td>Existing parts round-trip via <code>_preservedEntries</code></td></tr>
 <tr><td>Annotations</td><td>footnotes, endnotes</td><td>&#128309;</td><td><code>word/footnotes.xml</code> / <code>word/endnotes.xml</code> round-trip preserved</td></tr>
 <tr><td>Fields</td><td>TOC, page numbers, mail merge</td><td>✅</td><td>Write/read/round-trip</td></tr>
-<tr><td>SDT</td><td>content controls (block-level and inline)</td><td>&#128309;</td><td>Block-level <code>w:sdt</code> in <code>w:body</code> and inline <code>w:sdt</code> inside <code>w:p</code> preserved via raw XML capture/re-emission. Text boxes (<code>w:txbxContent</code>) deeply nested inside DrawingML and not yet covered.</td></tr>
+<tr><td>SDT</td><td>content controls (block-level and inline)</td><td>&#128309;</td><td>Block-level <code>w:sdt</code> in <code>w:body</code> and inline <code>w:sdt</code> inside <code>w:p</code> preserved via raw XML capture/re-emission.</td></tr>
 <tr><td>Styles</td><td>paragraph style reference (pStyle)</td><td>✅</td><td><code>setStyle()</code>/<code>getStyleID()</code> API, round-trip verified. <code>word/styles.xml</code> &#128309; preserved + default styles auto-generated. Character/table styles ❌</td></tr>
 <tr><td>Track Changes</td><td>revision marks</td><td>❌</td></tr>
 <tr><td>Other</td><td>OLE embeddings</td><td>&#128309;</td><td><code>word/embeddings/*</code> round-trip via <code>_preservedEntries</code></td></tr>
@@ -203,6 +203,7 @@
 <thead><tr><th>Format</th><th>Status</th><th>Notes</th></tr></thead>
 <tbody>
 <tr><td>ppt (HSLF)</td><td>~5%</td><td>Minimal reader can open OLE2 <code>.ppt</code> and scan <code>PowerPoint Document</code> for TextChars/TextBytes atoms. No no-op write or interop coverage yet.</td></tr>
+<p>SLF) | ~5% | Minimal reader can open OLE2 <code>.ppt</code> and scan <code>PowerPoint Document</code> for TextChars/TextBytes atoms. No no-op write or interop coverage yet. |</p>
 </tbody>
 </table>
 

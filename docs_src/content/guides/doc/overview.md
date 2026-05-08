@@ -1,12 +1,12 @@
 # doc (HWPF) Overview
 
-HWPF provides early support for the legacy Word 97-2003 `.doc` format. Coverage is ~25%.
+HWPF provides early support for the legacy Word 97-2003 `.doc` format. Coverage is ~20%.
 
 ## Status
 
-HWPF is useful today for text extraction, simple indexing/migration workflows, and limited main-body edits. It can open OLE2 `.doc` files, parse the File Information Block and selected table stream, extract main document text from the CLX/piece table, extract table and header/footer text, expose a minimal Range/Paragraph/CharacterRun model, and preserve unedited OLE streams/storages during no-op or limited body edits.
+HWPF is useful today for body-text extraction, simple indexing/migration workflows, and limited main-body edits. It can open OLE2 `.doc` files, parse the File Information Block and selected table stream, extract main document text from the CLX/piece table, expose a minimal Range/Paragraph/CharacterRun model, and preserve unedited OLE streams/storages during no-op or limited body edits.
 
-It is not a complete Word binary editing engine. Images, footnotes, comments, fields, and tracked changes are not modeled through public APIs.
+It is not a complete Word binary editing engine. Tables, images, header/footer stories, footnotes, comments, fields, and tracked changes are not modeled through public APIs.
 
 ## Basic Text Extraction
 
@@ -40,18 +40,19 @@ doc.write(output);
 - FIB / `0Table` / `1Table` parsing
 - Main body text extraction from CLX/piece table
 - Compressed and Unicode text pieces
-- Header/footer text and table structure extraction
 - Minimal Range / Paragraph / CharacterRun API
 - Selected CHPX character formatting: font name, size, bold, italic, underline, strike
 - Minimal paragraph property reading
 - No-op write preservation
 - Limited append paragraph and simple text replacement
 - OLE stream/storage and embedded OLE preservation
-- Java POI bidirectional testing for text extraction
+- Java POI Direction B smoke for dotnet-poi no-op saved `.doc`
 
 ## Limitations
 
+- No table model or table editing API
 - No image extraction or editing API
+- No header/footer story extraction API
 - No footnote/endnote/comment model
 - No field/bookmark model
 - No full Word style inheritance or complete PAPX/CHPX expansion

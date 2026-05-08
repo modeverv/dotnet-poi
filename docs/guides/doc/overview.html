@@ -98,10 +98,10 @@
     </aside>
     <main class="content">
 <h1>doc (HWPF) Overview</h1>
-<p>HWPF provides early support for the legacy Word 97-2003 <code>.doc</code> format. Coverage is ~25%.</p>
+<p>HWPF provides early support for the legacy Word 97-2003 <code>.doc</code> format. Coverage is ~20%.</p>
 <h2>Status</h2>
-<p>HWPF is useful today for text extraction, simple indexing/migration workflows, and limited main-body edits. It can open OLE2 <code>.doc</code> files, parse the File Information Block and selected table stream, extract main document text from the CLX/piece table, extract table and header/footer text, expose a minimal Range/Paragraph/CharacterRun model, and preserve unedited OLE streams/storages during no-op or limited body edits.</p>
-<p>It is not a complete Word binary editing engine. Images, footnotes, comments, fields, and tracked changes are not modeled through public APIs.</p>
+<p>HWPF is useful today for body-text extraction, simple indexing/migration workflows, and limited main-body edits. It can open OLE2 <code>.doc</code> files, parse the File Information Block and selected table stream, extract main document text from the CLX/piece table, expose a minimal Range/Paragraph/CharacterRun model, and preserve unedited OLE streams/storages during no-op or limited body edits.</p>
+<p>It is not a complete Word binary editing engine. Tables, images, header/footer stories, footnotes, comments, fields, and tracked changes are not modeled through public APIs.</p>
 <h2>Basic Text Extraction</h2>
 <pre><code class="language-csharp">using DotnetPoi.HWPF.UserModel;
 
@@ -126,18 +126,19 @@ doc.write(output);</code></pre>
 <li>FIB / <code>0Table</code> / <code>1Table</code> parsing</li>
 <li>Main body text extraction from CLX/piece table</li>
 <li>Compressed and Unicode text pieces</li>
-<li>Header/footer text and table structure extraction</li>
 <li>Minimal Range / Paragraph / CharacterRun API</li>
 <li>Selected CHPX character formatting: font name, size, bold, italic, underline, strike</li>
 <li>Minimal paragraph property reading</li>
 <li>No-op write preservation</li>
 <li>Limited append paragraph and simple text replacement</li>
 <li>OLE stream/storage and embedded OLE preservation</li>
-<li>Java POI bidirectional testing for text extraction</li>
+<li>Java POI Direction B smoke for dotnet-poi no-op saved <code>.doc</code></li>
 </ul>
 <h2>Limitations</h2>
 <ul>
+<li>No table model or table editing API</li>
 <li>No image extraction or editing API</li>
+<li>No header/footer story extraction API</li>
 <li>No footnote/endnote/comment model</li>
 <li>No field/bookmark model</li>
 <li>No full Word style inheritance or complete PAPX/CHPX expansion</li>

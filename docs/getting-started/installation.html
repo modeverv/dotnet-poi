@@ -98,49 +98,26 @@
     </aside>
     <main class="content">
 <h1>Installation</h1>
-<p>dotnet-poi ships as <strong>multiple NuGet packages</strong> — pick the combination that fits your project.</p>
-<h2>Quick Pick</h2>
-<table>
-<thead><tr><th>If you need…</th><th>Install this</th></tr></thead>
-<tbody>
-<tr><td>xlsx / docx / pptx read/write only</td><td><code>DotnetPoi.Ooxml</code></td></tr>
-<tr><td>OOXML + formula evaluator</td><td><code>DotnetPoi.Ooxml</code> + <code>DotnetPoi.Formula</code></td></tr>
-<tr><td>xls / doc / ppt (legacy binary) only</td><td><code>DotnetPoi.Legacy</code></td></tr>
-<tr><td>All formats + formula (everything)</td><td><code>DotnetPoi.All</code></td></tr>
-</tbody>
-</table>
+<p>dotnet-poi ships as <strong>two separate NuGet packages</strong>. Most projects only need <code>DotnetPoi.Core</code>.</p>
 <h2>Package Reference</h2>
-<p><strong>OOXML-only project (xlsx, docx, pptx):</strong></p>
+<p>Add the package to your <code>.csproj</code>:</p>
 <pre><code class="language-xml">&lt;ItemGroup&gt;
-  &lt;PackageReference Include=&quot;DotnetPoi.Ooxml&quot; Version=&quot;...&quot; /&gt;
+  &lt;PackageReference Include=&quot;DotnetPoi.Core&quot; Version=&quot;...&quot; /&gt;
 &lt;/ItemGroup&gt;</code></pre>
-<p><strong>Add formula evaluation when needed:</strong></p>
+<p>If you need spreadsheet formula evaluation, add the Formula package as well:</p>
 <pre><code class="language-xml">&lt;ItemGroup&gt;
-  &lt;PackageReference Include=&quot;DotnetPoi.Ooxml&quot; Version=&quot;...&quot; /&gt;
+  &lt;PackageReference Include=&quot;DotnetPoi.Core&quot; Version=&quot;...&quot; /&gt;
   &lt;PackageReference Include=&quot;DotnetPoi.Formula&quot; Version=&quot;...&quot; /&gt;
 &lt;/ItemGroup&gt;</code></pre>
-<p><strong>Legacy binary formats (xls, doc, ppt):</strong></p>
-<pre><code class="language-xml">&lt;ItemGroup&gt;
-  &lt;PackageReference Include=&quot;DotnetPoi.Legacy&quot; Version=&quot;...&quot; /&gt;
-&lt;/ItemGroup&gt;</code></pre>
-<p><strong>Everything in one dependency:</strong></p>
-<pre><code class="language-xml">&lt;ItemGroup&gt;
-  &lt;PackageReference Include=&quot;DotnetPoi.All&quot; Version=&quot;...&quot; /&gt;
-&lt;/ItemGroup&gt;</code></pre>
-<p>Transitive dependencies (<code>DotnetPoi.Common</code>, <code>DotnetPoi.POIFS</code>) are resolved automatically by NuGet.</p>
-<h2>Why Multiple Packages?</h2>
+<h2>Why Two Packages?</h2>
 <table>
-<thead><tr><th>Package</th><th>Contents</th><th>Best for</th></tr></thead>
+<thead><tr><th>Package</th><th>Contents</th><th>When to use</th></tr></thead>
 <tbody>
-<tr><td><code>DotnetPoi.Ooxml</code></td><td>XSSF (xlsx/xlsm), XWPF (docx/docm), XSLF (pptx/pptm)</td><td>Modern Office 2007+ formats</td></tr>
-<tr><td><code>DotnetPoi.Legacy</code></td><td>HSSF (xls), HWPF (doc), HSLF (ppt)</td><td>Legacy binary formats</td></tr>
-<tr><td><code>DotnetPoi.Formula</code></td><td>Formula evaluator (<code>IFormulaEvaluator</code>, <code>FormulaEvaluator</code>, <code>CellValue</code>)</td><td>Programmatic formula calculation</td></tr>
-<tr><td><code>DotnetPoi.Common</code></td><td>SS interfaces, shared enums, XML writer</td><td>Included transitively</td></tr>
-<tr><td><code>DotnetPoi.POIFS</code></td><td>OLE2/CFB container, encryption helpers</td><td>Included transitively</td></tr>
-<tr><td><code>DotnetPoi.All</code></td><td>All of the above in one meta-package</td><td>Convenience</td></tr>
+<tr><td><code>DotnetPoi.Core</code></td><td>All format implementations (xlsx, xls, docx, pptx, doc, ppt) + common interfaces + XML writer</td><td>Always required</td></tr>
+<tr><td><code>DotnetPoi.Formula</code></td><td>Formula evaluator (<code>IFormulaEvaluator</code>, <code>FormulaEvaluator</code>, <code>CellValue</code>)</td><td>Only when you need programmatic formula evaluation</td></tr>
 </tbody>
 </table>
-<p><strong>Design principle:</strong> Format packages have zero knowledge of <code>Formula</code>. Adding <code>DotnetPoi.Formula</code> to your project automatically enables <code>createFormulaEvaluator()</code> via lazy assembly discovery at runtime. Without it, the call throws a clear <code>NotSupportedException</code>.</p>
+<p><strong>Design principle:</strong> <code>Core</code> has zero knowledge of <code>Formula</code>. Adding <code>DotnetPoi.Formula</code> to your project automatically enables <code>createFormulaEvaluator()</code> via lazy assembly discovery at runtime. Without it, the call throws a clear <code>NotSupportedException</code>.</p>
 <h2>Verify Installation</h2>
 <p>Create a file <code>TestInstall.csproj</code>:</p>
 <pre><code class="language-xml">&lt;Project Sdk=&quot;Microsoft.NET.Sdk&quot;&gt;
@@ -149,7 +126,7 @@
     &lt;TargetFramework&gt;net8.0&lt;/TargetFramework&gt;
   &lt;/PropertyGroup&gt;
   &lt;ItemGroup&gt;
-    &lt;PackageReference Include=&quot;DotnetPoi.Ooxml&quot; Version=&quot;...&quot; /&gt;
+    &lt;PackageReference Include=&quot;DotnetPoi.Core&quot; Version=&quot;...&quot; /&gt;
   &lt;/ItemGroup&gt;
 &lt;/Project&gt;</code></pre>
 <p>Add <code>Program.cs</code>:</p>
