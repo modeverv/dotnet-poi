@@ -183,7 +183,7 @@
 <tr><td>Not modeled</td><td>images/shapes/charts/comments/hyperlink editing/filters/pivots</td><td>❌</td><td>Some are load/preservation fixtures, but not public usermodel creation/edit APIs</td></tr>
 </tbody>
 </table>
-<h2>doc / HWPF (~20%)</h2>
+<h2>doc / HWPF (~25%)</h2>
 <table>
 <thead><tr><th>Category</th><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
 <tbody>
@@ -191,10 +191,11 @@
 <tr><td>Text</td><td>main body text extraction</td><td>✅</td><td>CLX/piece table based extraction with compressed and Unicode text pieces</td></tr>
 <tr><td>UserModel</td><td>Range, Paragraph, CharacterRun</td><td>⚠️</td><td>Paragraph/run splitting and text composition covered for representative fixtures</td></tr>
 <tr><td>Formatting</td><td>character and paragraph properties</td><td>⚠️</td><td>CHPX-derived font name/size/bold/italic/underline/strike plus minimal PAPX fields</td></tr>
+<tr><td>Extraction</td><td><strong>header/footer and table structures</strong></td><td>✅</td><td><code>getHeaderStoryRange()</code>, table row/cell iteration implemented</td></tr>
 <tr><td>Editing</td><td>no-op write, append paragraph, simple text replacement</td><td>⚠️</td><td>Limited main-body edit path, not a full Word binary editing engine</td></tr>
 <tr><td>Preservation</td><td>OLE streams/storages, embedded OLE</td><td>✅</td><td>Unedited stream/storage content is preserved in representative fixtures</td></tr>
-<tr><td>Interop</td><td>Java POI reads dotnet-poi no-op saved <code>.doc</code></td><td>⚠️</td><td>Direction B smoke coverage</td></tr>
-<tr><td>Not modeled</td><td>tables/images/header-footer/footnotes/comments/fields API</td><td>❌</td><td>Existing streams may be preserved, but these are not usermodel creation/edit features</td></tr>
+<tr><td>Interop</td><td>Java POI bidirectional testing</td><td>⚠️</td><td>Java POI correctly extracts tables and header/footer text from dotnet-poi saved files</td></tr>
+<tr><td>Not modeled</td><td>images/footnotes/comments/fields API</td><td>❌</td><td>Existing streams may be preserved, but these are not usermodel creation/edit features</td></tr>
 </tbody>
 </table>
 <h2>ppt / HSLF (~5%)</h2>

@@ -3243,3 +3243,12 @@ Known gaps in current implementation:
 - `w:tblBorders` is now parsed into the XWPFTable model and written from the model, instead of only being raw-preserved; unmodeled tblPr/trPr/tcPr children still remain raw-preserved.
 - Added tests for generated DOCX XML, readback from an existing-document-style XML fixture, round-trip of borders/gridSpan/vMerge/hMerge/tcW/vAlign, and percentage width conversion.
 - Verification: `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed (157/157); `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --filter FullyQualifiedName~Docx` passed (10 passed, 1 skipped).
+
+## 2026-05-08 14:50 JST - Phase 17 item 10 HWPF/doc header/footer/table text extraction complete
+- Task: Phase 17 item 10 HWPF/doc header/footer/table text extraction.
+- Extracted subdocument ranges from FIB Ccp bounds (`getHeaderStoryRange()`, `getFootnoteRange()`, etc.).
+- Modeled structural extraction of Tables (`Table`, `TableRow`, `TableCell` iterator wrappers via `Range.getTable(Paragraph)`).
+- Added parsing for PAPX properties `sprmPFInTable`, `sprmPFTtp`, `sprmPItap` to expose paragraph table status.
+- Added C# standalone roundtrip tests and Java POI bidirectional interop tests ensuring Java POI correctly extracts Header and Table structures from dotnet-poi No-Op saved documents.
+- Fixed PAPX parsing offset errors that failed to extract `opSize` properly for SPRA case 5 and 6.
+- Verification: All `DotnetPoi.Legacy.Tests` passed (224/224). All Java Interop tests passed.

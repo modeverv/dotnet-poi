@@ -82,7 +82,7 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Preservation | non-Workbook OLE streams, VBA streams, unknown BIFF records | ✅ | Light edits preserve unmodeled streams/records where possible |
 | Not modeled | images/shapes/charts/comments/hyperlink editing/filters/pivots | ❌ | Some are load/preservation fixtures, but not public usermodel creation/edit APIs |
 
-## doc / HWPF (~20%)
+## doc / HWPF (~25%)
 
 | Category | Feature | Status | Notes |
 |---|---|---|---|
@@ -90,10 +90,11 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Text | main body text extraction | ✅ | CLX/piece table based extraction with compressed and Unicode text pieces |
 | UserModel | Range, Paragraph, CharacterRun | ⚠️ | Paragraph/run splitting and text composition covered for representative fixtures |
 | Formatting | character and paragraph properties | ⚠️ | CHPX-derived font name/size/bold/italic/underline/strike plus minimal PAPX fields |
+| Extraction | **header/footer and table structures** | ✅ | `getHeaderStoryRange()`, table row/cell iteration implemented |
 | Editing | no-op write, append paragraph, simple text replacement | ⚠️ | Limited main-body edit path, not a full Word binary editing engine |
 | Preservation | OLE streams/storages, embedded OLE | ✅ | Unedited stream/storage content is preserved in representative fixtures |
-| Interop | Java POI reads dotnet-poi no-op saved `.doc` | ⚠️ | Direction B smoke coverage |
-| Not modeled | tables/images/header-footer/footnotes/comments/fields API | ❌ | Existing streams may be preserved, but these are not usermodel creation/edit features |
+| Interop | Java POI bidirectional testing | ⚠️ | Java POI correctly extracts tables and header/footer text from dotnet-poi saved files |
+| Not modeled | images/footnotes/comments/fields API | ❌ | Existing streams may be preserved, but these are not usermodel creation/edit features |
 
 ## ppt / HSLF (~5%)
 
