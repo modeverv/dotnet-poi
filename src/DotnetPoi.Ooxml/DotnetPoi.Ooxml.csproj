@@ -19,7 +19,7 @@
     <!-- ── NuGet package metadata ─────────────────────────────────────── -->
     <PropertyGroup>
         <PackageId>DotnetPoi.Ooxml</PackageId>
-        <VersionPrefix>0.1.0</VersionPrefix>
+        <VersionPrefix>1.0.0</VersionPrefix>
         <PackageVersion>$(VersionPrefix)</PackageVersion>
         <Authors>modeverv</Authors>
         <Description>OOXML implementations for xlsx, docx, pptx, and macro-enabled Office 2007+ formats.</Description>

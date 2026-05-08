@@ -2,7 +2,6 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
-using System.Xml.Linq;
 using DotnetPoi.POIFS.Crypt;
 using DotnetPoi.SS.UserModel;
 using DotnetPoi.SS.Util;
@@ -1263,73 +1262,152 @@ public sealed class XSSFWorkbook : IWorkbook
             ? new Dictionary<(int Row, int Column), (XSSFClientAnchor? Anchor, bool Visible)>()
             : ReadCommentVmlInfo(archive, vmlPath);
 
+        const string ssNs = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
         using var stream = commentsEntry.Open();
-        var document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
-        XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-        var authors = document.Root?
-            .Element(ns + "authors")?
-            .Elements(ns + "author")
-            .Select(author => author.Value)
-            .ToList() ?? new List<string>();
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
+        var authors = new List<string>();
 
-        foreach (var commentElement in document.Root?
-            .Element(ns + "commentList")?
-            .Elements(ns + "comment") ?? Enumerable.Empty<XElement>())
+        while (reader.Read())
         {
-            var cellRef = (string?)commentElement.Attribute("ref");
-            if (cellRef is null)
-                continue;
+            if (reader.NodeType != XmlNodeType.Element) continue;
+            if (!string.Equals(reader.NamespaceURI, ssNs, StringComparison.Ordinal)) continue;
 
-            var authorId = (int?)commentElement.Attribute("authorId") ?? 0;
-            var author = authorId >= 0 && authorId < authors.Count ? authors[authorId] : string.Empty;
-            var (row, col) = ParseCellRef(cellRef);
-            var text = ReadRichTextElement(commentElement.Element(ns + "text"));
+            if (reader.LocalName == "author")
+            {
+                authors.Add(reader.IsEmptyElement ? string.Empty : ReadXmlElementText(reader));
+            }
+            else if (reader.LocalName == "comment")
+            {
+                var cellRef = reader.GetAttribute("ref");
+                if (cellRef is null) { SkipXmlElement(reader); continue; }
 
-            vmlInfo.TryGetValue((row, col), out var shapeInfo);
-            var anchor = shapeInfo.Anchor ?? new XSSFClientAnchor(0, 0, 0, 0, col, row, col + 2, row + 4);
-            var comment = new XSSFComment(sheet, row, col, author, text, anchor, shapeInfo.Visible);
-            sheet.RegisterComment(comment);
-            if (sheet.getRow(row)?.getCell(col) is XSSFCell cell)
-                cell.SetCellCommentFromXml(comment);
+                int authorId = 0;
+                var authorIdStr = reader.GetAttribute("authorId");
+                if (authorIdStr is not null)
+                    int.TryParse(authorIdStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out authorId);
+                var author = authorId >= 0 && authorId < authors.Count ? authors[authorId] : string.Empty;
+                var (row, col) = ParseCellRef(cellRef);
+                var text = ReadCommentTextElement(reader, ssNs);
+
+                vmlInfo.TryGetValue((row, col), out var shapeInfo);
+                var anchor = shapeInfo.Anchor ?? new XSSFClientAnchor(0, 0, 0, 0, col, row, col + 2, row + 4);
+                var comment = new XSSFComment(sheet, row, col, author, text, anchor, shapeInfo.Visible);
+                sheet.RegisterComment(comment);
+                if (sheet.getRow(row)?.getCell(col) is XSSFCell cell)
+                    cell.SetCellCommentFromXml(comment);
+            }
         }
     }
 
-    private static XSSFRichTextString? ReadRichTextElement(XElement? textElement)
+    private static XSSFRichTextString? ReadCommentTextElement(XmlReader reader, string ssNs)
     {
-        if (textElement is null)
-            return null;
-
-        XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-        var runElements = textElement.Elements(ns + "r").ToList();
-        if (runElements.Count > 0)
+        if (reader.IsEmptyElement) return null;
+        int commentDepth = reader.Depth;
+        XSSFRichTextString? result = null;
+        while (reader.Read())
         {
-            var runs = new List<XSSFRichTextString.TextRun>();
-            foreach (var runElement in runElements)
-            {
-                var run = new XSSFRichTextString.TextRun
-                {
-                    Text = runElement.Element(ns + "t")?.Value ?? string.Empty
-                };
-                var rPr = runElement.Element(ns + "rPr");
-                if (rPr is not null)
-                {
-                    run.Bold = rPr.Element(ns + "b") is not null;
-                    run.Italic = rPr.Element(ns + "i") is not null;
-                    run.Underline = rPr.Element(ns + "u") is not null;
-                    run.Strikethrough = rPr.Element(ns + "strike") is not null;
-                    var szVal = (string?)rPr.Element(ns + "sz")?.Attribute("val");
-                    if (szVal is not null && double.TryParse(szVal, NumberStyles.Float, CultureInfo.InvariantCulture, out var fontSize))
-                        run.FontSize = fontSize;
-                    run.FontName = (string?)rPr.Element(ns + "rFont")?.Attribute("val");
-                    run.Color = (string?)rPr.Element(ns + "color")?.Attribute("rgb")
-                        ?? (string?)rPr.Element(ns + "color")?.Attribute("val");
-                }
-                runs.Add(run);
-            }
-            return new XSSFRichTextString(runs);
+            if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == commentDepth) break;
+            if (reader.NodeType != XmlNodeType.Element) continue;
+            if (reader.LocalName == "text" && string.Equals(reader.NamespaceURI, ssNs, StringComparison.Ordinal))
+                result = ParseRichTextElement(reader, ssNs);
         }
+        return result;
+    }
 
-        return new XSSFRichTextString(textElement.Element(ns + "t")?.Value ?? string.Empty);
+    private static XSSFRichTextString ParseRichTextElement(XmlReader reader, string ssNs)
+    {
+        if (reader.IsEmptyElement) return new XSSFRichTextString(string.Empty);
+        int textDepth = reader.Depth;
+        var runs = new List<XSSFRichTextString.TextRun>();
+        string? simpleText = null;
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == textDepth) break;
+            if (reader.NodeType != XmlNodeType.Element) continue;
+            if (!string.Equals(reader.NamespaceURI, ssNs, StringComparison.Ordinal)) continue;
+            if (reader.LocalName == "r")
+                runs.Add(ParseRichTextRun(reader, ssNs));
+            else if (reader.LocalName == "t")
+                simpleText = ReadXmlElementText(reader);
+            else if (!reader.IsEmptyElement)
+                SkipXmlElement(reader);
+        }
+        if (runs.Count > 0) return new XSSFRichTextString(runs);
+        return new XSSFRichTextString(simpleText ?? string.Empty);
+    }
+
+    private static XSSFRichTextString.TextRun ParseRichTextRun(XmlReader reader, string ssNs)
+    {
+        var run = new XSSFRichTextString.TextRun();
+        if (reader.IsEmptyElement) return run;
+        int runDepth = reader.Depth;
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == runDepth) break;
+            if (reader.NodeType != XmlNodeType.Element) continue;
+            if (!string.Equals(reader.NamespaceURI, ssNs, StringComparison.Ordinal)) { if (!reader.IsEmptyElement) SkipXmlElement(reader); continue; }
+            if (reader.LocalName == "t")
+                run.Text = ReadXmlElementText(reader);
+            else if (reader.LocalName == "rPr")
+                ParseRunProperties(reader, ssNs, run);
+            else if (!reader.IsEmptyElement)
+                SkipXmlElement(reader);
+        }
+        return run;
+    }
+
+    private static void ParseRunProperties(XmlReader reader, string ssNs, XSSFRichTextString.TextRun run)
+    {
+        if (reader.IsEmptyElement) return;
+        int rPrDepth = reader.Depth;
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == rPrDepth) break;
+            if (reader.NodeType != XmlNodeType.Element) continue;
+            if (!string.Equals(reader.NamespaceURI, ssNs, StringComparison.Ordinal)) { if (!reader.IsEmptyElement) SkipXmlElement(reader); continue; }
+            switch (reader.LocalName)
+            {
+                case "b": run.Bold = true; break;
+                case "i": run.Italic = true; break;
+                case "u": run.Underline = true; break;
+                case "strike": run.Strikethrough = true; break;
+                case "sz":
+                    var szVal = reader.GetAttribute("val");
+                    if (szVal is not null && double.TryParse(szVal, NumberStyles.Float, CultureInfo.InvariantCulture, out var sz))
+                        run.FontSize = sz;
+                    break;
+                case "rFont":
+                    run.FontName = reader.GetAttribute("val");
+                    break;
+                case "color":
+                    run.Color = reader.GetAttribute("rgb") ?? reader.GetAttribute("val");
+                    break;
+            }
+            if (!reader.IsEmptyElement) SkipXmlElement(reader);
+        }
+    }
+
+    private static string ReadXmlElementText(XmlReader reader)
+    {
+        if (reader.IsEmptyElement) return string.Empty;
+        int depth = reader.Depth;
+        var sb = new StringBuilder();
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == depth) break;
+            if (reader.NodeType == XmlNodeType.Text || reader.NodeType == XmlNodeType.SignificantWhitespace)
+                sb.Append(reader.Value);
+        }
+        return sb.ToString();
+    }
+
+    private static void SkipXmlElement(XmlReader reader)
+    {
+        int depth = reader.Depth;
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == depth) break;
+        }
     }
 
     private static (string? CommentsPath, string? VmlPath) ReadSheetCommentRelationshipTargets(ZipArchive archive, string sheetPartName)
@@ -1372,37 +1450,69 @@ public sealed class XSSFWorkbook : IWorkbook
             return result;
 
         using var stream = entry.Open();
-        var document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
-        foreach (var shape in document.Descendants().Where(e => e.Name.LocalName == "shape"))
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
+        while (reader.Read())
         {
-            var clientData = shape.Descendants().FirstOrDefault(e => e.Name.LocalName == "ClientData");
-            if (clientData is null)
+            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "shape")
                 continue;
+            ParseVmlShape(reader, result);
+        }
+        return result;
+    }
 
-            int? row = null;
-            int? column = null;
-            string? anchorText = null;
-            var style = (string?)shape.Attribute("style");
-            var visible = style?.IndexOf("visibility:visible", StringComparison.OrdinalIgnoreCase) >= 0
-                || clientData.Elements().Any(e => e.Name.LocalName == "Visible");
+    private static void ParseVmlShape(XmlReader reader, Dictionary<(int Row, int Column), (XSSFClientAnchor? Anchor, bool Visible)> result)
+    {
+        var style = reader.GetAttribute("style");
+        bool visibleFromStyle = style?.IndexOf("visibility:visible", StringComparison.OrdinalIgnoreCase) >= 0;
+        if (reader.IsEmptyElement) return;
 
-            var rowText = clientData.Elements().FirstOrDefault(e => e.Name.LocalName == "Row")?.Value;
-            if (int.TryParse(rowText?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedRow))
-                row = parsedRow;
+        int shapeDepth = reader.Depth;
+        int? row = null;
+        int? column = null;
+        string? anchorText = null;
+        bool visibleFromClientData = false;
 
-            var columnText = clientData.Elements().FirstOrDefault(e => e.Name.LocalName == "Column")?.Value;
-            if (int.TryParse(columnText?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedColumn))
-                column = parsedColumn;
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == shapeDepth) break;
+            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "ClientData") continue;
 
-            anchorText = clientData.Elements().FirstOrDefault(e => e.Name.LocalName == "Anchor")?.Value;
-
-            if (row is null || column is null)
-                continue;
-
-            result[(row.Value, column.Value)] = (ParseCommentAnchor(anchorText, row.Value, column.Value), visible);
+            if (!reader.IsEmptyElement)
+            {
+                int cdDepth = reader.Depth;
+                while (reader.Read())
+                {
+                    if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == cdDepth) break;
+                    if (reader.NodeType != XmlNodeType.Element) continue;
+                    switch (reader.LocalName)
+                    {
+                        case "Visible":
+                            visibleFromClientData = true;
+                            if (!reader.IsEmptyElement) SkipXmlElement(reader);
+                            break;
+                        case "Row":
+                            var rowText = ReadXmlElementText(reader);
+                            if (int.TryParse(rowText.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var r))
+                                row = r;
+                            break;
+                        case "Column":
+                            var colText = ReadXmlElementText(reader);
+                            if (int.TryParse(colText.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var c))
+                                column = c;
+                            break;
+                        case "Anchor":
+                            anchorText = ReadXmlElementText(reader);
+                            break;
+                        default:
+                            if (!reader.IsEmptyElement) SkipXmlElement(reader);
+                            break;
+                    }
+                }
+            }
         }
 
-        return result;
+        if (row is null || column is null) return;
+        result[(row.Value, column.Value)] = (ParseCommentAnchor(anchorText, row.Value, column.Value), visibleFromStyle || visibleFromClientData);
     }
 
     private static XSSFClientAnchor ParseCommentAnchor(string? anchorText, int row, int column)

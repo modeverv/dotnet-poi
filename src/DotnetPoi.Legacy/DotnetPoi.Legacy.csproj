@@ -12,7 +12,7 @@
     <!-- ── NuGet package metadata ─────────────────────────────────────── -->
     <PropertyGroup>
         <PackageId>DotnetPoi.Legacy</PackageId>
-        <VersionPrefix>0.1.0</VersionPrefix>
+        <VersionPrefix>0.5.0</VersionPrefix>
         <PackageVersion>$(VersionPrefix)</PackageVersion>
         <Authors>modeverv</Authors>
         <Description>Legacy Office 97-2003 binary format implementations for xls, doc, and ppt.</Description>

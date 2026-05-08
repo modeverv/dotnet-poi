@@ -1,5 +1,3 @@
-using System.Xml.Linq;
-
 namespace DotnetPoi.XWPF.UserModel;
 
 /// <summary>Representation of a DOCX comment from word/comments.xml.</summary>
@@ -53,17 +51,4 @@ public sealed class XWPFComment
         _onChanged?.Invoke();
     }
 
-    internal static XWPFComment FromXml(XElement commentElement, XNamespace wordNamespace, Action? onChanged = null)
-    {
-        var id = (string?)commentElement.Attribute(wordNamespace + "id") ?? "-1";
-        var author = (string?)commentElement.Attribute(wordNamespace + "author");
-        var initials = (string?)commentElement.Attribute(wordNamespace + "initials");
-        var date = (string?)commentElement.Attribute(wordNamespace + "date");
-
-        var paragraphTexts = commentElement
-            .Elements(wordNamespace + "p")
-            .Select(p => string.Concat(p.Descendants(wordNamespace + "t").Select(t => (string?)t ?? string.Empty)));
-
-        return new XWPFComment(id, author, initials, date, string.Join("\n", paragraphTexts), onChanged);
-    }
 }

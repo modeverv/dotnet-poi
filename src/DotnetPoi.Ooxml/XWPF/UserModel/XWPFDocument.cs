@@ -2,7 +2,6 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
-using System.Xml.Linq;
 using DotnetPoi.SS.Xml;
 
 namespace DotnetPoi.XWPF.UserModel;
@@ -580,33 +579,35 @@ public sealed class XWPFDocument : IDisposable
         var entry = archive.GetEntry("[Content_Types].xml");
         if (entry is null) return;
 
-        XNamespace ns = "http://schemas.openxmlformats.org/package/2006/content-types";
+        const string ctNs = "http://schemas.openxmlformats.org/package/2006/content-types";
         using var stream = entry.Open();
-        var document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
-
-        foreach (var element in document.Root?.Elements(ns + "Default") ?? Enumerable.Empty<XElement>())
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
+        while (reader.Read())
         {
-            var extension = (string?)element.Attribute("Extension");
-            var contentType = (string?)element.Attribute("ContentType");
-            if (extension is not string extensionValue || extensionValue.Length == 0
-                || contentType is not string contentTypeValue || contentTypeValue.Length == 0)
-                continue;
-            if (extensionValue.Equals("rels", StringComparison.OrdinalIgnoreCase)
-                || extensionValue.Equals("xml", StringComparison.OrdinalIgnoreCase))
-                continue;
-            _preservedContentTypeDefaults.Add(new PreservedContentTypeDefault(extensionValue, contentTypeValue));
-        }
+            if (reader.NodeType != XmlNodeType.Element) continue;
+            if (!string.Equals(reader.NamespaceURI, ctNs, StringComparison.Ordinal)) continue;
 
-        foreach (var element in document.Root?.Elements(ns + "Override") ?? Enumerable.Empty<XElement>())
-        {
-            var partName = (string?)element.Attribute("PartName");
-            var contentType = (string?)element.Attribute("ContentType");
-            if (partName is not string partNameValue || partNameValue.Length == 0
-                || contentType is not string contentTypeValue || contentTypeValue.Length == 0)
-                continue;
-            if (IsModeledContentTypeOverride(partNameValue))
-                continue;
-            _preservedContentTypeOverrides.Add(new PreservedContentTypeOverride(partNameValue, contentTypeValue));
+            if (reader.LocalName == "Default")
+            {
+                var extension = reader.GetAttribute("Extension");
+                var contentType = reader.GetAttribute("ContentType");
+                if (extension is null || extension.Length == 0 || contentType is null || contentType.Length == 0)
+                    continue;
+                if (extension.Equals("rels", StringComparison.OrdinalIgnoreCase)
+                    || extension.Equals("xml", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                _preservedContentTypeDefaults.Add(new PreservedContentTypeDefault(extension, contentType));
+            }
+            else if (reader.LocalName == "Override")
+            {
+                var partName = reader.GetAttribute("PartName");
+                var contentType = reader.GetAttribute("ContentType");
+                if (partName is null || partName.Length == 0 || contentType is null || contentType.Length == 0)
+                    continue;
+                if (IsModeledContentTypeOverride(partName))
+                    continue;
+                _preservedContentTypeOverrides.Add(new PreservedContentTypeOverride(partName, contentType));
+            }
         }
     }
 
@@ -631,26 +632,29 @@ public sealed class XWPFDocument : IDisposable
         var entry = archive.GetEntry("word/_rels/document.xml.rels");
         if (entry is null) return;
 
-        XNamespace ns = "http://schemas.openxmlformats.org/package/2006/relationships";
+        const string relsNs = "http://schemas.openxmlformats.org/package/2006/relationships";
         using var stream = entry.Open();
-        var document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
-
-        foreach (var element in document.Root?.Elements(ns + "Relationship") ?? Enumerable.Empty<XElement>())
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
+        while (reader.Read())
         {
-            var id = (string?)element.Attribute("Id");
-            var type = (string?)element.Attribute("Type");
-            var target = (string?)element.Attribute("Target");
-            if (id is not string idValue || idValue.Length == 0
-                || type is not string typeValue || typeValue.Length == 0
-                || target is not string targetValue || targetValue.Length == 0)
+            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "Relationship")
                 continue;
-            if (IsModeledDocumentRelationship(typeValue))
+            if (!string.Equals(reader.NamespaceURI, relsNs, StringComparison.Ordinal))
+                continue;
+
+            var id = reader.GetAttribute("Id");
+            var type = reader.GetAttribute("Type");
+            var target = reader.GetAttribute("Target");
+            if (id is null || id.Length == 0 || type is null || type.Length == 0
+                || target is null || target.Length == 0)
+                continue;
+            if (IsModeledDocumentRelationship(type))
                 continue;
             _preservedDocumentRelationships.Add(new PreservedRelationship(
-                idValue,
-                typeValue,
-                targetValue,
-                (string?)element.Attribute("TargetMode")));
+                id,
+                type,
+                target,
+                reader.GetAttribute("TargetMode")));
         }
     }
 
@@ -748,22 +752,74 @@ public sealed class XWPFDocument : IDisposable
         var entry = archive.GetEntry("word/comments.xml");
         if (entry is null) return;
 
-        XNamespace w = NsW;
         using var stream = entry.Open();
-        XDocument document;
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
         try
         {
-            document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
+            while (reader.Read())
+            {
+                if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "comment"
+                    || !string.Equals(reader.NamespaceURI, NsW, StringComparison.Ordinal))
+                    continue;
+                _comments.Add(ParseCommentXml(reader, MarkCommentsModified));
+            }
         }
-        catch (XmlException)
+        catch (XmlException) { }
+    }
+
+    private static XWPFComment ParseCommentXml(XmlReader reader, Action? onChanged)
+    {
+        var id = reader.GetAttribute("id", NsW) ?? "-1";
+        var author = reader.GetAttribute("author", NsW);
+        var initials = reader.GetAttribute("initials", NsW);
+        var date = reader.GetAttribute("date", NsW);
+
+        var paragraphTexts = new List<string>();
+        var paragraphText = new StringBuilder();
+        bool inParagraph = false;
+        bool inT = false;
+        int relDepth = 0;
+        bool done = false;
+
+        if (!reader.IsEmptyElement)
         {
-            return;
+            while (!done && reader.Read())
+            {
+                if (reader.NodeType == XmlNodeType.Element)
+                {
+                    relDepth++;
+                    bool isW = string.Equals(reader.NamespaceURI, NsW, StringComparison.Ordinal);
+                    if (relDepth == 1 && isW && reader.LocalName == "p")
+                    {
+                        inParagraph = true;
+                        paragraphText.Clear();
+                    }
+                    else if (inParagraph && isW && reader.LocalName == "t")
+                    {
+                        inT = true;
+                    }
+                    if (reader.IsEmptyElement) relDepth--;
+                }
+                else if (reader.NodeType == XmlNodeType.EndElement)
+                {
+                    bool isW = string.Equals(reader.NamespaceURI, NsW, StringComparison.Ordinal);
+                    if (inT && isW && reader.LocalName == "t") inT = false;
+                    if (inParagraph && relDepth == 1 && isW && reader.LocalName == "p")
+                    {
+                        paragraphTexts.Add(paragraphText.ToString());
+                        inParagraph = false;
+                    }
+                    relDepth--;
+                    if (relDepth < 0) done = true;
+                }
+                else if (reader.NodeType == XmlNodeType.Text && inT)
+                {
+                    paragraphText.Append(reader.Value);
+                }
+            }
         }
 
-        foreach (var commentElement in document.Root?.Elements(w + "comment") ?? Enumerable.Empty<XElement>())
-        {
-            _comments.Add(XWPFComment.FromXml(commentElement, w, MarkCommentsModified));
-        }
+        return new XWPFComment(id, author, initials, date, string.Join("\n", paragraphTexts), onChanged);
     }
 
     private void ReadHeadersFooters(ZipArchive archive)

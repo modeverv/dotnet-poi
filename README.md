@@ -100,13 +100,13 @@ Current status: **1.0 for covered OOXML workflows** — packages are available o
 Version 1.0 means the documented OOXML workflows are treated as stable. It does **not** mean full Apache POI parity or complete Office feature coverage.
 
 | Package | NuGet ID | Version | Status |
-|---|---|---|---|
-| **All** | `DotnetPoi.All` | 1.0.x | Meta-package: OOXML 1.0 plus partial Legacy and Formula packages |
-| **OOXML** | `DotnetPoi.Ooxml` | 1.0.x | Stable for common xlsx/docx/pptx workflows |
-| **Common** | `DotnetPoi.Common` | 0.1.x | Shared API/support package, pulled transitively |
-| **POIFS** | `DotnetPoi.POIFS` | 0.1.x | OLE2/CFB support package, pulled transitively |
-| **Legacy** | `DotnetPoi.Legacy` | 0.1.x | In-development (HSSF/HWPF/HSLF) |
-| **Formula** | `DotnetPoi.Formula` | 0.1.x | Narrow evaluator subset |
+|---|---|---------|---|
+| **All** | `DotnetPoi.All` | 1.0.x   | Meta-package: OOXML 1.0 plus partial Legacy and Formula packages |
+| **OOXML** | `DotnetPoi.Ooxml` | 1.0.x   | Stable for common xlsx/docx/pptx workflows |
+| **Common** | `DotnetPoi.Common` | 1.0.x   | Shared API/support package, pulled transitively |
+| **POIFS** | `DotnetPoi.POIFS` | 1.0.x   | OLE2/CFB support package, pulled transitively |
+| **Legacy** | `DotnetPoi.Legacy` | 0.5.x   | In-development (HSSF/HWPF/HSLF) |
+| **Formula** | `DotnetPoi.Formula` | 0.1.x   | Narrow evaluator subset |
 
 The strongest format today is **xlsx / XSSF**, with broad support for workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. **docx / XWPF** and **pptx / XSLF** are also useful for practical generation, light editing, and loss-resistant round-trips of many real files.
 
