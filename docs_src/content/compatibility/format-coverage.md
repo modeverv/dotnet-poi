@@ -45,7 +45,7 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Fields | TOC, page numbers, mail merge | ✅ | Write/read/round-trip |
 | SDT | content controls (block-level and inline) | 🔵 | Block-level `w:sdt` in `w:body` and inline `w:sdt` inside `w:p` preserved via raw XML capture/re-emission. |
 | Styles | paragraph style reference (pStyle) | ✅ | `setStyle()`/`getStyleID()` API, round-trip verified. `word/styles.xml` 🔵 preserved + default styles auto-generated. Character/table styles ❌ |
-| Track Changes | revision marks | ❌ | |
+| Track Changes | revision marks | 🔵 | Tracked-change XML (`w:ins`, `w:del`, moves, etc.) is preserved in body/paragraph child order during round-trip; accept/reject/create/edit APIs are not modeled |
 | Other | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries` |
 | Other | docm macro preservation | ✅ | VBA bytes preserved |
 | Other | unknown part preservation | ✅ | `_preservedEntries` mechanism preserves non-model ZIP entries |
@@ -96,9 +96,15 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Interop | Java POI bidirectional testing | ⚠️ | Java POI correctly extracts tables and header/footer text from dotnet-poi saved files |
 | Not modeled | images/footnotes/comments/fields API | ❌ | Existing streams may be preserved, but these are not usermodel creation/edit features |
 
-## ppt / HSLF (~5%)
+## ppt / HSLF (~12%)
 
-| Format | Status | Notes |
-|---|---|---|
-| ppt (HSLF) | ~5% | Minimal reader can open OLE2 `.ppt` and scan `PowerPoint Document` for TextChars/TextBytes atoms. No no-op write or interop coverage yet. |
-SLF) | ~5% | Minimal reader can open OLE2 `.ppt` and scan `PowerPoint Document` for TextChars/TextBytes atoms. No no-op write or interop coverage yet. |
+| Category | Feature | Status | Notes |
+|---|---|---|---|
+| Reading | OLE2 `.ppt` open and stream inventory | ✅ | Detects `PowerPoint Document`, `Current User`, and summary streams |
+| Records | record tree scan with raw bytes | ✅ | Container/atom hierarchy is retained for preservation |
+| Slides | slide count and order | ✅ | Persist-pointer based order covered by representative fixtures |
+| Text | TextChars/TextBytes extraction | ✅ | UTF-16LE and CP1252 text atoms supported |
+| Editing | no-op write / round-trip | ✅ | OLE2 compound file is preserved through write |
+| Preservation | OLE streams/storages, images, comments, OLE | ✅ | Representative preservation fixtures covered |
+| Interop | Java POI direction B | ⚠️ | C# fixture generation exists; Java-side assertion still pending |
+| Not modeled | slide creation, shape editing, images, animations | ❌ | New presentation authoring is not implemented for HSLF |

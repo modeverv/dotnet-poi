@@ -26,6 +26,12 @@ dotnet add package DotnetPoi.All
 | Don't want to think about granular package selection | `DotnetPoi.Legacy` for legacy-only projects |
 | Need all formats + formula evaluation | `DotnetPoi.Ooxml` + `DotnetPoi.Formula` for minimal footprint |
 
+## Current scope
+
+- OOXML (`xlsx`, `docx`, `pptx`) is the most practical surface. `docx` tracked-change XML is preserved during round-trip, but revision accept/reject/create/edit APIs are not modeled.
+- Legacy binary formats are included for convenience, but remain partial: `xls` and `doc` cover practical read/write/light-edit slices, while `ppt` is preservation/text-extraction oriented.
+- Formula evaluation is intentionally limited. Formula text and cached-value preservation live in the format packages; full Excel-compatible calculation is not a project goal.
+
 ## License
 
 [Apache License 2.0](../../LICENSE) — same as upstream Apache POI.

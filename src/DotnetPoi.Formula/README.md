@@ -164,7 +164,7 @@ Accuracy of the formula engine is verified through:
 
 ## Version
 
-This is a **v0.x** package with intentionally limited scope. `DotnetPoi.Core` owns formula text/cached-value preservation; this package is only for the small evaluator subset listed above.
+This is a **v0.x** package with intentionally limited scope. The format packages (`DotnetPoi.Ooxml` / `DotnetPoi.Legacy`) own formula text and cached-value preservation; this package is only for the small evaluator subset listed above.
 
 ---
 
@@ -172,7 +172,7 @@ This is a **v0.x** package with intentionally limited scope. `DotnetPoi.Core` ow
 
 | Project | Tests |
 |---|---|
-| Formula.Tests | 10 |
+| Formula.Tests | 11 |
 
 ---
 

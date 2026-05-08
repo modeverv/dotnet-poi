@@ -1,12 +1,12 @@
 # ppt (HSLF) Overview
 
-HSLF is the legacy PowerPoint 97-2003 `.ppt` implementation. Coverage is ~5%.
+HSLF is the legacy PowerPoint 97-2003 `.ppt` implementation. Coverage is ~12%.
 
 ## Status
 
-HSLF is currently a minimal reader. It can open OLE2 `.ppt` files, read the `PowerPoint Document` stream, and extract early text content from `TextCharsAtom` and `TextBytesAtom` records. This can be useful for very basic text discovery experiments, but it is not yet ready for reliable migration, preservation, or editing workflows.
+HSLF is currently a preservation-first reader. It can open OLE2 `.ppt` files, inventory streams, read the `PowerPoint Document` record tree, recover slide order, extract text from `TextCharsAtom` and `TextBytesAtom` records, and no-op write the compound file back out. This is useful for archive discovery and cautious round-trip preservation, but it is not a slide authoring or shape editing engine.
 
-The next planned work is to add fixture coverage, OLE2 stream inventory, record tree preservation, no-op write round-trip, and Java POI interop.
+The next planned work is to deepen Java POI interop assertions and add a usermodel only where preservation is already stable.
 
 ## Basic Text Probe
 
@@ -26,16 +26,16 @@ foreach (var slide in ppt.getSlides())
 ## Supported Today
 
 - OLE2 `.ppt` open
-- `PowerPoint Document` stream scan
-- Minimal slide container detection
+- OLE2 stream inventory
+- `PowerPoint Document` record tree scan with raw record preservation
+- Slide count and slide order reconstruction
 - Text extraction from `TextCharsAtom` and `TextBytesAtom`
+- No-op write / round-trip preservation
 
 ## Limitations
 
-- No no-op write preservation yet
-- No Java POI interop track yet
-- Slide order is not yet rebuilt from `Current User` / `UserEditAtom` / persist pointers
-- No shapes, images, comments, notes, animations, transitions, OLE, or master/layout model
+- Java POI direction-B assertion is still pending
+- No shapes, images, comments, notes, animations, transitions, or master/layout editing model
 - No public editing API
 
 For new presentations, prefer `pptx` / XSLF.

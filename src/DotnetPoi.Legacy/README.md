@@ -19,8 +19,8 @@ NuGet automatically resolves transitive dependencies (`DotnetPoi.Common`, `Dotne
 | Format | Implementation | Status | Description |
 |---|---|---|---|
 | **xls** | HSSF | ⚠️ Partial (~35%) | Basic workbook read/write, styles, layout, and OLE/BIFF preservation. |
-| **doc** | HWPF | ⚠️ Partial (~20%) | Main body text extraction and limited body editing with OLE preservation. |
-| **ppt** | HSLF | ❌ Experimental (~5%) | Early text extraction reader; no write support yet. |
+| **doc** | HWPF | ⚠️ Partial (~25%) | Main body/header/footer/table text extraction and limited body editing with OLE preservation. |
+| **ppt** | HSLF | ⚠️ Experimental (~12%) | OLE2 open, text extraction, record inventory, and no-op preservation. |
 
 ### HSSF (Excel 97-2003)
 
@@ -34,8 +34,8 @@ NuGet automatically resolves transitive dependencies (`DotnetPoi.Common`, `Dotne
 
 ### HSLF (PowerPoint 97-2003)
 
-- **Supported:** OLE2 open; `PowerPoint Document` stream scan; basic text extraction.
-- **Not yet modeled:** Writing; slide order reconstruction; shapes; images; master slides.
+- **Supported:** OLE2 open; stream inventory; `PowerPoint Document` record tree scan; slide order; TextChars/TextBytes extraction; no-op write/preservation.
+- **Not yet modeled:** New slide creation; shape editing; image insertion; master/layout editing; animations.
 
 ## Usage scenarios
 

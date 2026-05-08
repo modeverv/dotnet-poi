@@ -7,6 +7,10 @@ Shared interfaces, enums, utilities, and XML writer foundation shared by all Dot
 
 ## License
 
+## Scope
+
+This package contains shared API types only. User-facing Office format support lives in `DotnetPoi.Ooxml`, `DotnetPoi.Legacy`, and `DotnetPoi.Formula`.
+
 [Apache License 2.0](../../LICENSE) — same as upstream Apache POI.
 
 ## Disclaimer

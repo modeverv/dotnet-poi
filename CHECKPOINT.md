@@ -3252,3 +3252,44 @@ Known gaps in current implementation:
 - Added C# standalone roundtrip tests and Java POI bidirectional interop tests ensuring Java POI correctly extracts Header and Table structures from dotnet-poi No-Op saved documents.
 - Fixed PAPX parsing offset errors that failed to extract `opSize` properly for SPRA case 5 and 6.
 - Verification: All `DotnetPoi.Legacy.Tests` passed (224/224). All Java Interop tests passed.
+
+## 2026-05-08 15:30 JST - README practical workflow assessment
+- User asked whether README implies practical business workflow coverage is now effectively sufficient.
+- Read README status/matrix: xlsx is broad and stable for common creation/read/edit/styling/layout/images/formulas-as-text/macro preservation; docx and pptx are practical for generation/light editing/preservation; xls now covers basic values/styles/layout/preservation/interop; doc covers body text, limited body edits, header/footer/table extraction, and preservation; ppt remains early.
+- Assessment: for typical business workflows centered on template fill, report generation, light editing, round-trip preservation, and Excel/Word/PowerPoint interoperability, the project appears to have crossed from "prototype port" into "practical pilot/limited production" territory. Remaining release risk is concentrated in advanced object-model editing: full formula evaluation, chart creation/editing, comments/deep review features, advanced legacy binary editing, and ppt depth.
+
+## 2026-05-08 15:35 JST - DOCX tracked changes preservation risk
+- User asked whether README `docx Track Changes / insertions/deletions/moves = ❌` means tracked changes are broken.
+- Code review finding: `XWPFDocument` does raw-capture unknown direct children of `w:body` and `w:p`, and comments mention track changes. However `WriteDocument()` emits modeled paragraphs first, modeled tables second, then preserved raw body elements; `WriteParagraph()` emits modeled runs/fields first, then preserved raw paragraph elements. Therefore tracked-change elements such as `w:ins`, `w:del`, `w:moveFrom`, `w:moveTo` may survive as raw XML but can be reordered relative to surrounding paragraphs/runs/tables.
+- Assessment: README `❌` should currently be read as "not modeled and not guaranteed safe"; tracked-change documents may be semantically damaged on read/write, especially when change elements are interleaved with normal content. To claim preservation (`🔵`), XWPF needs an order-preserving body/paragraph child model and tests with `w:ins`/`w:del`/move ranges.
+
+## 2026-05-08 15:55 JST - Phase 18 TODO2 DOCX tracked changes preservation
+- Task: implement Phase 18 TODO2: raise docx Track Changes from ❌ to 🔵 preservation by adding raw XML order preservation.
+- Implemented an internal order-preserving body child model in `XWPFDocument` so paragraphs, tables, and raw body-level XML are emitted in read/creation order instead of paragraphs first, tables second, raw last.
+- Implemented an internal order-preserving paragraph child model in `XWPFParagraph` so runs, fields, and raw paragraph-level XML (`w:ins`, `w:del`, inline SDT/bookmarks/etc.) are emitted in their observed order instead of raw XML being appended at paragraph end.
+- Updated field writing to use the same paragraph child order. This makes generated field output appear between surrounding runs, matching user-visible order better than the previous runs-first/fields-last writer.
+- Added XWPF tests:
+  - `RoundTrip_TrackedChanges_PreservedInParagraphOrder`
+  - `RoundTrip_TrackedChanges_PreservedInTableCellParagraphOrder`
+  - `Write_ParagraphsAndTables_KeepCreationOrder`
+- Updated README docx matrix: Track Changes is now `🔵`, with note that tracked-change XML is preserved in body/paragraph order but accept/reject/create/edit APIs are not modeled.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XWPF"` passed: 44/44.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed: 169/169.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Docx"` passed: 10 passed, 1 skipped.
+- Remaining limitation: this is preservation, not a tracked-changes object model. No accept/reject API, author/date editing, or semantic merge/edit behavior is implemented.
+
+## 2026-05-08 16:03 JST - Documentation maintenance for Phase 18 TODO2
+- Task: user requested maintenance for `NOW.md`, `agents.md`, `README.md`, `CHECKPOINT.md`, `docs_src`, and all project package README files under `src/`.
+- Updated status matrices so docx/XWPF Track Changes is now `🔵 preservation-only`, not `❌`.
+- Updated wording to clarify that tracked-change XML is preserved in body/paragraph child order, while accept/reject/create/edit APIs remain unsupported.
+- Updated test-count snapshots in `NOW.md` and root `README.md` to reflect current Ooxml/Legacy/Interop totals.
+- Updated `agents.md` Phase 18 TODO2 checkbox to completed with implementation notes.
+- Updated `docs_src/content/compatibility/format-coverage.md`, `limitations.md`, `interop.md`, and `guides/ppt/overview.md` for the current XWPF tracked-change and HSLF preservation status.
+- Updated package READMEs:
+  - `src/DotnetPoi.Ooxml/README.md`: added support-status table and XWPF tracked-change preservation note.
+  - `src/DotnetPoi.All/README.md`: added current-scope notes.
+  - `src/DotnetPoi.Legacy/README.md`: refreshed HWPF/HSLF percentages and supported/not-modeled lists.
+  - `src/DotnetPoi.Formula/README.md`: replaced stale `DotnetPoi.Core` wording and updated test count.
+  - `src/DotnetPoi.Common/README.md` and `src/DotnetPoi.POIFS/README.md`: clarified transitive package scope.
+- No commit made per repository rule.

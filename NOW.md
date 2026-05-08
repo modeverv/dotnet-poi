@@ -38,7 +38,7 @@
 | 〃 | マクロ有効（xlsm） | ✅ | VBA バイト保存 + ラウンドトリップ確認済 |
 | 〃 | **スパークライン** | ❌ | |
 | 〃 | **外部データ接続** | 🔵 不明パーツ保存のみ | `xl/connections.xml` / `xl/externalLinks/*` は round-trip 保持されるが API モデルなし |
-| 〃 | テスト数 | **166 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project。POI実ファイルを使った preservation / interop 系は Interop.Tests 側にも含む |
+| 〃 | テスト数 | **169 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project。POI実ファイルを使った preservation / interop 系は Interop.Tests 側にも含む |
 
 ---
 
@@ -66,11 +66,11 @@
 | **フィールド** | **TOC（目次）/ ページ番号 / 差し込み印刷** | ✅ | write/read/round-trip 完了 |
 | **SDT** | **コンテンツコントロール** | 🔵 | ブロックレベル `w:sdt`（bodyの直下）もインライン `w:sdt`（段落内）も raw XML 補完で round-trip 維持。 |
 | **スタイル** | **段落スタイル（pStyle参照）** | ✅ | `setStyle()`/`getStyleID()` API、round-trip 確認済。文字/テーブルスタイルは ❌。`word/styles.xml` は🔵保持＋新規文書にデフォルトスタイル自動生成 |
-| **変更履歴** | **トラックチェンジ** | ❌ | |
+| **変更履歴** | **トラックチェンジ** | 🔵 preservation-only | `w:ins` / `w:del` などの変更履歴XMLは body/paragraph child order を保持して round-trip。accept/reject/create/edit API は未実装 |
 | **その他** | マクロ有効（docm） | ✅ | VBA バイト保存 |
 | 〃 | 未知パーツ保存 | ✅ | _preservedEntries 機構実装済 |
 | 〃 | **OLE 埋め込み** | 🔵 不明パーツ保存のみ | `word/embeddings/*` は round-trip 保持される |
-| 〃 | テスト数 | **151 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project 内で検証 |
+| 〃 | テスト数 | **169 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project 内で検証 |
 
 ---
 
@@ -97,7 +97,7 @@
 | 〃 | **レイアウト読み取り・選択** | ✅ | `getSlideLayouts()` で名前/type 取得。`createSlide(layout)` でレイアウト指定。テンプレート pptx の軽編集に対応 |
 | **その他** | 未知パーツ保存 | ✅ | |
 | 〃 | マクロ有効（pptm） | ✅ | VBA バイト保存 |
-| 〃 | テスト数 | **151 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project 内で検証 |
+| 〃 | テスト数 | **169 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project 内で検証 |
 
 ---
 
@@ -190,7 +190,7 @@
 |---|---|---|
 | 10 | SmartArt / アニメーション / トランジション | pptx で新規作成できないが、不明パーツ保存で維持される。プログラマティックに生成するユースケースは稀。 |
 | 11 | ppt（HSLF）と xls/doc の未対応深部 | HSLF は open/text extraction/no-op preservation/round-trip まで対応済。スライド作成・図形編集・画像追加は未対応。HSSF/HWPF も基礎対応は進んだが、画像・図形・高度な書式・完全編集はまだ重い。新規開発はほぼ OOXML で行われる。 |
-| 12 | 変更履歴 / スパークライン | 特殊用途または複雑すぎる。最初の round-trip 対象としては重い。 |
+| 12 | スパークライン / 変更履歴API | スパークラインは未対応。docx 変更履歴は raw XML の順序保持 round-trip まで対応済みだが、accept/reject/create/edit の API モデルは未実装。 |
 
 ---
 
@@ -200,14 +200,14 @@
 |---|---|---|
 | Common.Tests | 79 | shared SS / XML writer / utilities |
 | POIFS.Tests | 11 | OLE2 container |
-| Ooxml.Tests | 166 | XSSF / XWPF / XSLF |
+| Ooxml.Tests | 169 | XSSF / XWPF / XSLF |
 | Legacy.Tests | 224 | HSSF / HWPF / HSLF |
 | Formula.Tests | 11 | 限定 formula evaluator subset |
 | All.Tests | 7 | 全体 smoke test |
 | Interop.Tests (C#) | 73 | 双方向 interop fixture 検証 (71 pass + 2 skip) |
-| **Total (C#)** | **571** | 569 pass + 2 skip |
+| **Total (C#)** | **574** | 572 pass + 2 skip |
 | Java POI 側 (Maven) | 45 tests | うち dotnet-poi 関連 25 tests |
 
 ---
 
-*最終更新: 2026-05-08 (phase 17-10: HWPF/doc header/footer/table text extraction 完了)*
+*最終更新: 2026-05-08 (phase 18 TODO2: docx tracked changes preservation-only 対応)*

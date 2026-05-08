@@ -19,11 +19,44 @@ public enum LineSpacingRule
 
 public sealed class XWPFParagraph
 {
+    internal enum ChildKind
+    {
+        Run,
+        Field,
+        Raw
+    }
+
+    internal sealed class Child
+    {
+        private Child(ChildKind kind, XWPFRun? run, XWPFField? field, string? rawXml)
+        {
+            Kind = kind;
+            Run = run;
+            Field = field;
+            RawXml = rawXml;
+        }
+
+        internal ChildKind Kind { get; }
+        internal XWPFRun? Run { get; }
+        internal XWPFField? Field { get; }
+        internal string? RawXml { get; }
+
+        internal static Child ForRun(XWPFRun run) => new(ChildKind.Run, run, null, null);
+        internal static Child ForField(XWPFField field) => new(ChildKind.Field, null, field, null);
+        internal static Child ForRaw(string rawXml) => new(ChildKind.Raw, null, null, rawXml);
+    }
+
     private readonly List<XWPFRun> _runs = new();
     private readonly List<XWPFField> _fields = new();
     private readonly List<string> _preservedRawElements = new();
+    private readonly List<Child> _children = new();
     internal IReadOnlyList<string> PreservedRawElements => _preservedRawElements;
-    internal void addPreservedRawElement(string rawXml) => _preservedRawElements.Add(rawXml);
+    internal IReadOnlyList<Child> Children => _children;
+    internal void addPreservedRawElement(string rawXml)
+    {
+        _preservedRawElements.Add(rawXml);
+        _children.Add(Child.ForRaw(rawXml));
+    }
     // Paragraph-level section properties (sectPr inside pPr for section breaks)
     private string? _preservedSectPr;
     internal string? PreservedSectPr => _preservedSectPr;
@@ -75,6 +108,7 @@ public sealed class XWPFParagraph
     {
         var run = new XWPFRun(this);
         _runs.Add(run);
+        _children.Add(Child.ForRun(run));
         return run;
     }
 
@@ -91,6 +125,7 @@ public sealed class XWPFParagraph
     {
         var field = new XWPFField(instruction, result);
         _fields.Add(field);
+        _children.Add(Child.ForField(field));
         return field;
     }
 

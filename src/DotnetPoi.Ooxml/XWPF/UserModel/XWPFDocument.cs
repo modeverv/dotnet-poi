@@ -8,6 +8,38 @@ namespace DotnetPoi.XWPF.UserModel;
 
 public sealed class XWPFDocument : IDisposable
 {
+    private enum BodyChildKind
+    {
+        Paragraph,
+        Table,
+        Raw
+    }
+
+    private sealed class BodyChild
+    {
+        private BodyChild(BodyChildKind kind, XWPFParagraph? paragraph, XWPFTable? table, string? rawXml)
+        {
+            Kind = kind;
+            Paragraph = paragraph;
+            Table = table;
+            RawXml = rawXml;
+        }
+
+        internal BodyChildKind Kind { get; }
+        internal XWPFParagraph? Paragraph { get; }
+        internal XWPFTable? Table { get; }
+        internal string? RawXml { get; }
+
+        internal static BodyChild ForParagraph(XWPFParagraph paragraph) =>
+            new(BodyChildKind.Paragraph, paragraph, null, null);
+
+        internal static BodyChild ForTable(XWPFTable table) =>
+            new(BodyChildKind.Table, null, table, null);
+
+        internal static BodyChild ForRaw(string rawXml) =>
+            new(BodyChildKind.Raw, null, null, rawXml);
+    }
+
     private const string NsW = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     private const string NsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private const string NsWp = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
@@ -44,6 +76,7 @@ public sealed class XWPFDocument : IDisposable
     private readonly List<XWPFParagraph> _paragraphs = new();
     private readonly List<XWPFPictureData> _pictures = new();
     private readonly List<XWPFTable> _tables = new();
+    private readonly List<BodyChild> _bodyChildren = new();
     private readonly List<string> _hyperlinkUrls = new();
     private long _nextDrawingId = 1;
 
@@ -125,6 +158,7 @@ public sealed class XWPFDocument : IDisposable
     {
         var paragraph = new XWPFParagraph(this);
         _paragraphs.Add(paragraph);
+        _bodyChildren.Add(BodyChild.ForParagraph(paragraph));
         return paragraph;
     }
 
@@ -134,6 +168,7 @@ public sealed class XWPFDocument : IDisposable
     {
         var table = new XWPFTable(this);
         _tables.Add(table);
+        _bodyChildren.Add(BodyChild.ForTable(table));
         return table;
     }
 
@@ -263,6 +298,12 @@ public sealed class XWPFDocument : IDisposable
     internal bool HasFooter => _footerCount > 0;
     internal int HeaderCount => _headerCount;
     internal int FooterCount => _footerCount;
+
+    private void AddPreservedRawBodyElement(string rawXml)
+    {
+        _preservedRawBodyElements.Add(rawXml);
+        _bodyChildren.Add(BodyChild.ForRaw(rawXml));
+    }
 
     public void write(Stream stream)
     {
@@ -410,12 +451,17 @@ public sealed class XWPFDocument : IDisposable
     private void Load(Stream stream)
     {
         _paragraphs.Clear();
+        _tables.Clear();
+        _bodyChildren.Clear();
         _pictures.Clear();
         _nextDrawingId = 1;
         _vbaProjectBin = null;
         _vbaDataXml = null;
         _vbaProjectBinRels = null;
         _preservedEntries.Clear();
+        _preservedRawBodyElements.Clear();
+        _preservedRawSectPrChildren.Clear();
+        _preservedBodySectPr.Clear();
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
 
@@ -679,7 +725,7 @@ public sealed class XWPFDocument : IDisposable
                     {
                         if (reader.LocalName is not ("p" or "tbl" or "sectPr" or "body"))
                         {
-                            _preservedRawBodyElements.Add(reader.ReadOuterXml());
+                            AddPreservedRawBodyElement(reader.ReadOuterXml());
                             skipRead = true;
                             continue;
                         }
@@ -687,7 +733,7 @@ public sealed class XWPFDocument : IDisposable
                     else
                     {
                         // Non-W namespace direct body child (e.g., mc:AlternateContent)
-                        _preservedRawBodyElements.Add(reader.ReadOuterXml());
+                        AddPreservedRawBodyElement(reader.ReadOuterXml());
                         skipRead = true;
                         continue;
                     }
@@ -1781,18 +1827,9 @@ public sealed class XWPFDocument : IDisposable
             writer.WriteAttributeString("xmlns:pic", NsPic);
         }
         writer.WriteStartElement("w", "body");
-        foreach (var para in _paragraphs)
+        foreach (var child in _bodyChildren)
         {
-            WriteParagraph(writer, para);
-        }
-        foreach (var table in _tables)
-        {
-            WriteTable(writer, table);
-        }
-        // Re-emit unknown body children (SDT, altChunk, bookmarks, etc.) verbatim
-        foreach (var raw in _preservedRawBodyElements)
-        {
-            writer.WriteRaw(raw);
+            WriteBodyChild(writer, child);
         }
         // Emit mid-document body-level section breaks (all except the final one)
         // The final body-level sectPr is emitted as the model's sectPr below.
@@ -1872,6 +1909,22 @@ public sealed class XWPFDocument : IDisposable
         writer.WriteEndElement(); // sectPr
         writer.WriteEndElement(); // body
         writer.WriteEndElement(); // document
+    }
+
+    private void WriteBodyChild(PoiXmlWriter writer, BodyChild child)
+    {
+        switch (child.Kind)
+        {
+            case BodyChildKind.Paragraph when child.Paragraph is not null:
+                WriteParagraph(writer, child.Paragraph);
+                break;
+            case BodyChildKind.Table when child.Table is not null:
+                WriteTable(writer, child.Table);
+                break;
+            case BodyChildKind.Raw when child.RawXml is not null:
+                writer.WriteRaw(child.RawXml);
+                break;
+        }
     }
 
     private void WriteParagraph(PoiXmlWriter writer, XWPFParagraph para)
@@ -1965,60 +2018,64 @@ public sealed class XWPFDocument : IDisposable
             writer.WriteEndElement(); // pPr
         }
 
-        foreach (var run in para.Runs)
+        foreach (var child in para.Children)
         {
-            WriteRun(writer, run);
-        }
-
-        // Write fields as the full fldChar sequence
-        foreach (var field in para.Fields)
-        {
-            // begin
-            writer.WriteStartElement("w", "r");
-            writer.WriteStartElement("w", "fldChar");
-            writer.WriteAttributeString("w", "fldCharType", "begin");
-            writer.WriteEndElement();
-            writer.WriteEndElement();
-
-            // instrText
-            writer.WriteStartElement("w", "r");
-            writer.WriteStartElement("w", "instrText");
-            writer.WriteAttributeString("xml:space", "preserve");
-            writer.WriteString(field.Instruction);
-            writer.WriteEndElement();
-            writer.WriteEndElement();
-
-            // separate
-            writer.WriteStartElement("w", "r");
-            writer.WriteStartElement("w", "fldChar");
-            writer.WriteAttributeString("w", "fldCharType", "separate");
-            writer.WriteEndElement();
-            writer.WriteEndElement();
-
-            // result (if non-empty)
-            if (!string.IsNullOrEmpty(field.Result))
+            switch (child.Kind)
             {
-                writer.WriteStartElement("w", "r");
-                writer.WriteStartElement("w", "t");
-                writer.WriteString(field.Result);
-                writer.WriteEndElement();
-                writer.WriteEndElement();
+                case XWPFParagraph.ChildKind.Run when child.Run is not null:
+                    WriteRun(writer, child.Run);
+                    break;
+                case XWPFParagraph.ChildKind.Field when child.Field is not null:
+                    WriteField(writer, child.Field);
+                    break;
+                case XWPFParagraph.ChildKind.Raw when child.RawXml is not null:
+                    writer.WriteRaw(child.RawXml);
+                    break;
             }
-
-            // end
-            writer.WriteStartElement("w", "r");
-            writer.WriteStartElement("w", "fldChar");
-            writer.WriteAttributeString("w", "fldCharType", "end");
-            writer.WriteEndElement();
-            writer.WriteEndElement();
         }
 
-        // Re-emit unknown direct children of w:p (inline SDT, bookmarks, tracked changes, etc.)
-        foreach (var raw in para.PreservedRawElements)
+        writer.WriteEndElement();
+    }
+
+    private void WriteField(PoiXmlWriter writer, XWPFField field)
+    {
+        // begin
+        writer.WriteStartElement("w", "r");
+        writer.WriteStartElement("w", "fldChar");
+        writer.WriteAttributeString("w", "fldCharType", "begin");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+
+        // instrText
+        writer.WriteStartElement("w", "r");
+        writer.WriteStartElement("w", "instrText");
+        writer.WriteAttributeString("xml:space", "preserve");
+        writer.WriteString(field.Instruction);
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+
+        // separate
+        writer.WriteStartElement("w", "r");
+        writer.WriteStartElement("w", "fldChar");
+        writer.WriteAttributeString("w", "fldCharType", "separate");
+        writer.WriteEndElement();
+        writer.WriteEndElement();
+
+        // result (if non-empty)
+        if (!string.IsNullOrEmpty(field.Result))
         {
-            writer.WriteRaw(raw);
+            writer.WriteStartElement("w", "r");
+            writer.WriteStartElement("w", "t");
+            writer.WriteString(field.Result);
+            writer.WriteEndElement();
+            writer.WriteEndElement();
         }
 
+        // end
+        writer.WriteStartElement("w", "r");
+        writer.WriteStartElement("w", "fldChar");
+        writer.WriteAttributeString("w", "fldCharType", "end");
+        writer.WriteEndElement();
         writer.WriteEndElement();
     }
 

@@ -14,6 +14,20 @@ dotnet add package DotnetPoi.Ooxml
 
 NuGet automatically resolves transitive dependencies (`DotnetPoi.Common`, `DotnetPoi.POIFS`).
 
+## Support Status
+
+`DotnetPoi.Ooxml` is the stable package for practical OOXML workflows:
+
+| Format | Implementation | Status | Description |
+|---|---|---|---|
+| **xlsx / xlsm** | XSSF | ✅ Practical (~78%) | Workbook creation/read/edit, styles, layout, images, formulas-as-text, macro preservation, and Java POI interop slices. |
+| **docx / docm** | XWPF | ✅ Practical (~65%) | Paragraphs/runs, tables, sections, headers/footers, images, fields, text boxes, macro preservation, and loss-resistant round-trips. |
+| **pptx / pptm** | XSLF | ⚠️ Practical basic (~40%) | Slides, text, pictures, tables, slide size, layout references, macro preservation, and preservation of many advanced parts. |
+
+### XWPF tracked changes
+
+Tracked-change XML (`w:ins`, `w:del`, move ranges, etc.) is preserved in body/paragraph child order during round-trip. This is preservation-only: accept/reject/create/edit APIs for revisions are not modeled.
+
 ## Usage scenarios
 
 | If you need… | Install this |

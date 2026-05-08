@@ -159,7 +159,7 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | Fields | TOC, page numbers, mail merge-style fields | ✅ | Write/read/round-trip covered. |
 | Content Controls | SDT (structured document tags) | 🔵 | Block-level and inline SDT preserved via raw XML capture/re-emission. |
 | Styles | paragraph style reference (pStyle) | ✅ | `setStyle()`/`getStyleID()` API, round-trip verified. Character/table styles ❌. `word/styles.xml` 🔵 preserved + default styles auto-generated for new docs. |
-| Track Changes | insertions/deletions/moves | ❌ | |
+| Track Changes | insertions/deletions/moves | 🔵 | Tracked-change XML is preserved in body/paragraph child order during round-trip; API-level accept/reject/create/edit is not modeled. |
 | Other | docm macro preservation | ✅ | VBA byte preservation. |
 | 〃 | unknown part preservation | ✅ | `_preservedEntries` mechanism implemented. |
 | 〃 | OLE embeddings | 🔵 | `word/embeddings/*` round-trip via `_preservedEntries`. |
@@ -228,9 +228,9 @@ Highest priority gaps:
 | 2 | Chart creation | xlsx, pptx | Existing charts can be preserved, but report/presentation generation often needs to create charts from data. |
 | 3 | Comment API model | xlsx, docx | Existing comments survive round-trip through `_preservedEntries`, but API-level read/create/edit support is not implemented. |
 | 4 | HSSF/HWPF depth | xls, doc | Basic legacy read/write and preservation exist, but images, shapes, advanced formatting, and complete editing are still limited. |
-| 5 | docx text boxes and style depth | docx | Paragraph style references are supported, but text boxes and full character/table style editing remain limited. |
+| 5 | docx style depth and revision APIs | docx | Paragraph style references and tracked-change preservation are supported, but full character/table style editing and accept/reject/create/edit APIs for revisions remain limited. |
 
-Lower priority gaps include SmartArt, animations, transitions, `ppt` legacy depth, tracked changes, and sparklines.
+Lower priority gaps include SmartArt, animations, transitions, `ppt` legacy depth, tracked-change editing APIs, and sparklines.
 
 ### Test Coverage Snapshot
 
@@ -238,15 +238,15 @@ Tracked in [NOW.md](./NOW.md):
 
 | Package | Test Project | Tests | Notes |
 |---|---|---|---:|
-| **OOXML** | Ooxml.Tests | 151 | OOXML-specific split tests |
-| **Legacy** | Legacy.Tests | 221 | Legacy-specific split tests |
+| **OOXML** | Ooxml.Tests | 169 | OOXML-specific split tests |
+| **Legacy** | Legacy.Tests | 224 | Legacy-specific split tests |
 | **Formula** | Formula.Tests | 11 | Minimal formula package coverage |
 | **Common** | Common.Tests | 79 | Shared SS/utility tests |
 | **POIFS** | POIFS.Tests | 11 | OLE2 container tests |
 | **All** | All.Tests | 7 | Meta-package smoke tests |
-| **Interop** | Interop.Tests (C#) | 70 passed / 2 skipped | Bidirectional Java/.NET fixtures + preservation |
-| **Total (C#)** | | **550 passed / 2 skipped** | |
-| Java POI side (Maven) | | 44+ | Java fixture generation/readback tests |
+| **Interop** | Interop.Tests (C#) | 71 passed / 2 skipped | Bidirectional Java/.NET fixtures + preservation |
+| **Total (C#)** | | **572 passed / 2 skipped** | |
+| Java POI side (Maven) | | 45+ | Java fixture generation/readback tests |
 
 ---
 

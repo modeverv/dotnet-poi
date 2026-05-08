@@ -717,8 +717,115 @@ public class XWPFDocumentTests
         Assert.Equal(" PAGE ", fields[0].Instruction);
         Assert.Equal("1", fields[0].Result);
 
-        // Runs should also be preserved (field result "1" appears as a run after text runs, since fields are written after runs)
-        Assert.Equal("Before field.  After field.1", loadedPara.getText());
+        Assert.Equal("Before field. 1 After field.", loadedPara.getText());
+    }
+
+    [Fact]
+    public void RoundTrip_TrackedChanges_PreservedInParagraphOrder()
+    {
+        using var stream = CreateDocxWithDocumentXml("""
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body>
+                <w:p>
+                  <w:r><w:t>Before </w:t></w:r>
+                  <w:ins w:id="1" w:author="Alice" w:date="2026-05-08T00:00:00Z">
+                    <w:r><w:t>inserted </w:t></w:r>
+                  </w:ins>
+                  <w:r><w:t>Middle </w:t></w:r>
+                  <w:del w:id="2" w:author="Bob" w:date="2026-05-08T00:00:00Z">
+                    <w:r><w:delText>deleted </w:delText></w:r>
+                  </w:del>
+                  <w:r><w:t>After</w:t></w:r>
+                </w:p>
+              </w:body>
+            </w:document>
+            """);
+
+        using var doc = new XWPFDocument(stream);
+        using var outStream = new MemoryStream();
+        doc.write(outStream);
+        outStream.Position = 0;
+
+        using var archive = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var xml = ReadEntry(archive, "word/document.xml");
+
+        var before = xml.IndexOf("Before ", StringComparison.Ordinal);
+        var ins = xml.IndexOf("<w:ins", StringComparison.Ordinal);
+        var middle = xml.IndexOf("Middle ", StringComparison.Ordinal);
+        var del = xml.IndexOf("<w:del", StringComparison.Ordinal);
+        var after = xml.IndexOf("After", StringComparison.Ordinal);
+
+        Assert.True(before >= 0);
+        Assert.True(ins > before);
+        Assert.True(middle > ins);
+        Assert.True(del > middle);
+        Assert.True(after > del);
+        Assert.Contains("w:author=\"Alice\"", xml);
+        Assert.Contains("<w:delText>deleted </w:delText>", xml);
+    }
+
+    [Fact]
+    public void RoundTrip_TrackedChanges_PreservedInTableCellParagraphOrder()
+    {
+        using var stream = CreateDocxWithDocumentXml("""
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body>
+                <w:tbl>
+                  <w:tr>
+                    <w:tc>
+                      <w:p>
+                        <w:r><w:t>Cell before </w:t></w:r>
+                        <w:ins w:id="3" w:author="Carol"><w:r><w:t>cell insert </w:t></w:r></w:ins>
+                        <w:r><w:t>Cell after</w:t></w:r>
+                      </w:p>
+                    </w:tc>
+                  </w:tr>
+                </w:tbl>
+              </w:body>
+            </w:document>
+            """);
+
+        using var doc = new XWPFDocument(stream);
+        using var outStream = new MemoryStream();
+        doc.write(outStream);
+        outStream.Position = 0;
+
+        using var archive = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var xml = ReadEntry(archive, "word/document.xml");
+
+        var before = xml.IndexOf("Cell before ", StringComparison.Ordinal);
+        var ins = xml.IndexOf("<w:ins", StringComparison.Ordinal);
+        var after = xml.IndexOf("Cell after", StringComparison.Ordinal);
+
+        Assert.True(before >= 0);
+        Assert.True(ins > before);
+        Assert.True(after > ins);
+        Assert.Contains("w:author=\"Carol\"", xml);
+    }
+
+    [Fact]
+    public void Write_ParagraphsAndTables_KeepCreationOrder()
+    {
+        using var doc = new XWPFDocument();
+        doc.createParagraph().createRun().setText("P1");
+        var table = doc.createTable();
+        table.createRow().createCell().addParagraph().createRun().setText("T1");
+        doc.createParagraph().createRun().setText("P2");
+
+        using var stream = new MemoryStream();
+        doc.write(stream);
+        stream.Position = 0;
+
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var xml = ReadEntry(archive, "word/document.xml");
+
+        var p1 = xml.IndexOf("P1", StringComparison.Ordinal);
+        var t1 = xml.IndexOf("T1", StringComparison.Ordinal);
+        var p2 = xml.IndexOf("P2", StringComparison.Ordinal);
+
+        Assert.True(p1 >= 0);
+        Assert.True(t1 > p1);
+        Assert.True(p2 > t1);
     }
 
     [Fact]

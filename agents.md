@@ -748,7 +748,9 @@ integration:
     - 1.0 後の目標としては広すぎる
     - 実用ワークフロー単位で増やす方が良いです
 
-
+#### phase 18 TODO2
+- [x] 1. docx | **変更履歴** | **トラックチェンジ** | 🔵 preservation-only |
+         raw XMLの順序保持モデルを入れて 🔵 preservation に上げる対応完了。`XWPFDocument` は body child order（paragraph/table/raw）を保持し、`XWPFParagraph` は paragraph child order（run/field/raw）を保持する。`w:ins` / `w:del` などの変更履歴XMLは通常runとの相対順序を保って round-trip する。accept/reject/create/edit API は未実装。
 
 ---
 

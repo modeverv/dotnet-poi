@@ -38,7 +38,7 @@ Both directions run in CI on every push.
 | docx (XWPF) | ✅ Comprehensive | ✅ Comprehensive |
 | doc (HWPF) | — | ⚠️ No-op saved `.doc` smoke |
 | pptx (XSLF) | ✅ Comprehensive | ✅ Comprehensive |
-| ppt (HSLF) | ❌ Planned | ❌ Planned |
+| ppt (HSLF) | ⚠️ Fixture survey / text extraction | ⚠️ C# no-op fixture generation; Java assertion pending |
 | xlsm (macro) | N/A | ✅ |
 | docm (macro) | N/A | ✅ |
 | pptm (macro) | N/A | ✅ |
