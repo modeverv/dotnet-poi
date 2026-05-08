@@ -38,7 +38,7 @@
 | 〃 | マクロ有効（xlsm） | ✅ | VBA バイト保存 + ラウンドトリップ確認済 |
 | 〃 | **スパークライン** | ❌ | |
 | 〃 | **外部データ接続** | 🔵 不明パーツ保存のみ | `xl/connections.xml` / `xl/externalLinks/*` は round-trip 保持されるが API モデルなし |
-| 〃 | テスト数 | **151 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project。POI実ファイルを使った preservation / interop 系は Interop.Tests 側にも含む |
+| 〃 | テスト数 | **166 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project。POI実ファイルを使った preservation / interop 系は Interop.Tests 側にも含む |
 
 ---
 
@@ -93,7 +93,8 @@
 | 〃 | **オートシェイプ（矩形/円/etc.）以外の図形** | ❌ | |
 | **メディア** | **動画・音声埋め込み** | 🔵 不明パーツ保存のみ | 画像以外の `ppt/media/*` は round-trip 保持されるが API モデルなし |
 | **アニメ** | **アニメーション / トランジション** | 🔵 不明パーツ保存のみ | |
-| **テーマ** | レイアウト・マスター・テーマ | 🔵 不明パーツ保存のみ | 編集不可 |
+| **テーマ** | レイアウト・マスター保存 | ✅ | テンプレート round-trip で master/layout 全保持 |
+| 〃 | **レイアウト読み取り・選択** | ✅ | `getSlideLayouts()` で名前/type 取得。`createSlide(layout)` でレイアウト指定。テンプレート pptx の軽編集に対応 |
 | **その他** | 未知パーツ保存 | ✅ | |
 | 〃 | マクロ有効（pptm） | ✅ | VBA バイト保存 |
 | 〃 | テスト数 | **151 Ooxml.Tests 全体** | XSSF/XWPF/XSLF の split test project 内で検証 |
@@ -197,14 +198,14 @@
 |---|---|---|
 | Common.Tests | 79 | shared SS / XML writer / utilities |
 | POIFS.Tests | 11 | OLE2 container |
-| Ooxml.Tests | 151 | XSSF / XWPF / XSLF |
+| Ooxml.Tests | 166 | XSSF / XWPF / XSLF |
 | Legacy.Tests | 221 | HSSF / HWPF / HSLF |
 | Formula.Tests | 11 | 限定 formula evaluator subset |
 | All.Tests | 7 | 全体 smoke test |
 | Interop.Tests (C#) | 72 | 双方向 interop fixture 検証 (70 pass + 2 skip) |
-| **Total (C#)** | **552** | 550 pass + 2 skip |
+| **Total (C#)** | **567** | 565 pass + 2 skip |
 | Java POI 側 (Maven) | 44 tests | うち dotnet-poi 関連 24 tests |
 
 ---
 
-*最終更新: 2026-05-08*
+*最終更新: 2026-05-08 (phase 17-7: XSLF layout/master 最小操作 追加)*

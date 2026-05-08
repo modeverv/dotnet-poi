@@ -914,8 +914,7 @@ public class XWPFDocumentTests
 
         // Row 0: cells[0] has gridSpan=3
         var loadedRow0 = loadedTable.getRows()[0];
-        Assert.Equal(1, loadedRow0.getCells().Count);
-        var loadedCell = loadedRow0.getCells()[0];
+        var loadedCell = Assert.Single(loadedRow0.getCells());
         Assert.Equal(3, loadedCell.getGridSpan());
         Assert.Equal("A1", loadedCell.getParagraphs()[0].getText());
 
@@ -928,6 +927,130 @@ public class XWPFDocumentTests
         var loadedRow2 = loadedTable.getRows()[2];
         Assert.Equal(2, loadedRow2.getCells().Count);
         Assert.Equal("continue", loadedRow2.getCells()[0].getVMerge());
+    }
+
+    [Fact]
+    public void RoundTrip_TableDepthApi_PreservesBordersCellWidthAndVerticalAlignment()
+    {
+        using var original = new XWPFDocument();
+        var table = original.createTable();
+        table.setWidth(9000, "dxa");
+        table.setTopBorder(XWPFTable.XWPFBorderType.Single, 8, 0, "4472C4");
+        table.setBottomBorder(XWPFTable.XWPFBorderType.Double, 12, 1, "70AD47");
+        table.setInsideHBorder(XWPFTable.XWPFBorderType.Dotted, 4, 0, "auto");
+        table.setInsideVBorder(XWPFTable.XWPFBorderType.Dashed, 6, 0, "FF0000");
+
+        var row1 = table.createRow();
+        row1.createCell().addParagraph().createRun().setText("A1");
+        row1.createCell().addParagraph().createRun().setText("A2");
+        row1.createCell().addParagraph().createRun().setText("A3");
+        table.mergeCellsHorizontally(0, 0, 2);
+
+        var row2 = table.createRow();
+        var cell21 = row2.createCell();
+        cell21.setWidth(3200, "dxa");
+        cell21.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.Center);
+        cell21.addParagraph().createRun().setText("B1");
+        row2.createCell().addParagraph().createRun().setText("B2");
+
+        var row3 = table.createRow();
+        var cell31 = row3.createCell();
+        cell31.setWidth("33.3%");
+        cell31.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.Bottom);
+        cell31.addParagraph().createRun().setText("C1");
+        row3.createCell().addParagraph().createRun().setText("C2");
+        table.mergeCellsVertically(1, 1, 2);
+
+        using var stream = new MemoryStream();
+        original.write(stream);
+        stream.Position = 0;
+
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true))
+        {
+            var xml = ReadEntry(archive, "word/document.xml");
+            Assert.Contains("<w:tblBorders>", xml);
+            Assert.Contains("<w:top w:val=\"single\" w:sz=\"8\" w:space=\"0\" w:color=\"4472C4\"/>", xml);
+            Assert.Contains("<w:bottom w:val=\"double\" w:sz=\"12\" w:space=\"1\" w:color=\"70AD47\"/>", xml);
+            Assert.Contains("<w:insideH w:val=\"dotted\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>", xml);
+            Assert.Contains("<w:gridSpan w:val=\"3\"/>", xml);
+            Assert.Contains("<w:vAlign w:val=\"center\"/>", xml);
+            Assert.Contains("<w:tcW w:w=\"1665\" w:type=\"pct\"/>", xml);
+        }
+
+        stream.Position = 0;
+        using var loaded = new XWPFDocument(stream);
+        var loadedTable = Assert.Single(loaded.getTables());
+        Assert.Equal(XWPFTable.XWPFBorderType.Single, loadedTable.getTopBorderType());
+        Assert.Equal(8, loadedTable.getTopBorderSize());
+        Assert.Equal("4472C4", loadedTable.getTopBorderColor());
+        Assert.Equal(XWPFTable.XWPFBorderType.Double, loadedTable.getBottomBorderType());
+        Assert.Equal(1, loadedTable.getBottomBorderSpace());
+        Assert.Equal(XWPFTable.XWPFBorderType.Dotted, loadedTable.getInsideHBorderType());
+        Assert.Equal(XWPFTable.XWPFBorderType.Dashed, loadedTable.getInsideVBorderType());
+        Assert.Equal("FF0000", loadedTable.getInsideVBorderColor());
+
+        Assert.Equal(3, loadedTable.getRows()[0].getCells()[0].getGridSpan());
+        Assert.Equal("continue", loadedTable.getRows()[0].getCells()[1].getHMerge());
+        Assert.Equal("restart", loadedTable.getRows()[1].getCells()[1].getVMerge());
+        Assert.Equal("continue", loadedTable.getRows()[2].getCells()[1].getVMerge());
+
+        var loadedCell21 = loadedTable.getRows()[1].getCells()[0];
+        Assert.Equal(3200, loadedCell21.getWidth());
+        Assert.Equal("dxa", loadedCell21.getWidthType());
+        Assert.Equal(XWPFTableCell.XWPFVertAlign.Center, loadedCell21.getVerticalAlignment());
+
+        var loadedCell31 = loadedTable.getRows()[2].getCells()[0];
+        Assert.Equal(1665, loadedCell31.getWidth());
+        Assert.Equal("pct", loadedCell31.getWidthType());
+        Assert.Equal(XWPFTableCell.XWPFVertAlign.Bottom, loadedCell31.getVerticalAlignment());
+    }
+
+    [Fact]
+    public void Read_TableBordersFromExistingDocument_AvailableThroughApi()
+    {
+        using var stream = CreateDocxWithDocumentXml("""
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body>
+                <w:tbl>
+                  <w:tblPr>
+                    <w:tblW w:w="7200" w:type="dxa"/>
+                    <w:tblBorders>
+                      <w:top w:val="thick" w:sz="18" w:space="2" w:color="111111"/>
+                      <w:left w:val="single" w:sz="8" w:space="0" w:color="222222"/>
+                      <w:insideV w:val="dashed" w:sz="6" w:space="1" w:color="333333"/>
+                    </w:tblBorders>
+                  </w:tblPr>
+                  <w:tr>
+                    <w:tc>
+                      <w:tcPr>
+                        <w:tcW w:w="2400" w:type="dxa"/>
+                        <w:vAlign w:val="bottom"/>
+                      </w:tcPr>
+                      <w:p><w:r><w:t>cell</w:t></w:r></w:p>
+                    </w:tc>
+                  </w:tr>
+                </w:tbl>
+                <w:sectPr/>
+              </w:body>
+            </w:document>
+            """);
+
+        using var doc = new XWPFDocument(stream);
+        var table = Assert.Single(doc.getTables());
+        Assert.Equal(7200, table.getWidth());
+        Assert.Equal(XWPFTable.XWPFBorderType.Thick, table.getTopBorderType());
+        Assert.Equal(18, table.getTopBorderSize());
+        Assert.Equal(2, table.getTopBorderSpace());
+        Assert.Equal("111111", table.getTopBorderColor());
+        Assert.Equal(XWPFTable.XWPFBorderType.Single, table.getLeftBorderType());
+        Assert.Equal(XWPFTable.XWPFBorderType.Dashed, table.getInsideVBorderType());
+        Assert.Equal("333333", table.getInsideVBorderColor());
+
+        var cell = table.getRows()[0].getCells()[0];
+        Assert.Equal(2400, cell.getWidth());
+        Assert.Equal("dxa", cell.getWidthType());
+        Assert.Equal(XWPFTableCell.XWPFVertAlign.Bottom, cell.getVerticalAlignment());
     }
 
     [Fact]

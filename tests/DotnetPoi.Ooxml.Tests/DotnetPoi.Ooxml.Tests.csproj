@@ -27,6 +27,7 @@
         <Content Include="../../tests/test-files/example.xlsm" CopyToOutputDirectory="PreserveNewest" Link="example.xlsm" />
         <Content Include="../../tests/test-files/example.docm" CopyToOutputDirectory="PreserveNewest" Link="example.docm" />
         <Content Include="../../tests/test-files/example.pptm" CopyToOutputDirectory="PreserveNewest" Link="example.pptm" />
+        <Content Include="../../tests/test-files/poi-pptx-layouts.pptx" CopyToOutputDirectory="PreserveNewest" Link="poi-pptx-layouts.pptx" />
     </ItemGroup>
 
 </Project>

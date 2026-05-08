@@ -969,6 +969,12 @@ public sealed class XWPFDocument : IDisposable
                             case "tblStyle" when inTblPr && currentTable is not null:
                                 currentTable.setTableStyle(reader.GetAttribute("w:val"));
                                 break;
+                            case "tblBorders" when inTblPr && currentTable is not null:
+                            {
+                                ParseTableBorders(reader.ReadOuterXml(), currentTable);
+                                skipRead = true;
+                                continue;
+                            }
 
                             // trPr modeled children
                             case "trHeight" when inTrPr && currentRow is not null:
@@ -1079,7 +1085,7 @@ public sealed class XWPFDocument : IDisposable
                 // NOTE: The property container elements (tblPr, trPr, tcPr) themselves MUST be
                 // excluded so that their EndElement handler can reset the inXxxPr flag.
                 if (inTblPr && currentTable is not null && reader.NodeType == XmlNodeType.Element
-                    && reader.LocalName is not ("tblPr" or "tblW" or "tblStyle"))
+                    && reader.LocalName is not ("tblPr" or "tblW" or "tblStyle" or "tblBorders"))
                 {
                     currentTable.addPreservedRawTblPrChild(reader.ReadOuterXml());
                     skipRead = true;
@@ -1387,6 +1393,116 @@ public sealed class XWPFDocument : IDisposable
         }
         reader.MoveToElement();
         return null;
+    }
+
+    private static void ParseTableBorders(string bordersXml, XWPFTable table)
+    {
+        using var sr = new StringReader(bordersXml);
+        using var reader = XmlReader.Create(sr, new XmlReaderSettings { IgnoreWhitespace = false });
+
+        while (reader.Read())
+        {
+            if (reader.NodeType != XmlNodeType.Element)
+                continue;
+
+            var position = reader.LocalName switch
+            {
+                "top" => TableBorderPosition.Top,
+                "bottom" => TableBorderPosition.Bottom,
+                "left" => TableBorderPosition.Left,
+                "right" => TableBorderPosition.Right,
+                "insideH" => TableBorderPosition.InsideH,
+                "insideV" => TableBorderPosition.InsideV,
+                _ => (TableBorderPosition?)null
+            };
+
+            if (position is null)
+                continue;
+
+            var type = ParseBorderXmlValue(GetAttributeByLocalName(reader, "val"));
+            var size = ParseIntAttribute(reader, "sz", -1);
+            var space = ParseIntAttribute(reader, "space", -1);
+            var color = GetAttributeByLocalName(reader, "color") ?? "auto";
+            table.SetBorder(position.Value, type, size, space, color);
+        }
+    }
+
+    private static int ParseIntAttribute(XmlReader reader, string localName, int defaultValue)
+    {
+        var value = GetAttributeByLocalName(reader, localName);
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : defaultValue;
+    }
+
+    private static XWPFTable.XWPFBorderType ParseBorderXmlValue(string? value)
+    {
+        return value switch
+        {
+            "nil" => XWPFTable.XWPFBorderType.Nil,
+            "none" => XWPFTable.XWPFBorderType.None,
+            "single" => XWPFTable.XWPFBorderType.Single,
+            "thick" => XWPFTable.XWPFBorderType.Thick,
+            "double" => XWPFTable.XWPFBorderType.Double,
+            "dotted" => XWPFTable.XWPFBorderType.Dotted,
+            "dashed" => XWPFTable.XWPFBorderType.Dashed,
+            "dotDash" => XWPFTable.XWPFBorderType.DotDash,
+            "dotDotDash" => XWPFTable.XWPFBorderType.DotDotDash,
+            "triple" => XWPFTable.XWPFBorderType.Triple,
+            "thinThickSmallGap" => XWPFTable.XWPFBorderType.ThinThickSmallGap,
+            "thickThinSmallGap" => XWPFTable.XWPFBorderType.ThickThinSmallGap,
+            "thinThickThinSmallGap" => XWPFTable.XWPFBorderType.ThinThickThinSmallGap,
+            "thinThickMediumGap" => XWPFTable.XWPFBorderType.ThinThickMediumGap,
+            "thickThinMediumGap" => XWPFTable.XWPFBorderType.ThickThinMediumGap,
+            "thinThickThinMediumGap" => XWPFTable.XWPFBorderType.ThinThickThinMediumGap,
+            "thinThickLargeGap" => XWPFTable.XWPFBorderType.ThinThickLargeGap,
+            "thickThinLargeGap" => XWPFTable.XWPFBorderType.ThickThinLargeGap,
+            "thinThickThinLargeGap" => XWPFTable.XWPFBorderType.ThinThickThinLargeGap,
+            "wave" => XWPFTable.XWPFBorderType.Wave,
+            "doubleWave" => XWPFTable.XWPFBorderType.DoubleWave,
+            "dashSmallGap" => XWPFTable.XWPFBorderType.DashSmallGap,
+            "dashDotStroked" => XWPFTable.XWPFBorderType.DashDotStroked,
+            "threeDEmboss" => XWPFTable.XWPFBorderType.ThreeDEmboss,
+            "threeDEngrave" => XWPFTable.XWPFBorderType.ThreeDEngrave,
+            "outset" => XWPFTable.XWPFBorderType.Outset,
+            "inset" => XWPFTable.XWPFBorderType.Inset,
+            _ => XWPFTable.XWPFBorderType.None
+        };
+    }
+
+    private static string ToBorderXmlValue(XWPFTable.XWPFBorderType type)
+    {
+        return type switch
+        {
+            XWPFTable.XWPFBorderType.Nil => "nil",
+            XWPFTable.XWPFBorderType.None => "none",
+            XWPFTable.XWPFBorderType.Single => "single",
+            XWPFTable.XWPFBorderType.Thick => "thick",
+            XWPFTable.XWPFBorderType.Double => "double",
+            XWPFTable.XWPFBorderType.Dotted => "dotted",
+            XWPFTable.XWPFBorderType.Dashed => "dashed",
+            XWPFTable.XWPFBorderType.DotDash => "dotDash",
+            XWPFTable.XWPFBorderType.DotDotDash => "dotDotDash",
+            XWPFTable.XWPFBorderType.Triple => "triple",
+            XWPFTable.XWPFBorderType.ThinThickSmallGap => "thinThickSmallGap",
+            XWPFTable.XWPFBorderType.ThickThinSmallGap => "thickThinSmallGap",
+            XWPFTable.XWPFBorderType.ThinThickThinSmallGap => "thinThickThinSmallGap",
+            XWPFTable.XWPFBorderType.ThinThickMediumGap => "thinThickMediumGap",
+            XWPFTable.XWPFBorderType.ThickThinMediumGap => "thickThinMediumGap",
+            XWPFTable.XWPFBorderType.ThinThickThinMediumGap => "thinThickThinMediumGap",
+            XWPFTable.XWPFBorderType.ThinThickLargeGap => "thinThickLargeGap",
+            XWPFTable.XWPFBorderType.ThickThinLargeGap => "thickThinLargeGap",
+            XWPFTable.XWPFBorderType.ThinThickThinLargeGap => "thinThickThinLargeGap",
+            XWPFTable.XWPFBorderType.Wave => "wave",
+            XWPFTable.XWPFBorderType.DoubleWave => "doubleWave",
+            XWPFTable.XWPFBorderType.DashSmallGap => "dashSmallGap",
+            XWPFTable.XWPFBorderType.DashDotStroked => "dashDotStroked",
+            XWPFTable.XWPFBorderType.ThreeDEmboss => "threeDEmboss",
+            XWPFTable.XWPFBorderType.ThreeDEngrave => "threeDEngrave",
+            XWPFTable.XWPFBorderType.Outset => "outset",
+            XWPFTable.XWPFBorderType.Inset => "inset",
+            _ => "none"
+        };
     }
 
     /// <summary>
@@ -1771,10 +1887,11 @@ public sealed class XWPFDocument : IDisposable
             || para.getStyleID() is not null)
         {
             writer.WriteStartElement("w", "pPr");
-            if (para.getStyleID() is not null)
+            var styleId = para.getStyleID();
+            if (styleId is not null)
             {
                 writer.WriteStartElement("w", "pStyle");
-                writer.WriteAttributeString("w", "val", para.getStyleID());
+                writer.WriteAttributeString("w", "val", styleId);
                 writer.WriteEndElement();
             }
             if (para.Alignment is not null)
@@ -1912,22 +2029,26 @@ public sealed class XWPFDocument : IDisposable
         // tblPr: modeled properties + preserved raw children
         if (table.getWidth() > 0 || table.getWidthType() is not null
             || table.getTableStyle() is not null
+            || table.Borders.Count > 0
             || table.PreservedRawTblPrChildren.Count > 0)
         {
             writer.WriteStartElement("w", "tblPr");
-            if (table.getTableStyle() is not null)
+            var tableStyle = table.getTableStyle();
+            if (tableStyle is not null)
             {
                 writer.WriteStartElement("w", "tblStyle");
-                writer.WriteAttributeString("w", "val", table.getTableStyle());
+                writer.WriteAttributeString("w", "val", tableStyle);
                 writer.WriteEndElement();
             }
-            if (table.getWidth() > 0)
+            if (table.getWidth() > 0 || table.getWidthType() is not null)
             {
                 writer.WriteStartElement("w", "tblW");
                 writer.WriteAttributeString("w", "w", table.getWidth().ToString(CultureInfo.InvariantCulture));
                 writer.WriteAttributeString("w", "type", table.getWidthType() ?? "dxa");
                 writer.WriteEndElement();
             }
+            if (table.Borders.Count > 0)
+                WriteTableBorders(writer, table);
             foreach (var raw in table.PreservedRawTblPrChildren)
                 writer.WriteRaw(raw);
             writer.WriteEndElement(); // tblPr
@@ -1971,8 +2092,9 @@ public sealed class XWPFDocument : IDisposable
                 {
                     writer.WriteStartElement("w", "trHeight");
                     writer.WriteAttributeString("w", "val", row.getHeight().ToString(CultureInfo.InvariantCulture));
-                    if (row.getHeightRule() is not null)
-                        writer.WriteAttributeString("w", "hRule", row.getHeightRule());
+                    var heightRule = row.getHeightRule();
+                    if (heightRule is not null)
+                        writer.WriteAttributeString("w", "hRule", heightRule);
                     writer.WriteEndElement();
                 }
                 foreach (var raw in row.PreservedRawTrPrChildren)
@@ -1985,12 +2107,13 @@ public sealed class XWPFDocument : IDisposable
                 writer.WriteStartElement("w", "tc");
 
                 // tcPr
-                if (cell.getWidth() > 0 || cell.getGridSpan() > 1 || cell.getVMerge() is not null
+                if (cell.getWidth() > 0 || cell.getWidthType() is not null
+                    || cell.getGridSpan() > 1 || cell.getVMerge() is not null
                     || cell.getHMerge() is not null || cell.getVAlign() is not null
                     || cell.PreservedRawTcPrChildren.Count > 0)
                 {
                     writer.WriteStartElement("w", "tcPr");
-                    if (cell.getWidth() > 0)
+                    if (cell.getWidth() > 0 || cell.getWidthType() is not null)
                     {
                         writer.WriteStartElement("w", "tcW");
                         writer.WriteAttributeString("w", "w", cell.getWidth().ToString(CultureInfo.InvariantCulture));
@@ -2003,16 +2126,18 @@ public sealed class XWPFDocument : IDisposable
                         writer.WriteAttributeString("w", "val", cell.getGridSpan().ToString(CultureInfo.InvariantCulture));
                         writer.WriteEndElement();
                     }
-                    if (cell.getVMerge() is not null)
+                    var vMerge = cell.getVMerge();
+                    if (vMerge is not null)
                     {
                         writer.WriteStartElement("w", "vMerge");
-                        writer.WriteAttributeString("w", "val", cell.getVMerge());
+                        writer.WriteAttributeString("w", "val", vMerge);
                         writer.WriteEndElement();
                     }
-                    if (cell.getHMerge() is not null)
+                    var hMerge = cell.getHMerge();
+                    if (hMerge is not null)
                     {
                         writer.WriteStartElement("w", "hMerge");
-                        writer.WriteAttributeString("w", "val", cell.getHMerge());
+                        writer.WriteAttributeString("w", "val", hMerge);
                         writer.WriteEndElement();
                     }
                     if (cell.getVAlign() is not null)
@@ -2035,6 +2160,31 @@ public sealed class XWPFDocument : IDisposable
             writer.WriteEndElement(); // tr
         }
         writer.WriteEndElement(); // tbl
+    }
+
+    private static void WriteTableBorders(PoiXmlWriter writer, XWPFTable table)
+    {
+        writer.WriteStartElement("w", "tblBorders");
+        WriteTableBorder(writer, table, TableBorderPosition.Top, "top");
+        WriteTableBorder(writer, table, TableBorderPosition.Left, "left");
+        WriteTableBorder(writer, table, TableBorderPosition.Bottom, "bottom");
+        WriteTableBorder(writer, table, TableBorderPosition.Right, "right");
+        WriteTableBorder(writer, table, TableBorderPosition.InsideH, "insideH");
+        WriteTableBorder(writer, table, TableBorderPosition.InsideV, "insideV");
+        writer.WriteEndElement();
+    }
+
+    private static void WriteTableBorder(PoiXmlWriter writer, XWPFTable table, TableBorderPosition position, string elementName)
+    {
+        if (!table.Borders.TryGetValue(position, out var border))
+            return;
+
+        writer.WriteStartElement("w", elementName);
+        writer.WriteAttributeString("w", "val", ToBorderXmlValue(border.Type));
+        writer.WriteAttributeString("w", "sz", border.Size.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("w", "space", border.Space.ToString(CultureInfo.InvariantCulture));
+        writer.WriteAttributeString("w", "color", border.Color);
+        writer.WriteEndElement();
     }
 
     private void WriteRun(PoiXmlWriter writer, XWPFRun run)

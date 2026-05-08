@@ -3232,3 +3232,14 @@ Known gaps in current implementation:
 - Tests added: inline DrawingML `w:txbxContent` and raw-captured `wp:anchor` textbox extraction. The anchor test asserts textbox text is attached to the owning paragraph for extraction without creating extra body paragraphs.
 - Verification: `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XWPF"` passed: 39/39.
 - Verification: `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed: 155/155. Existing XWPF nullable warnings remain; no new failures.
+
+## 2026-05-08 10:47 JST - Phase 17 item 5 docx table depth start
+- Task: Phase 17 item 5 docx table depth: cell merge, table borders, cell width, vertical alignment API.
+- Existing state: XWPFTable/XWPFTableCell already preserved and round-tripped gridSpan/vMerge/tcW/vAlign as string-ish model fields; tblBorders was only raw XML preservation, so user-visible border API/readback was missing.
+- Plan: add typed table border API and border XML read/write, add convenience merge helpers and typed vertical alignment/width setters, then cover write/read/round-trip in XWPFDocumentTests.
+
+## 2026-05-08 10:58 JST - Phase 17 item 5 docx table depth complete
+- Implemented typed/user-visible DOCX table depth APIs in XWPF: horizontal/vertical merge helpers, table border setters/getters/removers, typed cell vertical alignment, and string width setter for auto/twips/percent.
+- `w:tblBorders` is now parsed into the XWPFTable model and written from the model, instead of only being raw-preserved; unmodeled tblPr/trPr/tcPr children still remain raw-preserved.
+- Added tests for generated DOCX XML, readback from an existing-document-style XML fixture, round-trip of borders/gridSpan/vMerge/hMerge/tcW/vAlign, and percentage width conversion.
+- Verification: `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj` passed (157/157); `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --filter FullyQualifiedName~Docx` passed (10 passed, 1 skipped).

@@ -61,6 +61,14 @@ public sealed class XSLFSlide
 
     internal void AttachTable(XSLFTable table) => _tables.Add(table);
 
+    // ---- Layout reference ----
+
+    /// <summary>
+    /// Relative path from this slide's rels file to its assigned slide layout.
+    /// Null means use the presentation default (slideLayout1.xml).
+    /// </summary>
+    internal string? LayoutRelPath { get; set; }
+
     // ---- Raw XML preservation for unknown spTree children (group shapes, connectors, etc.) ----
 
     private readonly List<string> _preservedRawElements = new();

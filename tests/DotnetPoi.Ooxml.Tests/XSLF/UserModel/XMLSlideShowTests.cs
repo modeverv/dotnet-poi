@@ -592,6 +592,127 @@ public class XMLSlideShowTests
         Assert.Contains("p:notes", notesContent, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ----- slide layout tests -----
+
+    [Fact]
+    public void NewPresentation_GetSlideLayouts_ReturnsEmpty()
+    {
+        using var prs = new XMLSlideShow();
+        Assert.Empty(prs.getSlideLayouts());
+    }
+
+    [Fact]
+    public void Load_TemplateWithLayouts_ReturnsLayoutList()
+    {
+        using var prs = new XMLSlideShow(File.OpenRead("poi-pptx-layouts.pptx"));
+        var layouts = prs.getSlideLayouts();
+        Assert.True(layouts.Count > 0, "Expected at least one layout from template");
+    }
+
+    [Fact]
+    public void Load_TemplateWithLayouts_LayoutTypesAndNamesCorrect()
+    {
+        using var prs = new XMLSlideShow(File.OpenRead("poi-pptx-layouts.pptx"));
+        var layouts = prs.getSlideLayouts();
+
+        var titleLayout = layouts.FirstOrDefault(l => l.Type == "title");
+        Assert.NotNull(titleLayout);
+        Assert.Equal("Title Slide", titleLayout!.Name);
+
+        var contentLayout = layouts.FirstOrDefault(l => l.Type == "obj");
+        Assert.NotNull(contentLayout);
+        Assert.Equal("Title and Content", contentLayout!.Name);
+
+        var blankLayout = layouts.FirstOrDefault(l => l.Type == "blank");
+        Assert.NotNull(blankLayout);
+    }
+
+    [Fact]
+    public void Load_TemplateSlide_HasLayoutRelPath()
+    {
+        using var prs = new XMLSlideShow(File.OpenRead("poi-pptx-layouts.pptx"));
+        // The POI fixture slide1 uses slideLayout7.xml (blank)
+        var slide = prs.getSlides()[0];
+        Assert.Contains("slideLayouts/slideLayout", slide.LayoutRelPath ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CreateSlide_WithLayout_SetsLayoutRelInRels()
+    {
+        using var prs = new XMLSlideShow(File.OpenRead("poi-pptx-layouts.pptx"));
+        var layouts = prs.getSlideLayouts();
+        var titleLayout = layouts.First(l => l.Type == "title");
+
+        var slide = prs.createSlide(titleLayout);
+        using var ms = WriteToStream(prs);
+
+        // Find the new slide index (it's the last one added)
+        int slideIndex = prs.getSlides().Count; // 1-based for filename
+        ms.Position = 0;
+        using var archive = new ZipArchive(ms, ZipArchiveMode.Read);
+        var relsXml = ReadEntry(archive, $"ppt/slides/_rels/slide{slideIndex}.xml.rels");
+        Assert.Contains("slideLayout1.xml", relsXml); // title layout is slideLayout1.xml
+    }
+
+    [Fact]
+    public void RoundTrip_TemplateLayouts_MasterAndLayoutsPreserved()
+    {
+        using var prs = new XMLSlideShow(File.OpenRead("poi-pptx-layouts.pptx"));
+        using var ms  = WriteToStream(prs);
+
+        using var archive = new ZipArchive(ms, ZipArchiveMode.Read);
+        var names = archive.Entries.Select(e => e.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // All 11 layouts and the master should be preserved
+        Assert.Contains("ppt/slideMasters/slideMaster1.xml", names);
+        for (int i = 1; i <= 11; i++)
+            Assert.Contains($"ppt/slideLayouts/slideLayout{i}.xml", names);
+    }
+
+    [Fact]
+    public void RoundTrip_TemplateLayouts_LayoutTypesReadableAfterRoundTrip()
+    {
+        using var prs1 = new XMLSlideShow(File.OpenRead("poi-pptx-layouts.pptx"));
+        using var ms   = WriteToStream(prs1);
+
+        using var prs2 = new XMLSlideShow(ms);
+        var layouts = prs2.getSlideLayouts();
+
+        Assert.True(layouts.Count >= 11);
+        Assert.NotNull(layouts.FirstOrDefault(l => l.Type == "title"));
+        Assert.NotNull(layouts.FirstOrDefault(l => l.Type == "obj"));
+        Assert.NotNull(layouts.FirstOrDefault(l => l.Type == "blank"));
+    }
+
+    [Fact]
+    public void RoundTrip_SlideLayoutRef_PreservedAfterRoundTrip()
+    {
+        using var prs1 = new XMLSlideShow(File.OpenRead("poi-pptx-layouts.pptx"));
+        var originalLayoutPath = prs1.getSlides()[0].LayoutRelPath;
+
+        using var ms   = WriteToStream(prs1);
+        using var prs2 = new XMLSlideShow(ms);
+
+        Assert.Equal(originalLayoutPath, prs2.getSlides()[0].LayoutRelPath);
+    }
+
+    [Fact]
+    public void RoundTrip_NewSlideWithLayout_LayoutRefPreserved()
+    {
+        using var prs1 = new XMLSlideShow(File.OpenRead("poi-pptx-layouts.pptx"));
+        var contentLayout = prs1.getSlideLayouts().First(l => l.Type == "obj");
+        prs1.createSlide(contentLayout);
+
+        int newSlideIndex = prs1.getSlides().Count; // last slide
+        using var ms   = WriteToStream(prs1);
+        using var prs2 = new XMLSlideShow(ms);
+
+        var loadedSlide = prs2.getSlides()[newSlideIndex - 1];
+        Assert.NotNull(loadedSlide.LayoutRelPath);
+        Assert.Contains("slideLayouts", loadedSlide.LayoutRelPath, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static MemoryStream WriteToStream(XMLSlideShow prs)
     {
         var stream = new MemoryStream();

@@ -717,16 +717,16 @@ integration:
   - [x] 4. ⭐*docx text box read support*
      - =w:txbxContent= のテキスト抽出
      - Word 文書で「本文が読めない」系の体感バグをかなり減らせる
-  - [ ] 5. ⭐*docx table depth*
+  - [x] 5. ⭐*docx table depth*
      - cell merge、table borders、cell width、vertical alignment の API 化
      - 帳票生成でかなり効く
 - [ ] *中優先*
   - [ ] 6. *pptx chart creation*
     - xlsx chart 実装の知見を流用
     - 資料生成ユースケースに刺さる
-  - [ ] 7. ⭐*pptx layouts/masters の最小操作*
-    - 既存 preservation に加えて、title/content layout の読み取り・選択
-    - 「テンプレート pptx を軽編集」が強くなる
+  - [x] 7. ⭐*pptx layouts/masters の最小操作*
+     - 既存 preservation に加えて、title/content layout の読み取り・選択       
+     - 「テンプレート pptx を軽編集」が強くなる
   - [ ] 8. *Formula evaluator の明確な subset 拡張*
     - =SUMIF=, =COUNTIF=, =IFERROR=, =VLOOKUP/XLOOKUP= あたり
     - ただし “Excel 完全互換” を目指さず、README に関数表を置く

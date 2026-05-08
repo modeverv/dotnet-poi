@@ -114,10 +114,14 @@ public sealed class XMLSlideShow : IDisposable
         "<a:extraClrSchemeLst/>" +
         "</a:theme>");
 
-    private readonly List<XSLFSlide>       _slides   = new();
+    private readonly List<XSLFSlide>        _slides   = new();
     private readonly List<XSLFPictureData> _pictures = new();
+    private readonly List<XSLFSlideLayout> _layouts  = new();
     private long _slideCx = DefaultSlideCx;
     private long _slideCy = DefaultSlideCy;
+
+    // True when we loaded master/layout XML from a file — skip writing stubs on write.
+    private bool _hasTemplateLayouts;
 
     // pptm support: opaque VBA binary preserved byte-for-byte.
     private byte[]? _vbaProjectBin;
@@ -141,6 +145,19 @@ public sealed class XMLSlideShow : IDisposable
         _slides.Add(slide);
         return slide;
     }
+
+    /// <summary>Creates a new slide that references the given slide layout.</summary>
+    public XSLFSlide createSlide(XSLFSlideLayout layout)
+    {
+        Guard.ThrowIfNull(layout, nameof(layout));
+        var slide = new XSLFSlide();
+        slide.LayoutRelPath = layout.SlideRelPath;
+        _slides.Add(slide);
+        return slide;
+    }
+
+    /// <summary>Returns all slide layouts loaded from the presentation (empty for new presentations).</summary>
+    public IReadOnlyList<XSLFSlideLayout> getSlideLayouts() => _layouts;
 
     /// <summary>Adds picture bytes and returns the 0-based picture index.</summary>
     public int addPicture(byte[] data, int format)
@@ -189,17 +206,23 @@ public sealed class XMLSlideShow : IDisposable
         foreach (var kv in _preservedEntries)
             WriteBinaryEntry(archive, kv.Key, kv.Value);
 
-        WriteEntry(archive, "[Content_Types].xml",                           WriteContentTypes);
-        WriteEntry(archive, "_rels/.rels",                                   WriteRootRelationships);
-        WriteEntry(archive, "ppt/presentation.xml",                          WritePresentation);
-        WriteEntry(archive, "ppt/_rels/presentation.xml.rels",               WritePresentationRels);
-        WriteEntry(archive, "ppt/presProps.xml",                             WritePresProps);
-        WriteEntry(archive, "ppt/tableStyles.xml",                           WriteTableStyles);
-        WriteBinaryEntry(archive, "ppt/theme/theme1.xml",                    OfficeThemeBytes);
-        WriteEntry(archive, "ppt/slideMasters/slideMaster1.xml",             WriteSlideMasterStub);
-        WriteEntry(archive, "ppt/slideMasters/_rels/slideMaster1.xml.rels",  WriteSlideMasterRels);
-        WriteEntry(archive, "ppt/slideLayouts/slideLayout1.xml",             WriteSlideLayoutStub);
-        WriteEntry(archive, "ppt/slideLayouts/_rels/slideLayout1.xml.rels",  WriteSlideLayoutRels);
+        WriteEntry(archive, "[Content_Types].xml",                  WriteContentTypes);
+        WriteEntry(archive, "_rels/.rels",                          WriteRootRelationships);
+        WriteEntry(archive, "ppt/presentation.xml",                 WritePresentation);
+        WriteEntry(archive, "ppt/_rels/presentation.xml.rels",      WritePresentationRels);
+        WriteEntry(archive, "ppt/presProps.xml",                    WritePresProps);
+        WriteEntry(archive, "ppt/tableStyles.xml",                  WriteTableStyles);
+
+        // For new (non-template) presentations write stubs; for template-loaded presentations
+        // the original master/layout/theme XML lives in _preservedEntries and was already emitted.
+        if (!_hasTemplateLayouts)
+        {
+            WriteBinaryEntry(archive, "ppt/theme/theme1.xml",                    OfficeThemeBytes);
+            WriteEntry(archive, "ppt/slideMasters/slideMaster1.xml",             WriteSlideMasterStub);
+            WriteEntry(archive, "ppt/slideMasters/_rels/slideMaster1.xml.rels",  WriteSlideMasterRels);
+            WriteEntry(archive, "ppt/slideLayouts/slideLayout1.xml",             WriteSlideLayoutStub);
+            WriteEntry(archive, "ppt/slideLayouts/_rels/slideLayout1.xml.rels",  WriteSlideLayoutRels);
+        }
 
         for (int i = 0; i < _slides.Count; i++)
         {
@@ -710,7 +733,8 @@ public sealed class XMLSlideShow : IDisposable
     {
         w.WriteStartElement("Relationships");
         w.WriteAttributeString("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
-        WriteRelationship(w, "rId1", "../slideLayouts/slideLayout1.xml", RelTypeSlideLayout);
+        var layoutPath = slide.LayoutRelPath ?? "../slideLayouts/slideLayout1.xml";
+        WriteRelationship(w, "rId1", layoutPath, RelTypeSlideLayout);
         foreach (var shape in slide.getShapes())
             WriteRelationship(w, shape.RelationId, $"../media/{shape.PictureData.getFileName()}", RelTypeImage);
         w.WriteEndElement();
@@ -823,6 +847,8 @@ public sealed class XMLSlideShow : IDisposable
     {
         _slides.Clear();
         _pictures.Clear();
+        _layouts.Clear();
+        _hasTemplateLayouts = false;
         _vbaProjectBin = null;
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
@@ -836,14 +862,18 @@ public sealed class XMLSlideShow : IDisposable
             if (!slidePathByRelId.TryGetValue(slideRelId, out var slidePath)) continue;
             var fullSlidePath = $"ppt/{slidePath}";
             var slideRelsPath = BuildRelsPath(fullSlidePath);
-            var mediaByRid    = ParseSlideRels(archive, slideRelsPath, mediaByName);
             var slide         = new XSLFSlide();
+            var mediaByRid    = ParseSlideRels(archive, slideRelsPath, mediaByName, slide);
             ParseSlideXml(archive, fullSlidePath, slide, mediaByRid);
             _slides.Add(slide);
         }
 
         // Read slide size from presentation.xml
         ParseSlideSize(archive);
+
+        // Parse slide masters and layouts to build the layout list.
+        // Must be before CollectPreservedEntries so _hasTemplateLayouts is set correctly.
+        ParseLayouts(archive);
 
         // pptm: preserve vbaProject.bin verbatim
         var vba = archive.GetEntry("ppt/vbaProject.bin");
@@ -855,8 +885,8 @@ public sealed class XMLSlideShow : IDisposable
             if (ms.Length > 0) _vbaProjectBin = ms.ToArray();
         }
 
-        // Collect non-model ZIP entries for unknown-part preservation
-        // Must be after _slides is populated so GetModelEntryNames() is accurate
+        // Collect non-model ZIP entries for unknown-part preservation.
+        // Must be after _slides and _hasTemplateLayouts are set so GetModelEntryNames() is accurate.
         CollectPreservedEntries(archive);
     }
 
@@ -891,12 +921,19 @@ public sealed class XMLSlideShow : IDisposable
             "ppt/_rels/presentation.xml.rels",
             "ppt/presProps.xml",
             "ppt/tableStyles.xml",
-            "ppt/theme/theme1.xml",
-            "ppt/slideMasters/slideMaster1.xml",
-            "ppt/slideMasters/_rels/slideMaster1.xml.rels",
-            "ppt/slideLayouts/slideLayout1.xml",
-            "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
         };
+
+        // Stub entries are model-written only for new (non-template) presentations.
+        // For template-loaded presentations these paths live in _preservedEntries.
+        if (!_hasTemplateLayouts)
+        {
+            known.Add("ppt/theme/theme1.xml");
+            known.Add("ppt/slideMasters/slideMaster1.xml");
+            known.Add("ppt/slideMasters/_rels/slideMaster1.xml.rels");
+            known.Add("ppt/slideLayouts/slideLayout1.xml");
+            known.Add("ppt/slideLayouts/_rels/slideLayout1.xml.rels");
+        }
+
         // Model-written slides
         for (int i = 1; i <= _slides.Count; i++)
         {
@@ -967,7 +1004,8 @@ public sealed class XMLSlideShow : IDisposable
     }
 
     private Dictionary<string, XSLFPictureData> ParseSlideRels(
-        ZipArchive archive, string relsPath, Dictionary<string, byte[]> mediaByName)
+        ZipArchive archive, string relsPath, Dictionary<string, byte[]> mediaByName,
+        XSLFSlide slide)
     {
         var map   = new Dictionary<string, XSLFPictureData>(StringComparer.Ordinal);
         var entry = archive.GetEntry(relsPath);
@@ -977,9 +1015,18 @@ public sealed class XMLSlideShow : IDisposable
         while (reader.Read())
         {
             if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "Relationship") continue;
-            if (!string.Equals(reader.GetAttribute("Type"), RelTypeImage, StringComparison.Ordinal)) continue;
-            var id     = reader.GetAttribute("Id");
-            var target = reader.GetAttribute("Target"); // e.g. "../media/image1.jpeg"
+            var relType = reader.GetAttribute("Type");
+            var id      = reader.GetAttribute("Id");
+            var target  = reader.GetAttribute("Target");
+
+            // Capture layout reference so the slide can point back to its correct layout on write.
+            if (string.Equals(relType, RelTypeSlideLayout, StringComparison.Ordinal) && target is not null)
+            {
+                slide.LayoutRelPath = target;
+                continue;
+            }
+
+            if (!string.Equals(relType, RelTypeImage, StringComparison.Ordinal)) continue;
             if (id is null || target is null) continue;
             var filename = Path.GetFileName(target);
             if (!mediaByName.TryGetValue(filename, out var bytes)) continue;
@@ -1465,5 +1512,111 @@ public sealed class XMLSlideShow : IDisposable
                 return;
             }
         }
+    }
+
+    // ----- layout / master parsing -----
+
+    private void ParseLayouts(ZipArchive archive)
+    {
+        _layouts.Clear();
+        var masterPaths = ParseSlideMasterPaths(archive);
+        foreach (var masterZipPath in masterPaths)
+        {
+            var masterRelsPath  = BuildRelsPath(masterZipPath);
+            var masterDir       = Path.GetDirectoryName(masterZipPath)?.Replace('\\', '/') ?? "ppt/slideMasters";
+            var layoutZipPaths  = ParseLayoutZipPathsFromMasterRels(archive, masterRelsPath, masterDir);
+            foreach (var layoutZipPath in layoutZipPaths)
+            {
+                var (name, type) = ParseLayoutNameAndType(archive, layoutZipPath);
+                _layouts.Add(new XSLFSlideLayout(name, type, layoutZipPath));
+            }
+        }
+        _hasTemplateLayouts = _layouts.Count > 0;
+    }
+
+    private static List<string> ParseSlideMasterPaths(ZipArchive archive)
+    {
+        var result = new List<string>();
+        var entry  = archive.GetEntry("ppt/_rels/presentation.xml.rels");
+        if (entry is null) return result;
+        using var s      = entry.Open();
+        using var reader = XmlReader.Create(s);
+        while (reader.Read())
+        {
+            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "Relationship") continue;
+            if (!string.Equals(reader.GetAttribute("Type"), RelTypeSlideMaster, StringComparison.Ordinal)) continue;
+            var target = reader.GetAttribute("Target"); // "slideMasters/slideMaster1.xml"
+            if (target is not null) result.Add($"ppt/{target}");
+        }
+        return result;
+    }
+
+    private static List<string> ParseLayoutZipPathsFromMasterRels(
+        ZipArchive archive, string masterRelsPath, string masterDir)
+    {
+        var result = new List<string>();
+        var entry  = archive.GetEntry(masterRelsPath);
+        if (entry is null) return result;
+        using var s      = entry.Open();
+        using var reader = XmlReader.Create(s);
+        while (reader.Read())
+        {
+            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "Relationship") continue;
+            if (!string.Equals(reader.GetAttribute("Type"), RelTypeSlideLayout, StringComparison.Ordinal)) continue;
+            var target = reader.GetAttribute("Target"); // "../slideLayouts/slideLayout1.xml"
+            if (target is null) continue;
+            var resolved = ResolveRelativePath(masterDir, target);
+            if (resolved is not null) result.Add(resolved);
+        }
+        return result;
+    }
+
+    private static (string name, string type) ParseLayoutNameAndType(ZipArchive archive, string zipPath)
+    {
+        var entry = archive.GetEntry(zipPath);
+        if (entry is null) return (string.Empty, string.Empty);
+        using var s      = entry.Open();
+        using var reader = XmlReader.Create(s);
+        while (reader.Read())
+        {
+            if (reader.NodeType != XmlNodeType.Element) continue;
+            if (reader.NamespaceURI == NsP && reader.LocalName == "sldLayout")
+            {
+                var type = reader.GetAttribute("type") ?? string.Empty;
+                // Scan forward for p:cSld to get the display name.
+                while (reader.Read())
+                {
+                    if (reader.NodeType == XmlNodeType.Element
+                        && reader.NamespaceURI == NsP && reader.LocalName == "cSld")
+                    {
+                        return (reader.GetAttribute("name") ?? string.Empty, type);
+                    }
+                    if (reader.NodeType == XmlNodeType.EndElement
+                        && reader.NamespaceURI == NsP && reader.LocalName == "sldLayout")
+                        break;
+                }
+                return (string.Empty, type);
+            }
+        }
+        return (string.Empty, string.Empty);
+    }
+
+    private static string? ResolveRelativePath(string baseDir, string relativePath)
+    {
+        // e.g. baseDir="ppt/slideMasters", relative="../slideLayouts/slideLayout1.xml"
+        // → "ppt/slideLayouts/slideLayout1.xml"
+        var segments = new List<string>(baseDir.Split('/'));
+        foreach (var part in relativePath.Split('/'))
+        {
+            if (part == "..")
+            {
+                if (segments.Count > 0) segments.RemoveAt(segments.Count - 1);
+            }
+            else if (part != "." && part.Length > 0)
+            {
+                segments.Add(part);
+            }
+        }
+        return segments.Count > 0 ? string.Join("/", segments) : null;
     }
 }
