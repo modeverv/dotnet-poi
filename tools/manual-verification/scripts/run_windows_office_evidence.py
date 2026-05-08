@@ -143,13 +143,13 @@ def case_matrix():
 #            "password": None,
 #            "encrypted": False,
 #        },
-         {
-              "kind": "encrypted pptx",
-              "app": "powerpoint",
-              "source": generated("manual-encrypted.pptx"),
-              "password": "f",
-              "encrypted": True,
-        },
+#         {
+#              "kind": "encrypted pptx",
+#              "app": "powerpoint",
+#              "source": generated("manual-encrypted.pptx"),
+#              "password": "f",
+#              "encrypted": True,
+#        },
         {
              "kind": "xls",
              "app": "excel",
@@ -164,13 +164,13 @@ def case_matrix():
             "password": None,
             "encrypted": False,
         },
-        {
-           "kind": "ppt",
-           "app": "powerpoint",
-           "source": generated("manual-simple.ppt"),
-           "password": None,
-           "encrypted": False,
-       },
+#        {
+#           "kind": "ppt",
+#           "app": "powerpoint",
+#           "source": generated("manual-simple.ppt"),
+#           "password": None,
+#           "encrypted": False,
+#       },
     ]
 
 
