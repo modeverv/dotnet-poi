@@ -3057,7 +3057,7 @@ Known gaps in current implementation:
 - Publish workflow cleanup:
   - NuGet flat-container 確認で `DotnetPoi.Common 0.1.0`, `DotnetPoi.POIFS 0.1.0`, `DotnetPoi.Legacy 0.1.0` が未公開 (404) と判明。
   - `.github/workflows/publish.yml` に `Common` / `POIFS` の version read, NuGet existence check, pack, push, release asset 添付を追加。
-  - Push order は dependency packages (`Common`, `POIFS`) → `Ooxml` / `Legacy` / `Formula` → `All` に調整。
+  - Push order は release train の固定順 (`Common`, `POIFS`, `Legacy`, `Formula`, `Ooxml`, `All`) に調整。
 - Generated noise cleanup:
   - `obj/*sync-conflict-*` generated files を削除し、MSBuild duplicate import warning の原因を解消。
   - Interop `from-dotnet-poi` binary fixture diffs は test-generated noise と判断し、release diff から除外するため restored。
@@ -3076,6 +3076,43 @@ Known gaps in current implementation:
 - Remaining before tag:
   - `.gitignore` had a pre-existing mixed staged/unstaged state around `.claude`; intentionally left untouched.
   - Known warnings remain: XWPF nullable warnings, xUnit analyzer warnings, UsageSamples nullable warnings. No build/test failures.
+
+## 2026-05-08 08:52 JST - Release hygiene / CI hardening
+
+- Task: `Common/POIFS/Legacy/Formula/Ooxml/All` の publish 順と tag 運用固定、NuGet install smoke の CI 追加、README/NOW/package README 更新漏れ防止。
+- Existing context:
+  - 既存差分で `DotnetPoi.Ooxml` / `DotnetPoi.All` は `1.0.0`、`Common` / `POIFS` / `Legacy` / `Formula` は `0.1.0`。
+  - 既存 `publish.yml` 差分で `Common` / `POIFS` の pack/push/release asset 追加済み。今回その上に検査と smoke を追加。
+- Implemented:
+  - `tools/release/package-hygiene.sh` を追加。
+    - publish 順を `Common -> POIFS -> Legacy -> Formula -> Ooxml -> All` として固定表示・検査。
+    - `PackageId` / `PackageVersion` / `PackageReadmeFile` / package README 存在と package ID 記載を検査。
+    - root `README.md` が全 package ID と `NOW.md` を参照していることを検査。
+    - tag push では `vX.Y.Z` が `DotnetPoi.Ooxml` と `DotnetPoi.All` の `PackageVersion` に一致しない場合 fail。
+  - `tools/release/nuget-install-smoke.sh` を追加。
+    - pack 済み local nupkg source から six packages すべてを temp console app に install し、代表 public type を参照して restore/run。
+  - `.github/workflows/ci.yml` に `Release Hygiene` job を追加。
+    - package hygiene -> publish order pack -> local NuGet install smoke。
+    - interop job は unit tests と release hygiene の両方に依存。
+  - `.github/workflows/publish.yml` に release package hygiene と publish 前 NuGet install smoke を追加。
+  - `README.md` の testing strategy と repository structure に release hygiene / `tools/release` を追記。
+- Verification:
+  - `tools/release/package-hygiene.sh` passed.
+  - `GITHUB_REF_NAME=v1.0.0 tools/release/package-hygiene.sh` passed.
+  - `GITHUB_REF_NAME=v9.9.9 tools/release/package-hygiene.sh` failed as expected with tag/version mismatch.
+  - Ruby YAML parse passed for `.github/workflows/ci.yml` and `.github/workflows/publish.yml`.
+  - Packed all packages to `/tmp/dotnet-poi-release-smoke` in publish order.
+  - `tools/release/nuget-install-smoke.sh /tmp/dotnet-poi-release-smoke` passed for:
+    - `DotnetPoi.Common 0.1.0`
+    - `DotnetPoi.POIFS 0.1.0`
+    - `DotnetPoi.Legacy 0.1.0`
+    - `DotnetPoi.Formula 0.1.0`
+    - `DotnetPoi.Ooxml 1.0.0`
+    - `DotnetPoi.All 1.0.0`
+- Notes:
+  - Full solution tests were not rerun in this step; the added checks exercise packaging/install paths only.
+  - Existing XWPF nullable warnings appeared during pack; no pack failure.
+  - No commit performed per repository rule.
 
 ## 2025-06-22 — Phase 15 実装順 5-8 completed: HSLF text extraction / no-op write / interop / status
 

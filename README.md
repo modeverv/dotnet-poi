@@ -259,6 +259,7 @@ This project employs a multi-layered testing strategy to ensure maximum fidelity
     - **Direction A:** Java POI writes → dotnet-poi reads.
     - **Direction B:** dotnet-poi writes → Java POI reads.
 - **Preservation Tests:** We verify that unmodeled features (macros, charts, comments, pivot tables) survive a read-modify-write cycle (round-trip) without data loss or corruption.
+- **Release Hygiene:** CI packs `DotnetPoi.Common` → `DotnetPoi.POIFS` → `DotnetPoi.Legacy` → `DotnetPoi.Formula` → `DotnetPoi.Ooxml` → `DotnetPoi.All`, validates tag/package metadata, checks package READMEs, and installs every local nupkg from a temporary NuGet source before publish.
 - **Manual Verification:** Before releases, we perform manual checks using real **Microsoft Office (Excel/Word/PowerPoint)** and **LibreOffice** on macOS, Windows, and Linux to ensure no "repair" dialogs or visual regressions occur.
 
 ---
@@ -409,6 +410,7 @@ dotnet-poi/
 │   ├── DotnetPoi.DocsGenerator/    # docs_src -> docs generator
 │   ├── XmlCheck/                   # XML inspection/check helper
 │   ├── dev/                        # Docker devbox compose/env/Dockerfile
+│   ├── release/                    # package hygiene and NuGet install smoke scripts
 │   ├── porter/                     # Porting progress tracker
 │   └── test.sh                     # Local interop test runner
 ├── DotnetPOI.sln                   # Main solution

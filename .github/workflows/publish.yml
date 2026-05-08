@@ -101,6 +101,9 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
+      - name: Validate release package hygiene
+        run: tools/release/package-hygiene.sh
+
       - name: Read package versions
         id: packages
         run: |
@@ -177,15 +180,14 @@ jobs:
 
       - name: Pack NuGet packages
         run: |
+          rm -rf /tmp/nuget-publish
+          mkdir -p /tmp/nuget-publish
+
           dotnet pack src/DotnetPoi.Common/DotnetPoi.Common.csproj \
             -c Release \
             -o /tmp/nuget-publish
 
           dotnet pack src/DotnetPoi.POIFS/DotnetPoi.POIFS.csproj \
-            -c Release \
-            -o /tmp/nuget-publish
-
-          dotnet pack src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj \
             -c Release \
             -o /tmp/nuget-publish
 
@@ -197,9 +199,16 @@ jobs:
             -c Release \
             -o /tmp/nuget-publish
 
+          dotnet pack src/DotnetPoi.Ooxml/DotnetPoi.Ooxml.csproj \
+            -c Release \
+            -o /tmp/nuget-publish
+
           dotnet pack src/DotnetPoi.All/DotnetPoi.All.csproj \
             -c Release \
             -o /tmp/nuget-publish
+
+      - name: NuGet install smoke
+        run: tools/release/nuget-install-smoke.sh /tmp/nuget-publish
 
       - name: Push missing packages to NuGet.org
         env:
@@ -220,9 +229,9 @@ jobs:
 
           push_if_missing "${{ steps.packages.outputs.common_id }}" "${{ steps.packages.outputs.common_version }}" "${{ steps.nuget.outputs.common_status }}"
           push_if_missing "${{ steps.packages.outputs.poifs_id }}" "${{ steps.packages.outputs.poifs_version }}" "${{ steps.nuget.outputs.poifs_status }}"
-          push_if_missing "${{ steps.packages.outputs.ooxml_id }}" "${{ steps.packages.outputs.ooxml_version }}" "${{ steps.nuget.outputs.ooxml_status }}"
           push_if_missing "${{ steps.packages.outputs.legacy_id }}" "${{ steps.packages.outputs.legacy_version }}" "${{ steps.nuget.outputs.legacy_status }}"
           push_if_missing "${{ steps.packages.outputs.formula_id }}" "${{ steps.packages.outputs.formula_version }}" "${{ steps.nuget.outputs.formula_status }}"
+          push_if_missing "${{ steps.packages.outputs.ooxml_id }}" "${{ steps.packages.outputs.ooxml_version }}" "${{ steps.nuget.outputs.ooxml_status }}"
           push_if_missing "${{ steps.packages.outputs.all_id }}" "${{ steps.packages.outputs.all_version }}" "${{ steps.nuget.outputs.all_status }}"
 
       - name: Generate release notes
