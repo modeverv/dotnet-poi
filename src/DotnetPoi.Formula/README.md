@@ -23,7 +23,7 @@ dotnet add package DotnetPoi.Formula
 <PackageReference Include="DotnetPoi.Formula" Version="..." />
 ```
 
-> Requires **DotnetPoi.Ooxml** (or **DotnetPoi.All**) 1.0.0+ and **.NET 8.0+** or **.NET Framework 4.7.2+**.
+> Requires **DotnetPoi.Ooxml** (or **DotnetPoi.All**) 0.1.0+ and **.NET 8.0+** or **.NET Framework 4.7.2+**.
 
 ---
 
@@ -164,7 +164,7 @@ Accuracy of the formula engine is verified through:
 
 ## Version
 
-This is a **v0.x** package with intentionally limited scope. Format packages such as `DotnetPoi.Ooxml` own formula text/cached-value preservation; this package is only for the small evaluator subset listed above.
+This is a **v0.x** package with intentionally limited scope. `DotnetPoi.Core` owns formula text/cached-value preservation; this package is only for the small evaluator subset listed above.
 
 ---
 

@@ -133,14 +133,16 @@
 | 〃 | 圧縮/Unicode text piece | ✅ | `FcCompressed` 相当の compressed/uncompressed piece 読み取り |
 | **UserModel** | Range / Paragraph / CharacterRun | ⚠️ 一部対応 | paragraph/run 分割、offset、text composition を確認済 |
 | 〃 | 文字書式読み取り | ⚠️ 一部対応 | CHPX/CHPFKP 由来の font name/size/bold/italic/underline/strike の一部 |
-| 〃 | 段落プロパティ読み取り | ⚠️ 最小対応 | justification など一部 PAPX のみ |
+| 〃 | 段落プロパティ読み取り | ⚠️ 最小対応 | justification, table properties (in-table, table level) 等一部 PAPX のみ |
 | 〃 | StyleSheet / FontTable | ⚠️ 最小対応 | Normal style fallback 用の最低限 |
+| **抽出** | **ヘッダー・フッター・テキストボックス抽出** | ✅ | `getHeaderStoryRange()`, `getFootnoteRange()` 等の subdocument range 抽出対応 |
+| 〃 | **表（Table）の構造抽出** | ✅ | Table / TableRow / TableCell クラスによる読み取り対応 |
 | **編集** | no-op write / round-trip | ✅ | 代表 fixture の stream/storage を byte-for-byte 保持 |
 | 〃 | 本文追記 / 文字列置換 | ⚠️ 限定対応 | main body を単一 Unicode piece として再構築。複雑な既存構造の編集エンジンではない |
 | **Preservation** | OLE stream/storage / 埋め込み OLE | ✅ | ObjectPool、Data stream、未編集 stream/storage を保持 |
-| **互換性** | Java POI interop | ⚠️ 一部対応 | dotnet-poi no-op saved `.doc` を Java POI が読む Direction B fixture あり |
-| **未対応** | 表/画像/API編集/ヘッダー・フッター/脚注/コメント/フィールドのモデル化 | ❌ | 既存 stream は保持対象だが、HWPF usermodel としての作成・編集は未移植 |
-| **その他** | テスト数 | **221 Legacy.Tests 全体 + interop** | POI `document/` fixtures 複数を対象 |
+| **互換性** | Java POI interop | ⚠️ 一部対応 | dotnet-poi no-op saved `.doc` を Java POI が読む Direction B fixture あり（テキスト・表抽出も検証） |
+| **未対応** | 画像/API編集/脚注の追加/フィールドのモデル化 | ❌ | 既存 stream は保持対象だが、HWPF usermodel としての作成・編集は未移植 |
+| **その他** | テスト数 | **224 Legacy.Tests 全体 + interop** | POI `document/` fixtures 複数を対象 |
 
 ---
 
@@ -199,13 +201,13 @@
 | Common.Tests | 79 | shared SS / XML writer / utilities |
 | POIFS.Tests | 11 | OLE2 container |
 | Ooxml.Tests | 166 | XSSF / XWPF / XSLF |
-| Legacy.Tests | 221 | HSSF / HWPF / HSLF |
+| Legacy.Tests | 224 | HSSF / HWPF / HSLF |
 | Formula.Tests | 11 | 限定 formula evaluator subset |
 | All.Tests | 7 | 全体 smoke test |
-| Interop.Tests (C#) | 72 | 双方向 interop fixture 検証 (70 pass + 2 skip) |
-| **Total (C#)** | **567** | 565 pass + 2 skip |
-| Java POI 側 (Maven) | 44 tests | うち dotnet-poi 関連 24 tests |
+| Interop.Tests (C#) | 73 | 双方向 interop fixture 検証 (71 pass + 2 skip) |
+| **Total (C#)** | **571** | 569 pass + 2 skip |
+| Java POI 側 (Maven) | 45 tests | うち dotnet-poi 関連 25 tests |
 
 ---
 
-*最終更新: 2026-05-08 (phase 17-7: XSLF layout/master 最小操作 追加)*
+*最終更新: 2026-05-08 (phase 17-10: HWPF/doc header/footer/table text extraction 完了)*
