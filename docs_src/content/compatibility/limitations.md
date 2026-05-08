@@ -31,7 +31,7 @@ docx tables support basic creation, width, grid columns, row height, header rows
 |---|---|---|
 | Comments (read/create) | xlsx, docx | Existing comments preserved on round-trip but cannot be read or created |
 | Content controls (SDT) | docx | Block-level and inline SDT are preserved on round-trip but cannot be edited through a public API |
-| Word text boxes (w:txbxContent) | docx | Text inside Word text boxes is not readable |
+
 | Track changes | docx | Revision marks not supported |
 | Grouped shapes | pptx | Preserved as raw `spTree` XML but cannot be edited through a public API |
 | Notes slides | pptx | Existing notes slides are preserved but cannot be created or read through a public API |
