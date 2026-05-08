@@ -2,6 +2,27 @@ namespace DotnetPoi.XWPF.UserModel;
 
 public sealed class XWPFRun
 {
+    internal enum ContentChildKind
+    {
+        Text,
+        Raw
+    }
+
+    internal sealed class ContentChild
+    {
+        private ContentChild(ContentChildKind kind, string? rawXml)
+        {
+            Kind = kind;
+            RawXml = rawXml;
+        }
+
+        internal ContentChildKind Kind { get; }
+        internal string? RawXml { get; }
+
+        internal static ContentChild ForText() => new(ContentChildKind.Text, null);
+        internal static ContentChild ForRaw(string rawXml) => new(ContentChildKind.Raw, rawXml);
+    }
+
     private readonly XWPFParagraph _paragraph;
     private string? _text;
     private bool _bold;
@@ -13,8 +34,13 @@ public sealed class XWPFRun
     private bool _strike;
     private readonly List<XWPFPicture> _pictures = new();
     private string? _hyperlinkUrl;
+    private bool _hasTextContentChild;
+    private readonly List<ContentChild> _contentChildren = new();
+    private readonly List<string> _commentReferenceIds = new();
     internal string? HyperlinkUrl => _hyperlinkUrl;
     internal string? HyperlinkRelId { get; set; }
+    internal IReadOnlyList<ContentChild> ContentChildren => _contentChildren;
+    internal bool HasContent => _text is not null || _contentChildren.Count > 0;
 
     // Raw XML for anchored (floating) images inside this run
     private readonly List<string> _rawAnchorXml = new();
@@ -54,7 +80,27 @@ public sealed class XWPFRun
 
     public IReadOnlyList<XWPFPicture> getEmbeddedPictures() => _pictures;
 
-    public void setText(string text) => _text = text;
+    public void setText(string text)
+    {
+        _text = text;
+        if (!_hasTextContentChild)
+        {
+            _contentChildren.Add(ContentChild.ForText());
+            _hasTextContentChild = true;
+        }
+    }
+
+    internal void addPreservedRawContentElement(string rawXml) =>
+        AddPreservedRawContentElement(rawXml);
+
+    private void AddPreservedRawContentElement(string rawXml)
+    {
+        _contentChildren.Add(ContentChild.ForRaw(rawXml));
+        if (TryGetCommentReferenceId(rawXml, out var id))
+            _commentReferenceIds.Add(id);
+    }
+
+    public IReadOnlyList<string> getCommentReferenceIds() => _commentReferenceIds;
 
     public string? getText(int pos) => _text;
 
@@ -125,4 +171,43 @@ public sealed class XWPFRun
     }
 
     internal void AttachPicture(XWPFPicture picture) => _pictures.Add(picture);
+
+    private static bool TryGetCommentReferenceId(string rawXml, out string id)
+    {
+        id = string.Empty;
+        if (!ContainsCommentReference(rawXml))
+            return false;
+
+        foreach (var marker in new[] { " w:id=", " id=" })
+        {
+            var index = rawXml.IndexOf(marker, StringComparison.Ordinal);
+            if (index < 0)
+                continue;
+
+            var valueStart = index + marker.Length;
+            if (valueStart >= rawXml.Length)
+                continue;
+
+            var quote = rawXml[valueStart];
+            if (quote != '"' && quote != '\'')
+                continue;
+
+            var valueEnd = rawXml.IndexOf(quote, valueStart + 1);
+            if (valueEnd <= valueStart)
+                continue;
+
+            id = rawXml.Substring(valueStart + 1, valueEnd - valueStart - 1);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool ContainsCommentReference(string rawXml) =>
+        rawXml.StartsWith("<w:commentReference", StringComparison.Ordinal)
+        || rawXml.StartsWith("<commentReference", StringComparison.Ordinal)
+        || rawXml.IndexOf("<w:commentReference ", StringComparison.Ordinal) >= 0
+        || rawXml.IndexOf("<commentReference ", StringComparison.Ordinal) >= 0
+        || rawXml.IndexOf("<w:commentReference/>", StringComparison.Ordinal) >= 0
+        || rawXml.IndexOf("<commentReference/>", StringComparison.Ordinal) >= 0;
 }

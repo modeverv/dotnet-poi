@@ -1372,40 +1372,29 @@ public sealed class XSSFWorkbook : IWorkbook
             return result;
 
         using var stream = entry.Open();
-        using var reader = XmlReader.Create(stream, new XmlReaderSettings { IgnoreWhitespace = false });
-        while (reader.Read())
+        var document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
+        foreach (var shape in document.Descendants().Where(e => e.Name.LocalName == "shape"))
         {
-            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "ClientData")
+            var clientData = shape.Descendants().FirstOrDefault(e => e.Name.LocalName == "ClientData");
+            if (clientData is null)
                 continue;
 
             int? row = null;
             int? column = null;
             string? anchorText = null;
-            bool visible = false;
-            var depth = reader.Depth;
-            while (reader.Read() && reader.Depth > depth)
-            {
-                if (reader.NodeType != XmlNodeType.Element)
-                    continue;
+            var style = (string?)shape.Attribute("style");
+            var visible = style?.IndexOf("visibility:visible", StringComparison.OrdinalIgnoreCase) >= 0
+                || clientData.Elements().Any(e => e.Name.LocalName == "Visible");
 
-                switch (reader.LocalName)
-                {
-                    case "Row":
-                        if (int.TryParse(reader.ReadElementContentAsString().Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedRow))
-                            row = parsedRow;
-                        break;
-                    case "Column":
-                        if (int.TryParse(reader.ReadElementContentAsString().Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedColumn))
-                            column = parsedColumn;
-                        break;
-                    case "Anchor":
-                        anchorText = reader.ReadElementContentAsString();
-                        break;
-                    case "Visible":
-                        visible = true;
-                        break;
-                }
-            }
+            var rowText = clientData.Elements().FirstOrDefault(e => e.Name.LocalName == "Row")?.Value;
+            if (int.TryParse(rowText?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedRow))
+                row = parsedRow;
+
+            var columnText = clientData.Elements().FirstOrDefault(e => e.Name.LocalName == "Column")?.Value;
+            if (int.TryParse(columnText?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedColumn))
+                column = parsedColumn;
+
+            anchorText = clientData.Elements().FirstOrDefault(e => e.Name.LocalName == "Anchor")?.Value;
 
             if (row is null || column is null)
                 continue;

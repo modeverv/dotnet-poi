@@ -3293,3 +3293,118 @@ Known gaps in current implementation:
   - `src/DotnetPoi.Formula/README.md`: replaced stale `DotnetPoi.Core` wording and updated test count.
   - `src/DotnetPoi.Common/README.md` and `src/DotnetPoi.POIFS/README.md`: clarified transitive package scope.
 - No commit made per repository rule.
+
+## 2026-05-08 16:15 JST - README/agents comments status split
+- Task: split README comment status between xlsx and docx, and add Phase 18 work plan for xlsx/docx comments.
+- README updated:
+  - xlsx/XSSF no longer groups charts and comments as preservation-only. Charts remain `🔵`; comments are now `✅` for common cell comment read/create/edit/remove through `XSSFComment`, cell/sheet lookup, and VML/comment part read/write.
+  - docx/XWPF comments remain `🔵` preservation-only: existing comments round-trip through preserved parts, but API creation/editing is not modeled.
+  - Practical Gaps now lists docx comment API only; xlsx cell comments are noted as already modeled for common workflows.
+- `agents.md` updated with `phase 18 TODO3 — comments API / preservation split`:
+  - xlsx comments follow-up: POI API comparison, remove/move/multi-sheet/visible/author tests, Java POI Direction B, docs limitations.
+  - docx comments path: marker preservation first (`w:commentRangeStart`, `w:commentRangeEnd`, `w:commentReference`), then read API, then create/edit API after preservation is stable.
+- `NOW.md` synchronized:
+  - xlsx comments changed from `🔵 不明パーツ保存のみ` to `✅` with current API/read-write scope and minimal rich formatting/VML styling caveat.
+  - practical gap changed from generic `xlsx, docx コメント` to `docx コメントAPI`; xlsx cell comments are noted as implemented for common workflows.
+- No code changes and no tests run for this documentation-only update.
+
+## 2026-05-08 16:18 JST - Phase 18 TODO3 implementation order 1 follow-up
+- Task: finish Phase 18 TODO3 implementation order 1 (`comments API / preservation split`) by checking for documentation drift beyond root README.
+- Confirmed root `README.md` already separates xlsx comments (`✅` common API supported) from docx comments (`🔵` preservation-only).
+- Updated remaining documentation surfaces:
+  - `docs_src/content/compatibility/format-coverage.md`: split xlsx charts from xlsx comments; xlsx comments are now `✅ Review`, docx comments explicitly remain preservation-only with no read/create/edit API.
+  - `docs_src/content/compatibility/limitations.md`: changed comments gap from `xlsx, docx` to docx-only and added a short note that xlsx cell comments are modeled with minimal rich formatting/VML styling.
+  - `src/DotnetPoi.Ooxml/README.md`: added separate `XSSF comments` and `XWPF comments` sections.
+- Ran docs generator: `dotnet run --project tools/DotnetPoi.DocsGenerator/DotnetPoi.DocsGenerator.csproj` and regenerated `docs/` HTML.
+- No code changes and no unit tests run; this was documentation/status synchronization only.
+
+## 2026-05-08 16:26 JST - Phase 18 TODO3 implementation order 2
+- Task: finish xlsx comments API confirmation/follow-up for Phase 18 TODO3.
+- Apache POI comparison notes:
+  - `XSSFCell.getCellComment()` delegates to `XSSFSheet.getCellComment(CellAddress)`; it does not keep a stale per-cell cache.
+  - `XSSFCell.setCellComment(null)` removes the comment for the cell; `XSSFCell.removeCellComment()` removes both comments-table and VML shape entries.
+  - `XSSFComment.setAddress(row, col)` updates the comments lookup so the old address no longer resolves and the new address does.
+  - `XSSFComment.isVisible()` reads VML `ClientData/Visible` and may also infer from VML shape style; `setVisible(false)` removes `Visible` and uses hidden style.
+  - `XSSFSheet.getCellComments()` exposes all sheet comments keyed by cell address.
+- Implementation updates:
+  - Removed stale per-cell comment cache from `XSSFCell`; `getCellComment()` now always looks up the sheet comment table.
+  - Added `XSSFSheet.getCellComments()` returning comments keyed by A1-style address strings.
+  - Reworked XSSF VML comment metadata read to parse shape-level VML with `XDocument`, preserving anchor and visible/hidden state more reliably.
+- Tests added:
+  - remove comment: no comments/VML/legacyDrawing parts are written when the last comment is removed.
+  - move comment: old cell lookup is cleared, new cell lookup works, and round-trip persists the new address.
+  - multiple sheets / visible-hidden / shared author list: comments1/comments2 parts, VML visible marker, author de-duplication, and readback are verified.
+  - Direction B: added `phase18-xssf-comments.xlsx` writer fixture and Java POI read assertion for authors, text, visibility, movement, and multi-sheet comments.
+- Docs status:
+  - README / docs_src / package README limitations were already split in implementation order 1; no new docs generator run needed for this code/test follow-up.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XSSFWorkbookTests"`: 46 passed.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Write_XlsxCommentsWorkbook_CreatesFixtureForPoi"`: 1 passed and generated `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase18-xssf-comments.xlsx`.
+  - `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest#readPhase18XssfCommentsWorkbook`: 1 passed.
+- No commit made per repository rule.
+
+## 2026-05-08 16:47 JST - Phase 18 TODO3 implementation order 3
+- Task: fix docx comments preservation for Phase 18 TODO3, implementation order 3.
+- Apache POI reference check:
+  - Confirmed POI has modeled docx comment APIs around `XWPFComment`, `XWPFComments`, `XWPFDocument.getDocComments()/getComments()/getCommentByID()`, and tests using `comment.docx` / `testComment.docx`.
+  - Kept this step preservation-only; docx comment read/create/edit API remains Phase 18 TODO3 order 4/5.
+- Implementation:
+  - Added ordered raw run-content preservation to `XWPFRun` and `XWPFDocument` so run-level unmodeled elements such as `w:commentReference` survive even when the run has no text.
+  - Preserved existing document-level relationship entries that are not modeled by XWPF writer, including `comments.xml`, `commentsExtended.xml`, `commentsIds.xml`, and `commentsExtensible.xml` relationships.
+  - Preserved non-modeled content type defaults/overrides from `[Content_Types].xml`, so comment parts and comment-owned media defaults remain package-visible after round-trip.
+- Tests:
+  - Added POI fixture tests for `testComment.docx` range markers (`w:commentRangeStart`, `w:commentRangeEnd`, `w:commentReference`) plus `word/comments.xml`, document rels, and content type overrides.
+  - Added POI fixture test for `comment.docx` collapsed comment reference inside a textless run.
+  - Added synthetic order tests for comment markers in table cell paragraphs and near hyperlink/tracked-change content.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XWPFDocumentTests"`: 41 passed.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj`: 176 passed.
+- Remaining:
+- This does not implement docx comments usermodel/read API. Next step is Phase 18 TODO3 order 4: parse `word/comments.xml` into minimal read-only XWPF comment objects and consider paragraph/run-side reference-id access without disrupting order preservation.
+
+## 2026-05-08 17:20 JST - Phase 18 TODO3 implementation order 4
+- Task: implement Phase 18 TODO3 order 4, minimal docx comments read API while preserving the order-preserving raw XML/write path from order 3.
+- Code:
+  - Added read-only `XWPFComment` model with `getId()`, `getAuthor()`, `getInitials()`, `getDate()`, and `getText()`.
+  - `XWPFDocument` now parses `word/comments.xml` into comments on load and exposes `getComments()` / `getCommentByID(string)`.
+  - `word/comments.xml` remains an unmodeled preserved ZIP entry for writing; read parsing is sidecar only and does not replace the preserved part.
+  - Malformed/minimal preserved comment parts that were only intended for byte preservation are ignored by the comment reader rather than blocking document load.
+  - `XWPFParagraph` exposes `getCommentRangeStartIds()`, `getCommentRangeEndIds()`, and aggregate `getCommentReferenceIds()`.
+  - `XWPFRun` exposes `getCommentReferenceIds()` for preserved `w:commentReference` children.
+- Tests:
+  - Added POI fixture coverage for `comment.docx` comment metadata/text and `testComment.docx` paragraph/run marker ids.
+  - Existing order-preservation tests for `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` still pass.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj --filter "FullyQualifiedName~XWPFDocumentTests"`: 43 passed.
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj`: 178 passed.
+- Docs/status:
+  - Updated `agents.md` Phase 18 TODO3 order 4 checkboxes.
+  - Updated root README, `NOW.md`, `docs_src/content/compatibility/*`, generated docs HTML, and `src/DotnetPoi.Ooxml/README.md` to describe docx comments as preservation + minimal read-only API, with create/edit still not implemented.
+- Remaining:
+  - Phase 18 TODO3 order 5: create/edit API is still intentionally deferred. Need decide collapsed reference vs range comment creation behavior based on Apache POI before adding new `word/comments.xml` write/model ownership.
+- No commit made per repository rule.
+
+## 2026-05-08 17:10 JST - Phase 18 TODO3 implementation order 5
+- Task: implement Phase 18 TODO3 order 5, minimal docx comments create/edit API.
+- Apache POI reference:
+  - POI creates the comments part through `XWPFDocument.createComments()` and comments through `XWPFComments.createComment(BigInteger)`.
+  - dotnet-poi kept the API smaller for now: `XWPFDocument.createComment(...)` creates a comment with the next numeric id, and `XWPFParagraph.addComment(comment)` inserts a paragraph/range comment marker set.
+  - Minimal behavior chosen: paragraph/range comments, not collapsed reference-only comments, because this exercises ordered `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` insertion and matches the preservation model from orders 3/4.
+- Code:
+  - `XWPFComment` is now mutable for minimal metadata/text editing: `setAuthor`, `setInitials`, `setDate`, `setText`.
+  - `XWPFDocument.createComment(...)` / `removeComment(id)` were added, with numeric id allocation and a comments-modified flag.
+  - `XWPFParagraph.addComment(comment)` inserts range start before the paragraph's existing children, range end after them, and a reference run after the range while preserving paragraph child order.
+  - `word/comments.xml` remains byte-preserved on no-op round-trip. Once comments are created/edited through the API, the model takes ownership and writes `word/comments.xml`, the content type override, and the document relationship.
+- Tests:
+  - Added C# coverage for creating a docx comment, writing comments part/rels/content type, inserting range markers in order, and reading it back through dotnet-poi.
+  - Added C# coverage for editing an existing POI fixture comment and writing the updated modeled comments part.
+  - Added Direction B fixture writer `phase18-xwpf-comments.docx` and Java POI read test for comment metadata/text and paragraph marker XMLBeans objects.
+- Docs/status:
+  - Updated `agents.md`, `NOW.md`, root `README.md`, `docs_src/content/compatibility/*`, and `src/DotnetPoi.Ooxml/README.md`.
+  - Ran docs generator to refresh generated `docs/` HTML.
+- Verification:
+  - `dotnet test tests/DotnetPoi.Ooxml.Tests/DotnetPoi.Ooxml.Tests.csproj`: 180 passed.
+  - `dotnet test tests/DotnetPoi.Interop.Tests/DotnetPoi.Interop.Tests.csproj --filter "FullyQualifiedName~Write_DocxCommentsDocument_CreatesFixtureForPoi"`: 1 passed and generated `tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase18-xwpf-comments.docx`.
+  - `mvn test -f tests/DotnetPoi.Interop.Tests/java/pom.xml -Dtest=ReadFromDotnetTest#readPhase18XwpfCommentsDocument`: 1 passed.
+- Remaining:
+  - Rich comment body content, arbitrary range selection, comment deletion with marker cleanup, and comment-owned media/tables are still limited.
+- No commit made per repository rule.

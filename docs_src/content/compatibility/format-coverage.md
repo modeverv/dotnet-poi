@@ -15,7 +15,8 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Layout | active cell, sheet selection, active sheet | ✅ | Active cell/selected in-memory; active sheet round-trips |
 | Layout | print settings (margins, paper size, orientation, headers) | ✅ | |
 | Drawings | images, anchors, rotation, hyperlinks | ✅ | |
-| Drawings | charts, comments | 🔵 | Preserved on round-trip, new creation not modeled |
+| Drawings | charts | 🔵 | Existing chart parts are preserved on round-trip; new creation/editing is not modeled |
+| Review | comments | ✅ | Cell comment read/create/edit/remove is modeled via `XSSFComment`, cell/sheet lookup, and VML/comment part write/read. Rich formatting and VML shape styling are still minimal |
 | Drawings | auto-shapes, group shapes, connectors | 🔵 | Unknown `xdr:twoCellAnchor` children in drawing.xml preserved verbatim via raw XML capture/re-emission. Currently only `xdr:pic` is modeled; all other element types survive round-trip. |
 | Data | data validation, conditional formatting, auto filter | ✅ | |
 | Data | pivot tables | ⚠️ | Programmatic creation works; editing existing not modeled |
@@ -40,7 +41,7 @@ Legend: **✅** complete / **⚠️** partial (write-only, etc.) / **🔵** pres
 | Images | inline images with rotation | ✅ | |
 | Images | floating (anchored) images | 🔵 | `<wp:anchor>` elements preserved via raw XML capture/re-emission |
 | Images | text boxes (w:txbxContent) | ✅ | Text extraction from inline and anchored drawing textboxes is supported |
-| Annotations | comments | 🔵 | Existing parts round-trip via `_preservedEntries` |
+| Annotations | comments | ✅ | Existing comments round-trip via preservation; minimal `XWPFComment` lookup/text APIs, comment metadata/text editing, and paragraph range comment creation are modeled |
 | Annotations | footnotes, endnotes | 🔵 | `word/footnotes.xml` / `word/endnotes.xml` round-trip preserved |
 | Fields | TOC, page numbers, mail merge | ✅ | Write/read/round-trip |
 | SDT | content controls (block-level and inline) | 🔵 | Block-level `w:sdt` in `w:body` and inline `w:sdt` inside `w:p` preserved via raw XML capture/re-emission. |

@@ -26,7 +26,7 @@
 | **図形** | 画像（複数/アンカー/回転） | ✅ | |
 | 〃 | ハイパーリンク | ✅ | |
 | 〃 | **グラフ** | 🔵 不明パーツ保存のみ | 既存ファイルのグラフは round-trip で保持されるが新規作成不可 |
-| 〃 | **コメント** | 🔵 不明パーツ保存のみ | 同上 |
+| **注釈** | **コメント** | ✅ | `XSSFComment` による cell comment read/create/edit/remove、cell/sheet lookup、`xl/commentsN.xml` + VML comment shape の読み書き対応。rich formatting と VML shape styling は minimal |
 | 〃 | **図形描画（オートシェイプ・図形）** | 🔵 不明パーツ保存のみ | `xdr:twoCellAnchor` の未知子要素（オートシェイプ, コネクタ, グループ）は raw XML 保持で round-trip 維持 |
 | **データ** | 入力規則（データバリデーション） | ✅ | |
 | 〃 | 条件付き書式 | ✅ | |
@@ -61,7 +61,7 @@
 | **画像** | 画像埋め込み（インライン・回転） | ✅ | |
 | 〃 | **フローティング画像（アンカー付き）** | 🔵 | `<wp:anchor>` は raw XML capture/re-emission で round-trip 保持 |
 | 〃 | **テキストボックス（w:txbxContent）** | ✅ | DrawingML 内にネストされた `w:txbxContent` からのテキスト抽出に対応 |
-| **注釈** | **コメント** | 🔵 不明パーツ保存のみ | 既存コメントは round-trip 保持されるが API モデルなし |
+| **注釈** | **コメント** | ✅ minimal API + preservation | 既存コメントは round-trip 保持。`XWPFComment` の id/author/initials/date/text、paragraph/run の参照 id、最小 create/edit と paragraph range marker 挿入に対応 |
 | 〃 | **脚注・文末脚注** | 🔵 不明パーツ保存のみ | `word/footnotes.xml` / `word/endnotes.xml` は round-trip 保持されるが API モデルなし |
 | **フィールド** | **TOC（目次）/ ページ番号 / 差し込み印刷** | ✅ | write/read/round-trip 完了 |
 | **SDT** | **コンテンツコントロール** | 🔵 | ブロックレベル `w:sdt`（bodyの直下）もインライン `w:sdt`（段落内）も raw XML 補完で round-trip 維持。 |
@@ -180,7 +180,7 @@
 |---|---|---|---|
 | 5 | **オートフィルター** | xlsx | ✅ 完了 — sheet.xml に `<autoFilter ref="...">` 要素を書き出し、読み戻し可能。フィルター条件は簡略化（ON/OFF のみ）。 |
 | 6 | **スタイル（段落スタイル・テーマ）** | docx | 文書の一貫した書式設定はスタイルが要。Word 標準スタイル（Normal/Heading1/Title）を使った文書を読むと書式が失われる。 |
-| 7 | **コメント** | xlsx, docx | レビューワークフローで多用される。既存コメントは不明パーツ保存で維持される可能性があるが新規作成不可。 |
+| 7 | **docx コメントAPI深さ** | docx | 最小 read/create/edit と paragraph range marker 挿入は対応済み。残りは rich content、複数範囲編集、削除時の本文 marker cleanup などの深い API。xlsx cell comments は common workflow 向け API 実装済み。 |
 | 8 | **テキストボックス（w:txbxContent）** | docx | ✅ 完了 — 読み取り（抽出）対応済み。DrawingML 内にネストされた `w:txbxContent` からのテキスト抽出が可能になり、本文が欠損する問題を解消。 |
 | 9 | **セル結合・罫線** | docx 表 | docx の表でセル結合ができないのは実用範囲を狭める。 |
 
@@ -210,4 +210,4 @@
 
 ---
 
-*最終更新: 2026-05-08 (phase 18 TODO2: docx tracked changes preservation-only 対応)*
+*最終更新: 2026-05-08 (phase 18 TODO3 order 5: docx comments minimal create/edit API 対応)*

@@ -113,6 +113,13 @@ public sealed class XSSFSheet : ISheet
 
     public XSSFComment? findCellComment(int row, int column) => getCellComment(row, column);
 
+    public IReadOnlyDictionary<string, XSSFComment> getCellComments()
+    {
+        return _comments.ToDictionary(
+            pair => XSSFHyperlink.FormatCellRef(pair.Key.Row, pair.Key.Column),
+            pair => pair.Value);
+    }
+
     internal void RegisterComment(XSSFComment comment)
     {
         Guard.ThrowIfNull(comment, nameof(comment));

@@ -1400,6 +1400,142 @@ public class XSSFWorkbookTests
         Assert.Equal("Updated from .NET", edited.getString()!.getString());
     }
 
+    [Fact]
+    public void RemoveCellComment_RemovesCommentPartsWhenNoCommentsRemain()
+    {
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Remove");
+        var cell = sheet.createRow(0).createCell(0);
+        cell.setCellValue("remove me");
+
+        var comment = sheet.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 0, 0, 2, 4));
+        comment.setAuthor("Reviewer");
+        comment.setString("Temporary");
+        cell.setCellComment(comment);
+
+        Assert.NotNull(cell.getCellComment());
+        cell.removeCellComment();
+        Assert.Null(cell.getCellComment());
+        Assert.Empty(sheet.getCellComments());
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+        stream.Position = 0;
+
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        Assert.Null(archive.GetEntry("xl/comments1.xml"));
+        Assert.Null(archive.GetEntry("xl/drawings/vmlDrawing1.vml"));
+        var sheetXml = ReadEntry(archive, "xl/worksheets/sheet1.xml");
+        Assert.DoesNotContain("legacyDrawing", sheetXml);
+    }
+
+    [Fact]
+    public void MoveCellComment_RoundTripsNewAddressAndClearsOldLookup()
+    {
+        using var workbook = new XSSFWorkbook();
+        var sheet = workbook.createSheet("Move");
+        var a1 = sheet.createRow(0).createCell(0);
+        a1.setCellValue("old");
+        var b2 = sheet.createRow(1).createCell(1);
+        b2.setCellValue("new");
+
+        var comment = sheet.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 0, 0, 2, 4));
+        comment.setAuthor("Mover");
+        comment.setString("Moved comment");
+        a1.setCellComment(comment);
+
+        comment.setAddress(1, 1);
+
+        Assert.Null(a1.getCellComment());
+        Assert.Null(sheet.getCellComment(0, 0));
+        Assert.Same(comment, b2.getCellComment());
+        Assert.Same(comment, sheet.getCellComment(1, 1));
+        Assert.True(sheet.getCellComments().ContainsKey("B2"));
+        Assert.False(sheet.getCellComments().ContainsKey("A1"));
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+        stream.Position = 0;
+
+        using var roundTripped = new XSSFWorkbook(stream);
+        var rtSheet = roundTripped.getSheet("Move")!;
+        Assert.Null(rtSheet.getCellComment(0, 0));
+        var moved = rtSheet.getCellComment(1, 1);
+        Assert.NotNull(moved);
+        Assert.Equal("Mover", moved!.getAuthor());
+        Assert.Equal("Moved comment", moved.getString()!.getString());
+    }
+
+    [Fact]
+    public void Comments_MultipleSheetsVisibleHiddenAndAuthors_RoundTrip()
+    {
+        using var workbook = new XSSFWorkbook();
+        var first = workbook.createSheet("First");
+        var second = workbook.createSheet("Second");
+
+        var a1 = first.createRow(0).createCell(0);
+        a1.setCellValue("visible comment");
+        var visible = first.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 0, 0, 2, 4));
+        visible.setAuthor("Alice");
+        visible.setString("Shown");
+        visible.setVisible(true);
+        a1.setCellComment(visible);
+
+        var c3 = first.createRow(2).createCell(2);
+        c3.setCellValue("hidden comment");
+        var hidden = first.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 2, 2, 4, 6));
+        hidden.setAuthor("Alice");
+        hidden.setString("Hidden");
+        hidden.setVisible(false);
+        c3.setCellComment(hidden);
+
+        var b2 = second.createRow(1).createCell(1);
+        b2.setCellValue("other sheet comment");
+        var other = second.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 1, 1, 3, 5));
+        other.setAuthor("Bob");
+        other.setString("Second sheet");
+        b2.setCellComment(other);
+
+        using var stream = new MemoryStream();
+        workbook.write(stream);
+        stream.Position = 0;
+
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true))
+        {
+            Assert.NotNull(archive.GetEntry("xl/comments1.xml"));
+            Assert.NotNull(archive.GetEntry("xl/comments2.xml"));
+
+            var comments1 = ReadEntry(archive, "xl/comments1.xml");
+            Assert.Contains("<author>Alice</author>", comments1);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(comments1, "<author>Alice</author>"));
+            Assert.Contains("<comment ref=\"A1\" authorId=\"1\">", comments1);
+            Assert.Contains("<comment ref=\"C3\" authorId=\"1\">", comments1);
+
+            var comments2 = ReadEntry(archive, "xl/comments2.xml");
+            Assert.Contains("<author>Bob</author>", comments2);
+            Assert.Contains("<comment ref=\"B2\" authorId=\"1\">", comments2);
+
+            var vml1 = ReadEntry(archive, "xl/drawings/vmlDrawing1.vml");
+            Assert.Contains("<x:Visible/>", vml1);
+            Assert.Contains("visibility:hidden", vml1);
+        }
+
+        stream.Position = 0;
+        using var roundTripped = new XSSFWorkbook(stream);
+        var rtFirst = roundTripped.getSheet("First")!;
+        var rtSecond = roundTripped.getSheet("Second")!;
+
+        Assert.Equal(2, rtFirst.getCellComments().Count);
+        Assert.Single(rtSecond.getCellComments());
+        Assert.True(rtFirst.getCellComment(0, 0)!.isVisible());
+        Assert.False(rtFirst.getCellComment(2, 2)!.isVisible());
+        Assert.Equal("Alice", rtFirst.getCellComment(0, 0)!.getAuthor());
+        Assert.Equal("Shown", rtFirst.getCellComment(0, 0)!.getString()!.getString());
+        Assert.Equal("Hidden", rtFirst.getCellComment(2, 2)!.getString()!.getString());
+        Assert.Equal("Bob", rtSecond.getCellComment(1, 1)!.getAuthor());
+        Assert.Equal("Second sheet", rtSecond.getCellComment(1, 1)!.getString()!.getString());
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         var entry = archive.GetEntry(name);

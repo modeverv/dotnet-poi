@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
+using System.Xml.Linq;
 using DotnetPoi.SS.Xml;
 
 namespace DotnetPoi.XWPF.UserModel;
@@ -40,6 +41,10 @@ public sealed class XWPFDocument : IDisposable
             new(BodyChildKind.Raw, null, null, rawXml);
     }
 
+    private sealed record PreservedContentTypeDefault(string Extension, string ContentType);
+    private sealed record PreservedContentTypeOverride(string PartName, string ContentType);
+    private sealed record PreservedRelationship(string Id, string Type, string Target, string? TargetMode);
+
     private const string NsW = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     private const string NsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private const string NsWp = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
@@ -64,6 +69,8 @@ public sealed class XWPFDocument : IDisposable
 
     private const string RelTypeStyles = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
     private const string ContentTypeStyles = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml";
+    private const string RelTypeComments = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
+    private const string ContentTypeComments = "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml";
 
     /// <summary>True if this document was loaded from docm (has a vbaProject.bin).</summary>
     public bool HasMacros => _vbaProjectBin != null;
@@ -74,6 +81,7 @@ public sealed class XWPFDocument : IDisposable
     private const int ImageRelIdOffset = 2;
 
     private readonly List<XWPFParagraph> _paragraphs = new();
+    private readonly List<XWPFComment> _comments = new();
     private readonly List<XWPFPictureData> _pictures = new();
     private readonly List<XWPFTable> _tables = new();
     private readonly List<BodyChild> _bodyChildren = new();
@@ -125,6 +133,9 @@ public sealed class XWPFDocument : IDisposable
     // docProps, and other unmodeled parts survive round-trip.
     private readonly Dictionary<string, byte[]> _preservedEntries
         = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<PreservedContentTypeDefault> _preservedContentTypeDefaults = new();
+    private readonly List<PreservedContentTypeOverride> _preservedContentTypeOverrides = new();
+    private readonly List<PreservedRelationship> _preservedDocumentRelationships = new();
 
     // Raw XML preservation for unknown direct children of w:body in document.xml
     // (SDT / content controls, altChunk, bookmarks, track changes, etc.).
@@ -145,6 +156,7 @@ public sealed class XWPFDocument : IDisposable
     private readonly List<string> _preservedBodySectPr = new();
 
     private XWPFStyles? _styles;
+    private bool _commentsModified;
 
     public XWPFDocument() { }
 
@@ -163,6 +175,41 @@ public sealed class XWPFDocument : IDisposable
     }
 
     public IReadOnlyList<XWPFParagraph> getParagraphs() => _paragraphs;
+
+    public IReadOnlyList<XWPFComment> getComments() => _comments;
+
+    public XWPFComment? getCommentByID(string id) =>
+        _comments.FirstOrDefault(comment => comment.getId() == id);
+
+    public XWPFComment createComment(string? author = null, string? text = null, string? initials = null, string? date = null)
+    {
+        var comment = new XWPFComment(GetNextCommentId(), author, initials, date, text ?? string.Empty, MarkCommentsModified);
+        _comments.Add(comment);
+        MarkCommentsModified();
+        return comment;
+    }
+
+    public bool removeComment(string id)
+    {
+        var index = _comments.FindIndex(comment => comment.getId() == id);
+        if (index < 0)
+            return false;
+
+        _comments.RemoveAt(index);
+        MarkCommentsModified();
+        return true;
+    }
+
+    internal void MarkCommentsModified() => _commentsModified = true;
+
+    private string GetNextCommentId()
+    {
+        var used = new HashSet<string>(_comments.Select(comment => comment.getId()), StringComparer.Ordinal);
+        var id = 0;
+        while (used.Contains(id.ToString(CultureInfo.InvariantCulture)))
+            id++;
+        return id.ToString(CultureInfo.InvariantCulture);
+    }
 
     public XWPFTable createTable()
     {
@@ -313,7 +360,11 @@ public sealed class XWPFDocument : IDisposable
 
         // Emit preserved (unknown) entries first, then model entries overwrite below
         foreach (var kv in _preservedEntries)
+        {
+            if (_commentsModified && kv.Key.Equals("word/comments.xml", StringComparison.OrdinalIgnoreCase))
+                continue;
             WriteBinaryEntry(archive, kv.Key, kv.Value);
+        }
 
         WriteEntry(archive, "[Content_Types].xml", WriteContentTypes);
         WriteEntry(archive, "_rels/.rels", WriteRootRelationships);
@@ -323,6 +374,8 @@ public sealed class XWPFDocument : IDisposable
         if (_numInstances.Count > 0)
             WriteEntry(archive, "word/numbering.xml", WriteNumbering);
         WriteEntry(archive, "word/styles.xml", WriteStyles);
+        if (_commentsModified)
+            WriteEntry(archive, "word/comments.xml", WriteComments);
         // headers and footers — write model content only if modified via API, otherwise preserved bytes are used
         if (_headerModified)
         {
@@ -451,6 +504,7 @@ public sealed class XWPFDocument : IDisposable
     private void Load(Stream stream)
     {
         _paragraphs.Clear();
+        _comments.Clear();
         _tables.Clear();
         _bodyChildren.Clear();
         _pictures.Clear();
@@ -462,10 +516,17 @@ public sealed class XWPFDocument : IDisposable
         _preservedRawBodyElements.Clear();
         _preservedRawSectPrChildren.Clear();
         _preservedBodySectPr.Clear();
+        _preservedContentTypeDefaults.Clear();
+        _preservedContentTypeOverrides.Clear();
+        _preservedDocumentRelationships.Clear();
+        _commentsModified = false;
 
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
 
+        ReadPreservedContentTypes(archive);
+        ReadPreservedDocumentRelationships(archive);
         ReadPictures(archive);
+        ReadComments(archive);
         ReadDocument(archive);
         ReadVbaFiles(archive);
         ReadHeadersFooters(archive);
@@ -486,6 +547,8 @@ public sealed class XWPFDocument : IDisposable
         };
         if (_numInstances.Count > 0)
             known.Add("word/numbering.xml");
+        if (_commentsModified)
+            known.Add("word/comments.xml");
         if (_vbaProjectBin != null)
         {
             known.Add("word/vbaProject.bin");
@@ -511,6 +574,95 @@ public sealed class XWPFDocument : IDisposable
             _preservedEntries[name] = ms.ToArray();
         }
     }
+
+    private void ReadPreservedContentTypes(ZipArchive archive)
+    {
+        var entry = archive.GetEntry("[Content_Types].xml");
+        if (entry is null) return;
+
+        XNamespace ns = "http://schemas.openxmlformats.org/package/2006/content-types";
+        using var stream = entry.Open();
+        var document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
+
+        foreach (var element in document.Root?.Elements(ns + "Default") ?? Enumerable.Empty<XElement>())
+        {
+            var extension = (string?)element.Attribute("Extension");
+            var contentType = (string?)element.Attribute("ContentType");
+            if (extension is not string extensionValue || extensionValue.Length == 0
+                || contentType is not string contentTypeValue || contentTypeValue.Length == 0)
+                continue;
+            if (extensionValue.Equals("rels", StringComparison.OrdinalIgnoreCase)
+                || extensionValue.Equals("xml", StringComparison.OrdinalIgnoreCase))
+                continue;
+            _preservedContentTypeDefaults.Add(new PreservedContentTypeDefault(extensionValue, contentTypeValue));
+        }
+
+        foreach (var element in document.Root?.Elements(ns + "Override") ?? Enumerable.Empty<XElement>())
+        {
+            var partName = (string?)element.Attribute("PartName");
+            var contentType = (string?)element.Attribute("ContentType");
+            if (partName is not string partNameValue || partNameValue.Length == 0
+                || contentType is not string contentTypeValue || contentTypeValue.Length == 0)
+                continue;
+            if (IsModeledContentTypeOverride(partNameValue))
+                continue;
+            _preservedContentTypeOverrides.Add(new PreservedContentTypeOverride(partNameValue, contentTypeValue));
+        }
+    }
+
+    private static bool IsModeledContentTypeOverride(string partName)
+    {
+        if (partName.Equals("/word/document.xml", StringComparison.OrdinalIgnoreCase)
+            || partName.Equals("/word/settings.xml", StringComparison.OrdinalIgnoreCase)
+            || partName.Equals("/word/numbering.xml", StringComparison.OrdinalIgnoreCase)
+            || partName.Equals("/word/styles.xml", StringComparison.OrdinalIgnoreCase)
+            || partName.Equals("/word/vbaProject.bin", StringComparison.OrdinalIgnoreCase)
+            || partName.Equals("/word/vbaData.xml", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var normalized = partName.TrimStart('/');
+        return normalized.StartsWith("word/header", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("word/footer", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("word/media/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ReadPreservedDocumentRelationships(ZipArchive archive)
+    {
+        var entry = archive.GetEntry("word/_rels/document.xml.rels");
+        if (entry is null) return;
+
+        XNamespace ns = "http://schemas.openxmlformats.org/package/2006/relationships";
+        using var stream = entry.Open();
+        var document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
+
+        foreach (var element in document.Root?.Elements(ns + "Relationship") ?? Enumerable.Empty<XElement>())
+        {
+            var id = (string?)element.Attribute("Id");
+            var type = (string?)element.Attribute("Type");
+            var target = (string?)element.Attribute("Target");
+            if (id is not string idValue || idValue.Length == 0
+                || type is not string typeValue || typeValue.Length == 0
+                || target is not string targetValue || targetValue.Length == 0)
+                continue;
+            if (IsModeledDocumentRelationship(typeValue))
+                continue;
+            _preservedDocumentRelationships.Add(new PreservedRelationship(
+                idValue,
+                typeValue,
+                targetValue,
+                (string?)element.Attribute("TargetMode")));
+        }
+    }
+
+    private static bool IsModeledDocumentRelationship(string type) =>
+        type is RelTypeSettings
+            or RelTypeStyles
+            or RelTypeNumbering
+            or RelTypeHyperlink
+            or RelTypeHeader
+            or RelTypeFooter
+            or RelTypeVbaProject
+            or "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 
     private void ReadStyles(ZipArchive archive)
     {
@@ -586,6 +738,31 @@ public sealed class XWPFDocument : IDisposable
             var ext = Path.GetExtension(entry.FullName).TrimStart('.').ToLowerInvariant();
             var format = ExtensionToFormat(ext);
             _pictures.Add(new XWPFPictureData(ms.ToArray(), format, _pictures.Count + 1));
+        }
+    }
+
+    private void ReadComments(ZipArchive archive)
+    {
+        _comments.Clear();
+
+        var entry = archive.GetEntry("word/comments.xml");
+        if (entry is null) return;
+
+        XNamespace w = NsW;
+        using var stream = entry.Open();
+        XDocument document;
+        try
+        {
+            document = XDocument.Load(stream, LoadOptions.PreserveWhitespace);
+        }
+        catch (XmlException)
+        {
+            return;
+        }
+
+        foreach (var commentElement in document.Root?.Elements(w + "comment") ?? Enumerable.Empty<XElement>())
+        {
+            _comments.Add(XWPFComment.FromXml(commentElement, w, MarkCommentsModified));
         }
     }
 
@@ -701,6 +878,7 @@ public sealed class XWPFDocument : IDisposable
         // Raw XML preservation state
         int bodyDepth = -1;
         int paragraphDepth = -1;
+        int runDepth = -1;
         int sectPrDepth = -1;
         bool skipRead = false;
 
@@ -791,6 +969,7 @@ public sealed class XWPFDocument : IDisposable
                                 if (currentParagraph is not null)
                                 {
                                     currentRun = currentParagraph.createRun();
+                                    runDepth = reader.Depth;
                                     if (hyperlinkRelId is not null && hyperlinkRelMap.TryGetValue(hyperlinkRelId, out var url))
                                         currentRun.setHyperlink(url);
                                 }
@@ -1151,6 +1330,16 @@ public sealed class XWPFDocument : IDisposable
                     skipRead = true;
                     continue;
                 }
+                // Preserve unmodeled direct children of w:r, including w:commentReference.
+                if (!inRPr && currentRun is not null && runDepth >= 0
+                    && reader.NodeType == XmlNodeType.Element
+                    && reader.Depth == runDepth + 1
+                    && reader.LocalName is not ("rPr" or "t" or "drawing" or "fldChar" or "instrText"))
+                {
+                    currentRun.addPreservedRawContentElement(reader.ReadOuterXml());
+                    skipRead = true;
+                    continue;
+                }
                 // Capture unmodeled children of run properties (rPr) as raw XML for re-emission
                 // Run-level rPr (inside w:r)
                 if (inRPr && currentRun is not null && reader.NodeType == XmlNodeType.Element
@@ -1182,12 +1371,14 @@ public sealed class XWPFDocument : IDisposable
                                 inPPr = false;
                                 inRPr = false;
                                 paragraphDepth = -1;
+                                runDepth = -1;
                                 break;
                             case "hyperlink":
                                 hyperlinkRelId = null;
                                 break;
                             case "r" when !inRPr:
                                 currentRun = null;
+                                runDepth = -1;
                                 break;
                             case "rPr":
                                 inRPr = false;
@@ -1678,6 +1869,19 @@ public sealed class XWPFDocument : IDisposable
         {
             WriteDefault(writer, ext, _pictures.First(p => p.Extension == ext).ContentType);
         }
+        var writtenDefaultExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "rels",
+            "xml"
+        };
+        foreach (var picture in _pictures)
+            writtenDefaultExtensions.Add(picture.Extension);
+        foreach (var preservedDefault in _preservedContentTypeDefaults)
+        {
+            if (!writtenDefaultExtensions.Add(preservedDefault.Extension))
+                continue;
+            WriteDefault(writer, preservedDefault.Extension, preservedDefault.ContentType);
+        }
         WriteDefault(writer, "xml", "application/xml");
         // docm uses macroEnabled content type; docx uses the standard one.
         WriteOverride(writer, "/word/document.xml",
@@ -1703,6 +1907,25 @@ public sealed class XWPFDocument : IDisposable
             WriteOverride(writer, "/word/vbaProject.bin", ContentTypeVbaProject);
             if (_vbaDataXml != null)
                 WriteOverride(writer, "/word/vbaData.xml", ContentTypeVbaData);
+        }
+        var writtenOverridePartNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "/word/document.xml",
+            "/word/settings.xml",
+            "/word/styles.xml"
+        };
+        if (_numInstances.Count > 0)
+            writtenOverridePartNames.Add("/word/numbering.xml");
+        if (_commentsModified)
+        {
+            WriteOverride(writer, "/word/comments.xml", ContentTypeComments);
+            writtenOverridePartNames.Add("/word/comments.xml");
+        }
+        foreach (var preservedOverride in _preservedContentTypeOverrides)
+        {
+            if (!writtenOverridePartNames.Add(preservedOverride.PartName))
+                continue;
+            WriteOverride(writer, preservedOverride.PartName, preservedOverride.ContentType);
         }
         writer.WriteEndElement();
     }
@@ -1749,6 +1972,7 @@ public sealed class XWPFDocument : IDisposable
         {
             var vbaRelId = $"rId{_pictures.Count + 3 + offset}";
             WriteRelationship(writer, vbaRelId, "vbaProject.bin", RelTypeVbaProject);
+            offset++;
         }
         // headers (variants: default, first, even)
         {
@@ -1772,7 +1996,80 @@ public sealed class XWPFDocument : IDisposable
                 WriteRelationship(writer, relId, $"footer{fFileIdx++}.xml", RelTypeFooter);
             }
         }
+        if (_commentsModified)
+        {
+            var commentsRelId = GetPreservedCommentsRelationshipId()
+                ?? GetNextDocumentRelationshipId(_pictures.Count + 3 + offset);
+            WriteRelationship(writer, commentsRelId, "comments.xml", RelTypeComments);
+        }
+        foreach (var relationship in _preservedDocumentRelationships)
+        {
+            if (_commentsModified && relationship.Type.Equals(RelTypeComments, StringComparison.Ordinal))
+                continue;
+            if (relationship.TargetMode is null)
+                WriteRelationship(writer, relationship.Id, relationship.Target, relationship.Type);
+            else
+                WriteRelationship(writer, relationship.Id, relationship.Target, relationship.Type, relationship.TargetMode);
+        }
         writer.WriteEndElement();
+    }
+
+    private string? GetPreservedCommentsRelationshipId() =>
+        _preservedDocumentRelationships.FirstOrDefault(r => r.Type.Equals(RelTypeComments, StringComparison.Ordinal))?.Id;
+
+    private string GetNextDocumentRelationshipId(int start)
+    {
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        used.Add("rId1");
+        used.Add("rId2");
+        foreach (var picture in _pictures)
+            used.Add($"rId{picture.Index + ImageRelIdOffset}");
+        for (int i = 0; i < _hyperlinkUrls.Count; i++)
+            used.Add($"rId{_pictures.Count + 3 + i}");
+        foreach (var relationship in _preservedDocumentRelationships)
+            used.Add(relationship.Id);
+
+        var index = Math.Max(3, start);
+        while (used.Contains($"rId{index}"))
+            index++;
+        return $"rId{index}";
+    }
+
+    private void WriteComments(PoiXmlWriter writer)
+    {
+        writer.WriteStartElement("w", "comments");
+        writer.WriteAttributeString("xmlns:w", NsW);
+        foreach (var comment in _comments.OrderBy(c => int.TryParse(c.getId(), out var id) ? id : int.MaxValue))
+        {
+            writer.WriteStartElement("w", "comment");
+            writer.WriteAttributeString("w", "id", comment.getId());
+            if (comment.getAuthor() is not null)
+                writer.WriteAttributeString("w", "author", comment.getAuthor()!);
+            if (comment.getInitials() is not null)
+                writer.WriteAttributeString("w", "initials", comment.getInitials()!);
+            if (comment.getDate() is not null)
+                writer.WriteAttributeString("w", "date", comment.getDate()!);
+            foreach (var paragraphText in SplitCommentParagraphs(comment.getText()))
+            {
+                writer.WriteStartElement("w", "p");
+                writer.WriteStartElement("w", "r");
+                writer.WriteStartElement("w", "t");
+                writer.WriteAttributeString("xml:space", "preserve");
+                writer.WriteString(paragraphText);
+                writer.WriteEndElement();
+                writer.WriteEndElement();
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement();
+        }
+        writer.WriteEndElement();
+    }
+
+    private static IEnumerable<string> SplitCommentParagraphs(string text)
+    {
+        var normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
+        var paragraphs = normalized.Split('\n');
+        return paragraphs.Length == 0 ? new[] { string.Empty } : paragraphs;
     }
 
     private static void WriteSettings(PoiXmlWriter writer)
@@ -2246,7 +2543,7 @@ public sealed class XWPFDocument : IDisposable
 
     private void WriteRun(PoiXmlWriter writer, XWPFRun run)
     {
-        if (run.TextValue is not null)
+        if (run.HasContent)
         {
             bool isHyperlink = run.HyperlinkUrl is not null;
             if (isHyperlink)
@@ -2320,10 +2617,21 @@ public sealed class XWPFDocument : IDisposable
                 }
                 writer.WriteEndElement(); // rPr
             }
-            writer.WriteStartElement("w", "t");
-            writer.WriteAttributeString("xml:space", "preserve");
-            writer.WriteString(run.TextValue);
-            writer.WriteEndElement(); // t
+            foreach (var child in run.ContentChildren)
+            {
+                switch (child.Kind)
+                {
+                    case XWPFRun.ContentChildKind.Text when run.TextValue is not null:
+                        writer.WriteStartElement("w", "t");
+                        writer.WriteAttributeString("xml:space", "preserve");
+                        writer.WriteString(run.TextValue);
+                        writer.WriteEndElement(); // t
+                        break;
+                    case XWPFRun.ContentChildKind.Raw when child.RawXml is not null:
+                        writer.WriteRaw(child.RawXml);
+                        break;
+                }
+            }
             writer.WriteEndElement(); // r
 
             if (isHyperlink)

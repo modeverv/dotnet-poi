@@ -110,7 +110,7 @@ Version 1.0 means the documented OOXML workflows are treated as stable. It does 
 
 The strongest format today is **xlsx / XSSF**, with broad support for workbook creation, reading, editing, styling, layout, images, formulas-as-text, macro preservation, and Java POI interop. **docx / XWPF** and **pptx / XSLF** are also useful for practical generation, light editing, and loss-resistant round-trips of many real files.
 
-This does **not** mean the whole Apache POI surface is complete. Advanced OOXML features such as chart creation and comment editing are still limited, some features are preservation-only rather than modeled APIs, and formula evaluation remains intentionally narrow. Legacy binary formats have improved: `.xls` now has practical basic workbook read/write, styling/layout slices, preservation, and Java POI interop coverage; `.doc` can extract body text and perform limited body edits with preservation. `.ppt` is still early. In short: **use it today for the supported workflows shown below; check the matrix before relying on an advanced or legacy feature.**
+This does **not** mean the whole Apache POI surface is complete. Advanced OOXML features such as chart creation and docx comment editing are still limited, some features are preservation-only rather than modeled APIs, and formula evaluation remains intentionally narrow. Legacy binary formats have improved: `.xls` now has practical basic workbook read/write, styling/layout slices, preservation, and Java POI interop coverage; `.doc` can extract body text and perform limited body edits with preservation. `.ppt` is still early. In short: **use it today for the supported workflows shown below; check the matrix before relying on an advanced or legacy feature.**
 
 Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not modeled for creation or editing / ❌ not implemented / — not applicable.
 
@@ -126,7 +126,8 @@ Legend: ✅ complete / ⚠️ partial / 🔵 preserved as unknown parts, but not
 | Styles | fonts, fills, borders, number/date formats, alignment | ✅ | Round-trip covered. |
 | Layout | merged cells, column width, row height, hidden rows/columns, freeze panes, print settings | ✅ | |
 | Drawings | images, anchors, rotation, hyperlinks | ✅ | |
-| Drawings | charts, comments | 🔵 | Existing package parts are preserved during round-trip; new creation/editing is not modeled. |
+| Drawings | charts | 🔵 | Existing chart parts are preserved during round-trip; new creation/editing is not modeled. |
+| Review | comments | ✅ | Cell comment read/create/edit/remove is modeled via `XSSFComment`, cell/sheet lookup, and VML/comment part write/read. Rich formatting and VML shape styling are still minimal. |
 | Drawings | auto-shapes | 🔵 | Unknown `xdr:twoCellAnchor` children (auto-shapes, connectors, group shapes) are preserved verbatim via raw XML capture/re-emission in drawing.xml. |
 | Data | data validation, conditional formatting, auto filter | ✅ | |
 | Data | pivot tables | ⚠️ | Programmatic creation exists; editing existing pivots is not modeled, but round-trip preservation is supported. |
@@ -226,7 +227,7 @@ Highest priority gaps:
 |---|---|---|---|
 | 1 | Full formula evaluation | xlsx | Template fill → save → open in Excel works; programmatic access to newly calculated results beyond the small DotnetPoi.Formula subset needs a real calculation engine. |
 | 2 | Chart creation | xlsx, pptx | Existing charts can be preserved, but report/presentation generation often needs to create charts from data. |
-| 3 | Comment API model | xlsx, docx | Existing comments survive round-trip through `_preservedEntries`, but API-level read/create/edit support is not implemented. |
+| 3 | Comment API depth | docx | Existing docx comments survive round-trip and can be read through minimal `XWPFComment` APIs. Minimal create/edit is available through `createComment(...)`, mutable comment metadata/text, and paragraph range marker insertion; richer comment content and cleanup-heavy editing remain limited. xlsx cell comments are already modeled for common read/create/edit/remove workflows. |
 | 4 | HSSF/HWPF depth | xls, doc | Basic legacy read/write and preservation exist, but images, shapes, advanced formatting, and complete editing are still limited. |
 | 5 | docx style depth and revision APIs | docx | Paragraph style references and tracked-change preservation are supported, but full character/table style editing and accept/reject/create/edit APIs for revisions remain limited. |
 

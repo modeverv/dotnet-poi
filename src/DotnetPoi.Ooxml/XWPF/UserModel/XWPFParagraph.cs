@@ -49,12 +49,18 @@ public sealed class XWPFParagraph
     private readonly List<XWPFRun> _runs = new();
     private readonly List<XWPFField> _fields = new();
     private readonly List<string> _preservedRawElements = new();
+    private readonly List<string> _commentRangeStartIds = new();
+    private readonly List<string> _commentRangeEndIds = new();
     private readonly List<Child> _children = new();
     internal IReadOnlyList<string> PreservedRawElements => _preservedRawElements;
     internal IReadOnlyList<Child> Children => _children;
     internal void addPreservedRawElement(string rawXml)
     {
         _preservedRawElements.Add(rawXml);
+        if (TryGetWordCommentMarkerId(rawXml, "commentRangeStart", out var startId))
+            _commentRangeStartIds.Add(startId);
+        if (TryGetWordCommentMarkerId(rawXml, "commentRangeEnd", out var endId))
+            _commentRangeEndIds.Add(endId);
         _children.Add(Child.ForRaw(rawXml));
     }
     // Paragraph-level section properties (sectPr inside pPr for section breaks)
@@ -103,6 +109,24 @@ public sealed class XWPFParagraph
     internal int Ilvl => _ilvl;
 
     public IReadOnlyList<XWPFRun> getRuns() => _runs;
+
+    public IReadOnlyList<string> getCommentRangeStartIds() => _commentRangeStartIds;
+
+    public IReadOnlyList<string> getCommentRangeEndIds() => _commentRangeEndIds;
+
+    public IReadOnlyList<string> getCommentReferenceIds() =>
+        _runs.SelectMany(run => run.getCommentReferenceIds()).ToArray();
+
+    public void addComment(XWPFComment comment)
+    {
+        Guard.ThrowIfNull(comment, nameof(comment));
+        var id = comment.getId();
+        AddPreservedRawElement($"<w:commentRangeStart w:id=\"{id}\"/>", 0);
+        AddPreservedRawElement($"<w:commentRangeEnd w:id=\"{id}\"/>", _children.Count);
+        var referenceRun = createRun();
+        referenceRun.addPreservedRawContentElement($"<w:commentReference w:id=\"{id}\"/>");
+        Document.MarkCommentsModified();
+    }
 
     public XWPFRun createRun()
     {
@@ -180,5 +204,60 @@ public sealed class XWPFParagraph
     {
         _numId = Document.GetOrCreateNumbering(XWPFDocument.NumberingFormat.Decimal);
         _ilvl = 0;
+    }
+
+    private static bool TryGetWordCommentMarkerId(string rawXml, string localName, out string id)
+    {
+        id = string.Empty;
+        if (!ContainsElementLocalName(rawXml, localName))
+            return false;
+
+        return TryGetXmlIdAttribute(rawXml, out id);
+    }
+
+    private void AddPreservedRawElement(string rawXml, int childIndex)
+    {
+        _preservedRawElements.Add(rawXml);
+        if (TryGetWordCommentMarkerId(rawXml, "commentRangeStart", out var startId))
+            _commentRangeStartIds.Add(startId);
+        if (TryGetWordCommentMarkerId(rawXml, "commentRangeEnd", out var endId))
+            _commentRangeEndIds.Add(endId);
+        _children.Insert(Math.Max(0, Math.Min(childIndex, _children.Count)), Child.ForRaw(rawXml));
+    }
+
+    private static bool ContainsElementLocalName(string rawXml, string localName) =>
+        rawXml.StartsWith("<w:" + localName, StringComparison.Ordinal)
+        || rawXml.StartsWith("<" + localName, StringComparison.Ordinal)
+        || rawXml.IndexOf("<w:" + localName + " ", StringComparison.Ordinal) >= 0
+        || rawXml.IndexOf("<" + localName + " ", StringComparison.Ordinal) >= 0
+        || rawXml.IndexOf("<w:" + localName + "/>", StringComparison.Ordinal) >= 0
+        || rawXml.IndexOf("<" + localName + "/>", StringComparison.Ordinal) >= 0;
+
+    private static bool TryGetXmlIdAttribute(string rawXml, out string id)
+    {
+        id = string.Empty;
+        foreach (var marker in new[] { " w:id=", " id=" })
+        {
+            var index = rawXml.IndexOf(marker, StringComparison.Ordinal);
+            if (index < 0)
+                continue;
+
+            var valueStart = index + marker.Length;
+            if (valueStart >= rawXml.Length)
+                continue;
+
+            var quote = rawXml[valueStart];
+            if (quote != '"' && quote != '\'')
+                continue;
+
+            var valueEnd = rawXml.IndexOf(quote, valueStart + 1);
+            if (valueEnd <= valueStart)
+                continue;
+
+            id = rawXml.Substring(valueStart + 1, valueEnd - valueStart - 1);
+            return true;
+        }
+
+        return false;
     }
 }

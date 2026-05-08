@@ -752,6 +752,39 @@ integration:
 - [x] 1. docx | **変更履歴** | **トラックチェンジ** | 🔵 preservation-only |
          raw XMLの順序保持モデルを入れて 🔵 preservation に上げる対応完了。`XWPFDocument` は body child order（paragraph/table/raw）を保持し、`XWPFParagraph` は paragraph child order（run/field/raw）を保持する。`w:ins` / `w:del` などの変更履歴XMLは通常runとの相対順序を保って round-trip する。accept/reject/create/edit API は未実装。
 
+#### phase 18 TODO3 — comments API / preservation split
+
+目的: README上のコメント状態を xlsx と docx で正確に分離し、実装も「xlsx は実装済み API の仕上げ」「docx は preservation → read → create/edit」の順で進める。
+
+前提:
+- xlsx / XSSF comments API は Phase 17 item 3 で基本実装済み。`XSSFComment`, `XSSFSheet.getCellComment()/findCellComment()`, `XSSFCell.getCellComment()/setCellComment()/removeCellComment()`, `XSSFDrawing.createCellComment()`, `xl/commentsN.xml`, VML comment shape, sheet rels の読み書きがある。
+- docx / XWPF comments は `word/comments.xml` などの part preservation に加え、最小 read/create/edit API を実装済み。本文側の `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` は参照 id を読み取れる。
+- Phase 18 TODO2 の body/paragraph child order preservation を前提に、docx comment range markers は通常 run / raw XML / tracked changes と相対順序を壊さないことを最優先にする。
+
+実装順:
+1. [x] README を修正し、xlsx comments は ✅ common API supported、docx comments は当初 🔵 preservation-only として分離する。
+   - xlsx の注意: rich comment formatting と VML shape styling は minimal / not byte-for-byte POI compatible。
+   - docx の注意: order 4/5 完了後は minimal read/create/edit API まで対応済み。
+2. [x] xlsx comments API の仕上げ確認。
+   - [x] Apache POI の `XSSFComment`, `CommentsTable`, `TestXSSFComment` を再確認し、API名・例外・移動/削除挙動の差分を `CHECKPOINT.md` に記録する。
+   - [x] 既存 `ReadAndEdit_PoiCommentFixture_RoundTripsUpdatedText` に加え、remove comment、move comment、複数 sheet comments、visible/hidden、author list の round-trip を追加する。
+   - [x] Java POI Direction B で dotnet-poi 生成 comment workbook を POI が読めることを確認する。
+   - [x] README / docs_src / package README で xlsx comments の制限（rich formatting, VML styling）を明記する。
+3. [x] docx comments preservation を順序保持レベルまで固定する。
+   - [x] Apache POI の `XWPFComment`, `XWPFComments`, `XWPFParagraph`, `XWPFRun` 周辺と `poi/test-data/document/comment*.docx` fixture を確認する。
+   - [x] `word/comments.xml`, `word/_rels/document.xml.rels`, `[Content_Types].xml` の保持だけでなく、本文内の `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` が paragraph child order を保って round-trip するテストを追加する。
+   - [x] table cell 内、hyperlink 内/近傍、tracked changes 近傍の comment marker preservation を代表ケースで固定する。
+4. [x] docx comments read API を最小実装する。
+   - [x] `XWPFComment` 相当の model を追加し、id / author / initials / date / text を読めるようにする。
+   - [x] `XWPFDocument.getComments()` / `getCommentByID()` 相当を追加する。
+   - [x] paragraph/run 側から comment reference id を取得できる最小 API を追加する。ただし本文の順序保持を壊す refactor は避ける。
+5. [x] docx comments create/edit API は read/preservation が安定してから着手する。
+   - [x] まず collapsed comment（単一位置の `commentReference`）か paragraph/range comment のどちらを最小対応にするか Apache POI に合わせて決める。最小対応は paragraph/range comment とし、comment part 作成は POI の `createComments().createComment(id)` に寄せる。
+   - [x] 新規 `word/comments.xml` 作成、content type override、document rels、comment id 採番を実装する。
+   - [x] `w:commentRangeStart` / `w:commentRangeEnd` / `w:commentReference` を order-preserving paragraph child として挿入する。
+   - [x] Java POI Direction B で dotnet-poi 生成 docx comments を POI が読めることを確認する。
+6. [x] 完了時に `NOW.md`, root `README.md`, `docs_src/content/compatibility/*`, `src/DotnetPoi.Ooxml/README.md`, `CHECKPOINT.md` を更新する。
+
 ---
 
 ## Porting Procedure (Per Class)

@@ -17,6 +17,10 @@ dotnet-poi can write formula text and preserve cached values, but **full formula
 
 Charts in xlsx and pptx are **preserved on round-trip but cannot be created or edited programmatically**. If your workflow requires generating chart visuals from data, this is not yet supported.
 
+### docx Comments
+
+Existing docx comments are preserved on round-trip, and dotnet-poi exposes a minimal XWPF comment API for comment metadata/text, paragraph/run marker reference ids, metadata/text editing, and paragraph range comment creation. Rich comment body content, arbitrary range editing, and cleanup-heavy marker deletion remain limited. xlsx cell comments are different: common read/create/edit/remove workflows are modeled through `XSSFComment`, cell/sheet lookup, and VML/comment part write/read, with rich formatting and VML shape styling still minimal.
+
 ### docx Style Editing
 
 Paragraph style references are supported with `setStyle()` / `getStyleID()`, and `word/styles.xml` is read or generated for new documents. Character styles, table styles, and full Word style inheritance are not yet editable or evaluated by dotnet-poi.
@@ -33,7 +37,7 @@ Tracked-change XML such as `w:ins`, `w:del`, and move ranges is preserved as raw
 
 | Feature | Format | Impact |
 |---|---|---|
-| Comments (read/create) | xlsx, docx | Existing comments preserved on round-trip but cannot be read or created |
+| Comments API | docx | Existing comments are preserved on round-trip and can be read through minimal XWPF APIs, but cannot be created or edited through public XWPF APIs |
 | Content controls (SDT) | docx | Block-level and inline SDT are preserved on round-trip but cannot be edited through a public API |
 | Track changes API | docx | Revision markup is preserved on round-trip, but accept/reject/create/edit APIs are not supported |
 | Grouped shapes | pptx | Preserved as raw `spTree` XML but cannot be edited through a public API |

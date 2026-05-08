@@ -3,6 +3,7 @@ package org.dotnetpoi.interop;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -18,6 +19,7 @@ import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Comment;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.FormulaError;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
@@ -39,6 +41,7 @@ import org.apache.poi.xslf.usermodel.XSLFTextParagraph;
 import org.apache.poi.xslf.usermodel.XSLFTextRun;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFComment;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFFooter;
@@ -833,6 +836,65 @@ public class ReadFromDotnetTest {
             assertEquals(3, workbook.getNumberOfSheets());
             assertEquals(1, workbook.getActiveSheetIndex());
             assertEquals("Second", workbook.getSheetAt(1).getSheetName());
+        }
+    }
+
+    @Test
+    void readPhase18XssfCommentsWorkbook() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase18-xssf-comments.xlsx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XSSFWorkbook workbook = new XSSFWorkbook(input)) {
+            XSSFSheet first = workbook.getSheet("Comments A");
+            XSSFSheet second = workbook.getSheet("Comments B");
+            assertNotNull(first);
+            assertNotNull(second);
+
+            assertEquals(2, first.getCellComments().size());
+            assertEquals(1, second.getCellComments().size());
+
+            Comment visible = first.getRow(0).getCell(0).getCellComment();
+            assertNotNull(visible);
+            assertEquals("DotnetPoi", visible.getAuthor());
+            assertEquals("Visible from dotnet-poi", visible.getString().getString());
+            assertTrue(visible.isVisible());
+
+            assertNull(first.getCellComment(new org.apache.poi.ss.util.CellAddress("B2")));
+            Comment moved = first.getRow(2).getCell(2).getCellComment();
+            assertNotNull(moved);
+            assertEquals("DotnetPoi", moved.getAuthor());
+            assertEquals("Moved to C3", moved.getString().getString());
+            assertFalse(moved.isVisible());
+
+            Comment other = second.getRow(1).getCell(1).getCellComment();
+            assertNotNull(other);
+            assertEquals("Interop", other.getAuthor());
+            assertEquals("Second sheet comment", other.getString().getString());
+        }
+    }
+
+    @Test
+    void readPhase18XwpfCommentsDocument() throws IOException {
+        Path fixture = findRepoRoot().resolve("tests/DotnetPoi.Interop.Tests/fixtures/from-dotnet-poi/phase18-xwpf-comments.docx");
+        assertTrue(Files.exists(fixture), "Run the C# WriteForPoi tests before this Java read test.");
+
+        try (InputStream input = Files.newInputStream(fixture);
+             XWPFDocument document = new XWPFDocument(input)) {
+            assertEquals(1, document.getComments().length);
+            XWPFComment comment = document.getCommentByID("0");
+            assertNotNull(comment);
+            assertEquals("DotnetPoi", comment.getAuthor());
+            assertEquals("DP", comment.getInitials());
+            assertEquals("Docx comment from dotnet-poi", comment.getText());
+
+            XWPFParagraph paragraph = document.getParagraphs().get(0);
+            assertEquals("DotnetPoi commented text", paragraph.getText());
+            assertEquals(1, paragraph.getCTP().getCommentRangeStartList().size());
+            assertEquals(1, paragraph.getCTP().getCommentRangeEndList().size());
+            assertEquals("0", paragraph.getCTP().getCommentRangeStartList().get(0).getId().toString());
+            assertEquals("0", paragraph.getCTP().getCommentRangeEndList().get(0).getId().toString());
+            assertEquals("0", paragraph.getRuns().get(1).getCTR().getCommentReferenceList().get(0).getId().toString());
         }
     }
 

@@ -112,7 +112,8 @@
 <tr><td>Layout</td><td>active cell, sheet selection, active sheet</td><td>✅</td><td>Active cell/selected in-memory; active sheet round-trips</td></tr>
 <tr><td>Layout</td><td>print settings (margins, paper size, orientation, headers)</td><td>✅</td></tr>
 <tr><td>Drawings</td><td>images, anchors, rotation, hyperlinks</td><td>✅</td></tr>
-<tr><td>Drawings</td><td>charts, comments</td><td>&#128309;</td><td>Preserved on round-trip, new creation not modeled</td></tr>
+<tr><td>Drawings</td><td>charts</td><td>&#128309;</td><td>Existing chart parts are preserved on round-trip; new creation/editing is not modeled</td></tr>
+<tr><td>Review</td><td>comments</td><td>✅</td><td>Cell comment read/create/edit/remove is modeled via <code>XSSFComment</code>, cell/sheet lookup, and VML/comment part write/read. Rich formatting and VML shape styling are still minimal</td></tr>
 <tr><td>Drawings</td><td>auto-shapes, group shapes, connectors</td><td>&#128309;</td><td>Unknown <code>xdr:twoCellAnchor</code> children in drawing.xml preserved verbatim via raw XML capture/re-emission. Currently only <code>xdr:pic</code> is modeled; all other element types survive round-trip.</td></tr>
 <tr><td>Data</td><td>data validation, conditional formatting, auto filter</td><td>✅</td></tr>
 <tr><td>Data</td><td>pivot tables</td><td>⚠️</td><td>Programmatic creation works; editing existing not modeled</td></tr>
@@ -138,12 +139,12 @@
 <tr><td>Images</td><td>inline images with rotation</td><td>✅</td></tr>
 <tr><td>Images</td><td>floating (anchored) images</td><td>&#128309;</td><td><code>&lt;wp:anchor&gt;</code> elements preserved via raw XML capture/re-emission</td></tr>
 <tr><td>Images</td><td>text boxes (w:txbxContent)</td><td>✅</td><td>Text extraction from inline and anchored drawing textboxes is supported</td></tr>
-<tr><td>Annotations</td><td>comments</td><td>&#128309;</td><td>Existing parts round-trip via <code>_preservedEntries</code></td></tr>
+<tr><td>Annotations</td><td>comments</td><td>✅</td><td>Existing comments round-trip via preservation; minimal <code>XWPFComment</code> lookup/text APIs, comment metadata/text editing, and paragraph range comment creation are modeled</td></tr>
 <tr><td>Annotations</td><td>footnotes, endnotes</td><td>&#128309;</td><td><code>word/footnotes.xml</code> / <code>word/endnotes.xml</code> round-trip preserved</td></tr>
 <tr><td>Fields</td><td>TOC, page numbers, mail merge</td><td>✅</td><td>Write/read/round-trip</td></tr>
 <tr><td>SDT</td><td>content controls (block-level and inline)</td><td>&#128309;</td><td>Block-level <code>w:sdt</code> in <code>w:body</code> and inline <code>w:sdt</code> inside <code>w:p</code> preserved via raw XML capture/re-emission.</td></tr>
 <tr><td>Styles</td><td>paragraph style reference (pStyle)</td><td>✅</td><td><code>setStyle()</code>/<code>getStyleID()</code> API, round-trip verified. <code>word/styles.xml</code> &#128309; preserved + default styles auto-generated. Character/table styles ❌</td></tr>
-<tr><td>Track Changes</td><td>revision marks</td><td>❌</td></tr>
+<tr><td>Track Changes</td><td>revision marks</td><td>&#128309;</td><td>Tracked-change XML (<code>w:ins</code>, <code>w:del</code>, moves, etc.) is preserved in body/paragraph child order during round-trip; accept/reject/create/edit APIs are not modeled</td></tr>
 <tr><td>Other</td><td>OLE embeddings</td><td>&#128309;</td><td><code>word/embeddings/*</code> round-trip via <code>_preservedEntries</code></td></tr>
 <tr><td>Other</td><td>docm macro preservation</td><td>✅</td><td>VBA bytes preserved</td></tr>
 <tr><td>Other</td><td>unknown part preservation</td><td>✅</td><td><code>_preservedEntries</code> mechanism preserves non-model ZIP entries</td></tr>
@@ -198,12 +199,18 @@
 <tr><td>Not modeled</td><td>images/footnotes/comments/fields API</td><td>❌</td><td>Existing streams may be preserved, but these are not usermodel creation/edit features</td></tr>
 </tbody>
 </table>
-<h2>ppt / HSLF (~5%)</h2>
+<h2>ppt / HSLF (~12%)</h2>
 <table>
-<thead><tr><th>Format</th><th>Status</th><th>Notes</th></tr></thead>
+<thead><tr><th>Category</th><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>ppt (HSLF)</td><td>~5%</td><td>Minimal reader can open OLE2 <code>.ppt</code> and scan <code>PowerPoint Document</code> for TextChars/TextBytes atoms. No no-op write or interop coverage yet.</td></tr>
-<p>SLF) | ~5% | Minimal reader can open OLE2 <code>.ppt</code> and scan <code>PowerPoint Document</code> for TextChars/TextBytes atoms. No no-op write or interop coverage yet. |</p>
+<tr><td>Reading</td><td>OLE2 <code>.ppt</code> open and stream inventory</td><td>✅</td><td>Detects <code>PowerPoint Document</code>, <code>Current User</code>, and summary streams</td></tr>
+<tr><td>Records</td><td>record tree scan with raw bytes</td><td>✅</td><td>Container/atom hierarchy is retained for preservation</td></tr>
+<tr><td>Slides</td><td>slide count and order</td><td>✅</td><td>Persist-pointer based order covered by representative fixtures</td></tr>
+<tr><td>Text</td><td>TextChars/TextBytes extraction</td><td>✅</td><td>UTF-16LE and CP1252 text atoms supported</td></tr>
+<tr><td>Editing</td><td>no-op write / round-trip</td><td>✅</td><td>OLE2 compound file is preserved through write</td></tr>
+<tr><td>Preservation</td><td>OLE streams/storages, images, comments, OLE</td><td>✅</td><td>Representative preservation fixtures covered</td></tr>
+<tr><td>Interop</td><td>Java POI direction B</td><td>⚠️</td><td>C# fixture generation exists; Java-side assertion still pending</td></tr>
+<tr><td>Not modeled</td><td>slide creation, shape editing, images, animations</td><td>❌</td><td>New presentation authoring is not implemented for HSLF</td></tr>
 </tbody>
 </table>
 

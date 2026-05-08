@@ -804,6 +804,216 @@ public class XWPFDocumentTests
     }
 
     [Fact]
+    public void RoundTrip_PoiDocxCommentMarkersAndParts_Preserved()
+    {
+        using var input = new MemoryStream(File.ReadAllBytes(GetPoiTestDataPath("document/testComment.docx")));
+        using var doc = new XWPFDocument(input);
+
+        using var outStream = new MemoryStream();
+        doc.write(outStream);
+        outStream.Position = 0;
+
+        using var archive = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var xml = ReadEntry(archive, "word/document.xml");
+        AssertOrder(xml, "this is a ", "<w:commentRangeStart", "comment ", "<w:commentRangeEnd", "<w:commentReference", "paragraph!");
+
+        Assert.NotNull(archive.GetEntry("word/comments.xml"));
+        Assert.NotNull(archive.GetEntry("word/commentsExtended.xml"));
+        Assert.NotNull(archive.GetEntry("word/commentsIds.xml"));
+        Assert.NotNull(archive.GetEntry("word/commentsExtensible.xml"));
+
+        var rels = ReadEntry(archive, "word/_rels/document.xml.rels");
+        Assert.Contains("relationships/comments", rels);
+        Assert.Contains("comments.xml", rels);
+        Assert.Contains("commentsExtended.xml", rels);
+        Assert.Contains("commentsIds.xml", rels);
+        Assert.Contains("commentsExtensible.xml", rels);
+
+        var contentTypes = ReadEntry(archive, "[Content_Types].xml");
+        Assert.Contains("/word/comments.xml", contentTypes);
+        Assert.Contains("wordprocessingml.comments+xml", contentTypes);
+        Assert.Contains("commentsExtended+xml", contentTypes);
+        Assert.Contains("commentsIds+xml", contentTypes);
+        Assert.Contains("commentsExtensible+xml", contentTypes);
+    }
+
+    [Fact]
+    public void RoundTrip_CollapsedDocxCommentReferenceInsideRun_Preserved()
+    {
+        using var input = new MemoryStream(File.ReadAllBytes(GetPoiTestDataPath("document/comment.docx")));
+        using var doc = new XWPFDocument(input);
+
+        using var outStream = new MemoryStream();
+        doc.write(outStream);
+        outStream.Position = 0;
+
+        using var archive = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var xml = ReadEntry(archive, "word/document.xml");
+
+        Assert.Contains("<w:commentReference", xml);
+        Assert.Contains("w:id=\"0\"", xml);
+        Assert.NotNull(archive.GetEntry("word/comments.xml"));
+    }
+
+    [Fact]
+    public void RoundTrip_DocxCommentMarkers_PreservedInTableCellParagraphOrder()
+    {
+        using var stream = CreateDocxWithDocumentXml("""
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body>
+                <w:tbl>
+                  <w:tr>
+                    <w:tc>
+                      <w:p>
+                        <w:r><w:t>Cell before </w:t></w:r>
+                        <w:commentRangeStart w:id="7"/>
+                        <w:r><w:t>commented cell </w:t></w:r>
+                        <w:commentRangeEnd w:id="7"/>
+                        <w:r><w:commentReference w:id="7"/></w:r>
+                        <w:r><w:t>Cell after</w:t></w:r>
+                      </w:p>
+                    </w:tc>
+                  </w:tr>
+                </w:tbl>
+              </w:body>
+            </w:document>
+            """);
+
+        using var doc = new XWPFDocument(stream);
+        using var outStream = new MemoryStream();
+        doc.write(outStream);
+        outStream.Position = 0;
+
+        using var archive = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var xml = ReadEntry(archive, "word/document.xml");
+        AssertOrder(xml, "Cell before ", "<w:commentRangeStart", "commented cell ", "<w:commentRangeEnd", "<w:commentReference", "Cell after");
+    }
+
+    [Fact]
+    public void RoundTrip_DocxCommentMarkers_PreservedNearHyperlinkAndTrackedChanges()
+    {
+        using var stream = CreateDocxWithDocumentXml("""
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <w:body>
+                <w:p>
+                  <w:r><w:t>Before </w:t></w:r>
+                  <w:commentRangeStart w:id="8"/>
+                  <w:hyperlink r:id="rLink"><w:r><w:t>link text</w:t></w:r></w:hyperlink>
+                  <w:commentRangeEnd w:id="8"/>
+                  <w:r><w:commentReference w:id="8"/></w:r>
+                  <w:ins w:id="9" w:author="Reviewer"><w:r><w:t> inserted</w:t></w:r></w:ins>
+                  <w:r><w:t> After</w:t></w:r>
+                </w:p>
+              </w:body>
+            </w:document>
+            """);
+
+        using var doc = new XWPFDocument(stream);
+        using var outStream = new MemoryStream();
+        doc.write(outStream);
+        outStream.Position = 0;
+
+        using var archive = new ZipArchive(outStream, ZipArchiveMode.Read);
+        var xml = ReadEntry(archive, "word/document.xml");
+        AssertOrder(xml, "Before ", "<w:commentRangeStart", "link text", "<w:commentRangeEnd", "<w:commentReference", "<w:ins", " After");
+        Assert.Contains("w:author=\"Reviewer\"", xml);
+    }
+
+    [Fact]
+    public void Read_PoiDocxComments_ReturnsMinimalCommentModel()
+    {
+        using var input = new MemoryStream(File.ReadAllBytes(GetPoiTestDataPath("document/comment.docx")));
+        using var doc = new XWPFDocument(input);
+
+        var comment = Assert.Single(doc.getComments());
+        Assert.Same(comment, doc.getCommentByID("0"));
+        Assert.Equal("0", comment.getId());
+        Assert.Equal("Unbekannter Autor", comment.getAuthor());
+        Assert.Equal("", comment.getInitials());
+        Assert.Equal("2019-10-11T05:43:39Z", comment.getDate());
+        Assert.Equal("This is the first line\n\nThis is the second line", comment.getText());
+        Assert.Null(doc.getCommentByID("missing"));
+    }
+
+    [Fact]
+    public void Read_PoiDocxCommentMarkers_ReturnsParagraphAndRunReferenceIds()
+    {
+        using var input = new MemoryStream(File.ReadAllBytes(GetPoiTestDataPath("document/testComment.docx")));
+        using var doc = new XWPFDocument(input);
+
+        var paragraph = doc.getParagraphs().First(p => p.getText().Contains("comment ", StringComparison.Ordinal));
+
+        Assert.Contains("0", paragraph.getCommentRangeStartIds());
+        Assert.Contains("0", paragraph.getCommentRangeEndIds());
+        Assert.Contains("0", paragraph.getCommentReferenceIds());
+        Assert.Contains(paragraph.getRuns(), run => run.getCommentReferenceIds().Contains("0"));
+    }
+
+    [Fact]
+    public void Write_DocxCommentApi_CreatesCommentsPartRelationshipAndRangeMarkers()
+    {
+        using var doc = new XWPFDocument();
+        var paragraph = doc.createParagraph();
+        paragraph.createRun().setText("Commented text");
+        var comment = doc.createComment("Reviewer", "Created from dotnet-poi", "RV", "2026-05-08T08:30:00Z");
+        paragraph.addComment(comment);
+
+        using var stream = new MemoryStream();
+        doc.write(stream);
+        stream.Position = 0;
+
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true))
+        {
+            var documentXml = ReadEntry(archive, "word/document.xml");
+            AssertOrder(documentXml, "<w:commentRangeStart w:id=\"0\"/>", "Commented text", "<w:commentRangeEnd w:id=\"0\"/>", "<w:commentReference w:id=\"0\"/>");
+
+            var commentsXml = ReadEntry(archive, "word/comments.xml");
+            Assert.Contains("<w:comment w:id=\"0\" w:author=\"Reviewer\" w:initials=\"RV\" w:date=\"2026-05-08T08:30:00Z\">", commentsXml);
+            Assert.Contains("Created from dotnet-poi", commentsXml);
+
+            var rels = ReadEntry(archive, "word/_rels/document.xml.rels");
+            Assert.Contains("relationships/comments", rels);
+            Assert.Contains("comments.xml", rels);
+
+            var contentTypes = ReadEntry(archive, "[Content_Types].xml");
+            Assert.Contains("/word/comments.xml", contentTypes);
+            Assert.Contains("wordprocessingml.comments+xml", contentTypes);
+        }
+
+        stream.Position = 0;
+        using var loaded = new XWPFDocument(stream);
+        var loadedComment = Assert.Single(loaded.getComments());
+        Assert.Equal("Reviewer", loadedComment.getAuthor());
+        Assert.Equal("Created from dotnet-poi", loadedComment.getText());
+        var loadedParagraph = Assert.Single(loaded.getParagraphs());
+        Assert.Contains("0", loadedParagraph.getCommentRangeStartIds());
+        Assert.Contains("0", loadedParagraph.getCommentRangeEndIds());
+        Assert.Contains("0", loadedParagraph.getCommentReferenceIds());
+    }
+
+    [Fact]
+    public void Write_DocxCommentApi_EditsExistingCommentsPart()
+    {
+        using var input = new MemoryStream(File.ReadAllBytes(GetPoiTestDataPath("document/comment.docx")));
+        using var doc = new XWPFDocument(input);
+
+        var comment = Assert.Single(doc.getComments());
+        comment.setAuthor("Edited Author");
+        comment.setText("Edited comment text");
+
+        using var stream = new MemoryStream();
+        doc.write(stream);
+        stream.Position = 0;
+
+        using var loaded = new XWPFDocument(stream);
+        var loadedComment = Assert.Single(loaded.getComments());
+        Assert.Equal("0", loadedComment.getId());
+        Assert.Equal("Edited Author", loadedComment.getAuthor());
+        Assert.Equal("Edited comment text", loadedComment.getText());
+    }
+
+    [Fact]
     public void Write_ParagraphsAndTables_KeepCreationOrder()
     {
         using var doc = new XWPFDocument();
@@ -1185,6 +1395,32 @@ public class XWPFDocumentTests
         Assert.NotNull(entry);
         using var reader = new StreamReader(entry.Open());
         return reader.ReadToEnd();
+    }
+
+    private static void AssertOrder(string xml, params string[] fragments)
+    {
+        var previous = -1;
+        foreach (var fragment in fragments)
+        {
+            var index = xml.IndexOf(fragment, StringComparison.Ordinal);
+            Assert.True(index >= 0, $"Expected to find '{fragment}' in XML.");
+            Assert.True(index > previous, $"Expected '{fragment}' to appear after the previous fragment.");
+            previous = index;
+        }
+    }
+
+    private static string GetPoiTestDataPath(string relativePath)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(directory.FullName, "poi/test-data", relativePath);
+            if (File.Exists(candidate))
+                return candidate;
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException($"Could not locate POI test data file '{relativePath}'.");
     }
 
     private static MemoryStream CreateDocxWithDocumentXml(string documentXml)

@@ -26,7 +26,6 @@ public sealed class XSSFCell : ICell
 
     private XSSFCellStyle? _cellStyle;
     private XSSFHyperlink? _hyperlink;
-    private XSSFComment? _comment;
 
     // Rich text (per-character formatting). Null when cell contains plain text.
     private XSSFRichTextString? _richTextStringValue;
@@ -377,12 +376,11 @@ public sealed class XSSFCell : ICell
 
     public XSSFComment? getCellComment()
     {
-        return _comment ?? getSheet().getCellComment(getRowIndex(), getColumnIndex());
+        return getSheet().getCellComment(getRowIndex(), getColumnIndex());
     }
 
     public void setCellComment(XSSFComment? comment)
     {
-        _comment = comment;
         getSheet().SetCellComment(this, comment);
     }
 
@@ -393,7 +391,7 @@ public sealed class XSSFCell : ICell
 
     internal void SetCellCommentFromXml(XSSFComment comment)
     {
-        _comment = comment;
+        getSheet().RegisterComment(comment);
     }
 
     ICellStyle ICell.getCellStyle() => getCellStyle();

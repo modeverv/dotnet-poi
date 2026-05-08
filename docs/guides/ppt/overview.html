@@ -98,10 +98,10 @@
     </aside>
     <main class="content">
 <h1>ppt (HSLF) Overview</h1>
-<p>HSLF is the legacy PowerPoint 97-2003 <code>.ppt</code> implementation. Coverage is ~5%.</p>
+<p>HSLF is the legacy PowerPoint 97-2003 <code>.ppt</code> implementation. Coverage is ~12%.</p>
 <h2>Status</h2>
-<p>HSLF is currently a minimal reader. It can open OLE2 <code>.ppt</code> files, read the <code>PowerPoint Document</code> stream, and extract early text content from <code>TextCharsAtom</code> and <code>TextBytesAtom</code> records. This can be useful for very basic text discovery experiments, but it is not yet ready for reliable migration, preservation, or editing workflows.</p>
-<p>The next planned work is to add fixture coverage, OLE2 stream inventory, record tree preservation, no-op write round-trip, and Java POI interop.</p>
+<p>HSLF is currently a preservation-first reader. It can open OLE2 <code>.ppt</code> files, inventory streams, read the <code>PowerPoint Document</code> record tree, recover slide order, extract text from <code>TextCharsAtom</code> and <code>TextBytesAtom</code> records, and no-op write the compound file back out. This is useful for archive discovery and cautious round-trip preservation, but it is not a slide authoring or shape editing engine.</p>
+<p>The next planned work is to deepen Java POI interop assertions and add a usermodel only where preservation is already stable.</p>
 <h2>Basic Text Probe</h2>
 <pre><code class="language-csharp">using DotnetPoi.HSLF.UserModel;
 
@@ -116,16 +116,16 @@ foreach (var slide in ppt.getSlides())
 <h2>Supported Today</h2>
 <ul>
 <li>OLE2 <code>.ppt</code> open</li>
-<li><code>PowerPoint Document</code> stream scan</li>
-<li>Minimal slide container detection</li>
+<li>OLE2 stream inventory</li>
+<li><code>PowerPoint Document</code> record tree scan with raw record preservation</li>
+<li>Slide count and slide order reconstruction</li>
 <li>Text extraction from <code>TextCharsAtom</code> and <code>TextBytesAtom</code></li>
+<li>No-op write / round-trip preservation</li>
 </ul>
 <h2>Limitations</h2>
 <ul>
-<li>No no-op write preservation yet</li>
-<li>No Java POI interop track yet</li>
-<li>Slide order is not yet rebuilt from <code>Current User</code> / <code>UserEditAtom</code> / persist pointers</li>
-<li>No shapes, images, comments, notes, animations, transitions, OLE, or master/layout model</li>
+<li>Java POI direction-B assertion is still pending</li>
+<li>No shapes, images, comments, notes, animations, transitions, or master/layout editing model</li>
 <li>No public editing API</li>
 </ul>
 <p>For new presentations, prefer <code>pptx</code> / XSLF.</p>

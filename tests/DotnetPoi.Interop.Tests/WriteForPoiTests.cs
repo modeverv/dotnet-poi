@@ -950,6 +950,69 @@ public class WriteForPoiTests
     [Fact]
     [Trait("Category", "WriteForPoi")]
     [Trait("Format", "OOXML")]
+    public void Write_XlsxCommentsWorkbook_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase18-xssf-comments.xlsx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var wb = new XSSFWorkbook();
+        var first = wb.createSheet("Comments A");
+        var second = wb.createSheet("Comments B");
+
+        var a1 = first.createRow(0).createCell(0);
+        a1.setCellValue("visible");
+        var visible = first.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 0, 0, 2, 4));
+        visible.setAuthor("DotnetPoi");
+        visible.setString("Visible from dotnet-poi");
+        visible.setVisible(true);
+        a1.setCellComment(visible);
+
+        var c3 = first.createRow(2).createCell(2);
+        c3.setCellValue("moved");
+        var moved = first.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 1, 1, 3, 5));
+        moved.setAuthor("DotnetPoi");
+        moved.setString("Moved to C3");
+        moved.setAddress(2, 2);
+        c3.setCellComment(moved);
+
+        var b2 = second.createRow(1).createCell(1);
+        b2.setCellValue("second sheet");
+        var other = second.createDrawingPatriarch().createCellComment(new XSSFClientAnchor(0, 0, 0, 0, 1, 1, 3, 5));
+        other.setAuthor("Interop");
+        other.setString("Second sheet comment");
+        b2.setCellComment(other);
+
+        using var stream = File.Create(fixturePath);
+        wb.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
+    public void Write_DocxCommentsDocument_CreatesFixtureForPoi()
+    {
+        var fixturePath = GetFixturePath("phase18-xwpf-comments.docx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+
+        using var doc = new XWPFDocument();
+        var paragraph = doc.createParagraph();
+        paragraph.createRun().setText("DotnetPoi commented text");
+        var comment = doc.createComment("DotnetPoi", "Docx comment from dotnet-poi", "DP", "2026-05-08T08:30:00Z");
+        paragraph.addComment(comment);
+
+        using var stream = File.Create(fixturePath);
+        doc.write(stream);
+
+        Assert.True(File.Exists(fixturePath));
+        Assert.True(new FileInfo(fixturePath).Length > 0);
+    }
+
+    [Fact]
+    [Trait("Category", "WriteForPoi")]
+    [Trait("Format", "OOXML")]
     public void Write_DocxWithFields_CreatesFixtureForPoi()
     {
         var fixturePath = GetFixturePath("phase-docx-fields.docx");
