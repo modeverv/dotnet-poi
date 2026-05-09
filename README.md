@@ -60,7 +60,7 @@ The legacy `DotnetPoi.Core` facade package has been **removed**. Replace any exi
 <PackageReference Include="DotnetPoi.Core" Version="0.5.0" />
 
 <!-- After -->
-<PackageReference Include="DotnetPoi.All" Version="1.0.0" />
+<PackageReference Include="DotnetPoi.All" Version="1.0.1" />
 ```
 
 ### Design Principle
@@ -95,7 +95,7 @@ All format packages have **zero knowledge of `Formula`**. Adding `DotnetPoi.Form
 
 ## Status
 
-Current status: **1.0 for covered OOXML workflows** — packages are available on [NuGet.org](https://www.nuget.org/).
+Current status: **1.0.x for covered OOXML workflows** — packages are available on [NuGet.org](https://www.nuget.org/).
 
 Version 1.0 means the documented OOXML workflows are treated as stable. It does **not** mean full Apache POI parity or complete Office feature coverage.
 
@@ -268,7 +268,9 @@ This project employs a multi-layered testing strategy to ensure maximum fidelity
 
 ## Quick Start
 
-Published to **[NuGet.org](https://www.nuget.org/packages/DotnetPoi.All)** — `dotnet add package DotnetPoi.All --version 1.0.0`.
+Published to **[NuGet.org](https://www.nuget.org/packages/DotnetPoi.All)** — `dotnet add package DotnetPoi.All`.
+
+or
 
 ```bash
 git clone --recurse-submodules https://github.com/modeverv/dotnet-poi
