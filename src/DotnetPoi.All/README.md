@@ -13,8 +13,6 @@ For most users, this is the recommended package.
 
 ## Install
 
-Simple presentation creation and editing is usable: create/read slides, text boxes, formatted runs, pictures, rotation, tables, and slide size are covered, with Java POI interop tests for basic generated presentations. More advanced PowerPoint features such as charts, SmartArt, notes, media, layouts, masters, themes, animations, and grouped shapes are mostly preserved during round-trip rather than exposed as editable object models.
-
 ```shell
 dotnet add package DotnetPoi.All
 ```
@@ -136,11 +134,6 @@ dotnet-poi aims to solve both problems by porting Apache POI — a battle-tested
 | Interop | Java POI bidirectional fixtures | ⚠️ | basic/styles/layout/unicode/comprehensive fixture coverage. |
 | Preservation | non-Workbook OLE streams, VBA streams, unknown BIFF records | ✅ | Light edits preserve unmodeled streams/records where possible. |
 | Not modeled | images/shapes/charts/comments/hyperlink editing/filters/pivots | ❌ | Some are load/preservation fixtures, but not public usermodel creation/edit APIs. |
-| Use this if you… | Otherwise consider… |
-|---|---|
-| Want everything with one dependency | `DotnetPoi.Ooxml` for OOXML-only projects |
-| Don't want to think about granular package selection | `DotnetPoi.Legacy` for legacy-only projects |
-| Need all formats + formula evaluation | `DotnetPoi.Ooxml` + `DotnetPoi.Formula` for minimal footprint |
 
 #### doc / HWPF (~25%)
 
@@ -205,4 +198,3 @@ This project employs a multi-layered testing strategy to ensure maximum fidelity
 
 This project is not affiliated with the Apache Software Foundation or the Apache POI project.
 Apache POI is a registered trademark of the Apache Software Foundation.
-
