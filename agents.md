@@ -25,27 +25,24 @@ Apache POI source lives in `poi/` as a git submodule. **Always refer to the orig
 dotnet-poi/
 ├── poi/                        # Apache POI submodule (read-only, do not edit)
 ├── src/
-│   ├── DotnetPoi.Legacy/         # ★ NuGet: DotnetPoi.Legacy (HSSF, HWPF, HSLF)
-│   │   ├── SS/                 #   Common interfaces, enums, XML writer
-│   │   ├── POIFS/              #   OLE2 compound document container
-│   │   ├── XSSF/               #   xlsx (Excel 2007+)
-│   │   ├── HSSF/               #   xls (Excel 97-2003 / BIFF)
-│   │   ├── XWPF/               #   docx (Word 2007+)
-│   │   ├── HWPF/               #   doc (Word 97-2003)
-│   │   ├── XSLF/               #   pptx (PowerPoint 2007+)
-│   │   └── HSLF/               #   ppt (PowerPoint 97-2003)
-│   └── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (evaluator only)
+│   ├── DotnetPoi.Common/       # Common interfaces (ISheet, IRow), enums, exceptions
+│   ├── DotnetPoi.POIFS/        # OLE2/CFB container format implementation
+│   ├── DotnetPoi.Ooxml/        # ★ NuGet: DotnetPoi.Ooxml (XSSF, XWPF, XSLF for .xlsx/.docx/.pptx)
+│   ├── DotnetPoi.Legacy/       # ★ NuGet: DotnetPoi.Legacy (HSSF, HWPF, HSLF for .xls/.doc/.ppt)
+│   ├── DotnetPoi.Formula/      # ★ NuGet: DotnetPoi.Formula (formula evaluator)
+│   └── DotnetPoi.All/          # ★ NuGet: DotnetPoi.All (meta-package for all formats)
 ├── tests/
-│   ├── DotnetPoi.Legacy.Tests/      # Legacy tests (HSSF/HWPF/HSLF)
-│   ├── DotnetPoi.Formula.Tests/    # Formula evaluator tests (10)
-│   ├── DotnetPoi.Interop.Tests/   # Bidirectional compatibility tests
-│   │   ├── java/                #   Maven project (Apache POI dependency)
-│   │   ├── fixtures/            #   Files exchanged between Java and C#
-│   │   └── *.cs                 #   C# side of interop tests
-│   └── test-files/              # Shared test data files
-├── tools/
-│   └── porter/                 # Porting progress tracker
-├── agents.md                   # This file — LLM instructions
+│   ├── DotnetPoi.Common.Tests/ # Tests for Common
+│   ├── DotnetPoi.POIFS.Tests/  # Tests for POIFS
+│   ├── DotnetPoi.Ooxml.Tests/  # Tests for OOXML formats
+│   ├── DotnetPoi.Legacy.Tests/ # Tests for Legacy formats
+│   ├── DotnetPoi.Formula.Tests/ # Tests for Formula evaluator
+│   ├── DotnetPoi.Interop.Tests/ # Java POI compatibility tests
+│   └── test-files/             # Shared test data files
+├── examples/                   # Usage examples for each format
+├── docs/                       # Generated documentation website
+├── tools/                      # Development and release tools
+├── agents.md                   # This file — LLM agent instructions
 └── README.md
 ```
 
