@@ -22,7 +22,7 @@ dotnet-poi uses a **multi-package architecture** with clear separation of concer
 For most users, **`DotnetPoi.All`** is the simplest choice — it includes the stable OOXML package plus the current Legacy and Formula packages with a single dependency:
 
 ```xml
-<PackageReference Include="DotnetPoi.All" Version="1.0.0" />
+<PackageReference Include="DotnetPoi.All" Version="1.0.1" />
 ```
 
 ### Dependency Picker
